@@ -11,7 +11,7 @@ and Korean user documentation belong to this repository.
   unrelated changes and user attendance data.
 - When used inside Hive, `develop/` is the baseline directory on `main`.
   New manually managed feature checkouts use direct sibling `<task>/` directories
-  and `codex/` branches; preserve existing checkout and branch names. Compare
+  and `cy-agent/` branches; preserve existing checkout and branch names. Compare
   their common Git directory before reuse.
 - Use the smallest useful workflow. Material behavior changes require an
   independent review after relevant checks; simple docs need no extra agents.
@@ -55,3 +55,18 @@ and login-after-reboot behavior are separate evidence. Record their limits.
   clean, inactive task branches within explicit cleanup authorization.
 - Report executed checks, review findings, commit/merge evidence, and remaining
   blockers. Completion requires verified results. Deployment needs its own request.
+
+## Shared reliability entrypoint
+
+Before work, read the latest request, this guide and applicable nested guides,
+then read the current [Space start guide](https://chatgpt.com/space/page_fc9829154fa08191afb97a2aacfe93c4)
+and [workspace home](https://chatgpt.com/space/page_6abd33d7db1c819189336911027de558).
+Checked: v8, 2026-10-18. Apply its reliability procedure before edits and completion;
+keep the common procedure in Space. Standalone checkouts must not assume that
+workspace-root instructions load automatically. Nested guides specialize this
+contract; they do not replace shared policy or expand the authorized scope.
+If a Page is unavailable, record the missing context in the task TODO, continue
+independent authorized local work, and leave evidence-dependent actions pending.
+
+Use the existing [Checks](#checks) for the smallest relevant local validation.
+The [macOS workflow](.github/workflows/macos.yml) owns CI commands and prerequisites.
