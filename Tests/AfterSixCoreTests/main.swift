@@ -95,6 +95,29 @@ expectEqual(CountdownDisplay.hours.text(seconds: 3600, korean: false), "1 hr")
 expectEqual(CountdownDisplay.minutes.text(seconds: 60, korean: false), "1 min")
 print("PASS countdown formats: five units, two languages, fractional/boundary/expired durations")
 
+let elapsedSamples: [(CountdownDisplay, String, String)] = [
+    (.milliseconds, "3661250밀리초", "3661250 ms"),
+    (.seconds, "3661초", "3661 sec"),
+    (.minutes, "61분", "61 min"),
+    (.hours, "1시간", "1 hr"),
+    (.hoursMinutes, "1시간 1분", "1 hr 1 min")
+]
+for (choice, korean, english) in elapsedSamples {
+    expectEqual(choice.elapsedText(seconds: 3661.25, korean: true), korean)
+    expectEqual(choice.elapsedText(seconds: 3661.25, korean: false), english)
+    for value in [-1.0, 0, Double.infinity, -.infinity, .nan] {
+        expectTrue(choice.elapsedText(seconds: value, korean: false).hasPrefix("0"))
+    }
+}
+expectEqual(CountdownDisplay.seconds.elapsedText(seconds: 0.999, korean: false), "0 sec")
+expectEqual(CountdownDisplay.minutes.elapsedText(seconds: 59.999, korean: false), "0 min")
+expectEqual(CountdownDisplay.hours.elapsedText(seconds: 359.999, korean: false), "0 hr")
+expectEqual(CountdownDisplay.hours.elapsedText(seconds: 360, korean: false), "0.1 hr")
+expectEqual(CountdownDisplay.hoursMinutes.elapsedText(seconds: 3599.999, korean: false), "59 min")
+expectEqual(CountdownDisplay.hoursMinutes.elapsedText(seconds: 3600, korean: false), "1 hr")
+expectEqual(CountdownDisplay.milliseconds.elapsedText(seconds: 0.0005, korean: false), "0 ms")
+print("PASS elapsed formats: completed units, five formats, two languages, fractional/hour boundaries and nonfinite durations")
+
 
 let decimalHourSamples: [(TimeInterval, String)] = [
     (5400, "1.5"), (1800, "0.5"), (0, "0"), (-1, "0"),

@@ -1,5 +1,6 @@
 import AppKit
 import AfterSixCore
+import AppPluginHost
 
 @MainActor
 enum LuluBrand {
@@ -36,6 +37,100 @@ enum LuluBrand {
 
     static func menuBarIcon(for state: LuluDisplayState = .waiting, vacationEve: Bool = false) -> NSImage {
         vacationEve ? vacationMenuImages[state]! : menuImages[state]!
+    }
+
+    private struct OrbitCacheKey: Equatable {
+        let state: LuluDisplayState
+        let vacationEve: Bool
+        let white: Bool
+        let palette: PluginOrbitPalette
+    }
+    private struct OrbitRimSample {
+        let position: Double
+        let strength: Double
+    }
+    static let orbitFrameCount = 48
+    private static var orbitCacheKey: OrbitCacheKey?
+    private static var orbitImages: [Int: NSImage] = [:]
+    private static let orbitRim: [Int: [OrbitRimSample?]] = Dictionary(uniqueKeysWithValues: [1, 2].map { scale in
+        let path = eyeOutline()
+        path.flatness = 0.15
+        let flat = path.flattened
+        var points: [NSPoint] = []
+        for index in 0..<flat.elementCount {
+            var point = NSPoint.zero
+            let element = flat.element(at: index, associatedPoints: &point)
+            if element == .moveTo || element == .lineTo { points.append(point) }
+        }
+        let segments = zip(points, points.dropFirst()).map { start, end in
+            (start, end, hypot(end.x - start.x, end.y - start.y))
+        }
+        let length = segments.reduce(CGFloat.zero) { $0 + $1.2 }
+        let samples: [OrbitRimSample?] = (0..<(26 * 18 * scale * scale)).map { pixel in
+            let x = (CGFloat(pixel % (26 * scale)) + 0.5) / CGFloat(scale) * 144 / 26
+            let y = (CGFloat(pixel / (26 * scale)) + 0.5) / CGFloat(scale) * 100 / 18
+            var distance = CGFloat.infinity, position: CGFloat = 0, offset: CGFloat = 0
+            for (start, end, segmentLength) in segments {
+                let dx = end.x - start.x, dy = end.y - start.y
+                let t = min(1, max(0, ((x - start.x) * dx + (y - start.y) * dy) / (segmentLength * segmentLength)))
+                let nextDistance = hypot(x - start.x - t * dx, y - start.y - t * dy)
+                if nextDistance < distance { distance = nextDistance; position = (offset + t * segmentLength) / length }
+                offset += segmentLength
+            }
+            guard distance < 4.5 else { return nil }
+            return OrbitRimSample(position: Double(position), strength: Double(min(1, (4.5 - distance) / 1.8)))
+        }
+        return (scale, samples)
+    })
+
+    /// Preserve the exact template alpha; only a thin band on the existing eye rim changes color.
+    static func menuBarIcon(for state: LuluDisplayState, vacationEve: Bool, orbitPhase: Double,
+                            appearance: NSAppearance, highlighted: Bool, palette: PluginOrbitPalette = .standard) -> NSImage {
+        let white = highlighted || appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let key = OrbitCacheKey(state: state, vacationEve: vacationEve, white: white, palette: palette)
+        if orbitCacheKey != key { orbitImages.removeAll(keepingCapacity: true); orbitCacheKey = key }
+        let normalized = orbitPhase.isFinite ? orbitPhase - floor(orbitPhase) : 0
+        let frame = Int((normalized * Double(orbitFrameCount)).rounded(.down)) % orbitFrameCount
+        if let image = orbitImages[frame] { return image }
+        let start = [16, 8, 0].map { Double((palette.startRGB >> $0) & 0xFF) }
+        let end = [16, 8, 0].map { Double((palette.endRGB >> $0) & 0xFF) }
+        let original = menuBarIcon(for: state, vacationEve: vacationEve)
+        let image = NSImage(size: original.size)
+        for scale in [1, 2] {
+            let source = original.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == 26 * scale }!
+            guard let sourceBytes = source.bitmapData,
+                  let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: source.pixelsWide, pixelsHigh: source.pixelsHigh,
+                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                    colorSpaceName: .deviceRGB, bytesPerRow: source.bytesPerRow, bitsPerPixel: 0),
+                  let bytes = rep.bitmapData else { continue }
+            rep.size = original.size
+            bytes.update(from: sourceBytes, count: source.bytesPerRow * source.pixelsHigh)
+            for y in 0..<rep.pixelsHigh {
+                for x in 0..<rep.pixelsWide {
+                    let offset = y * rep.bytesPerRow + x * 4
+                    let foreground = white ? 255.0 : 0.0
+                    var opacity = 0.0, trail = 0.0
+                    if sourceBytes[offset + 3] > 0, !(vacationEve && y < 5 * scale),
+                       let rim = orbitRim[scale]![y * rep.pixelsWide + x] {
+                        let delta = (Double(frame) / Double(orbitFrameCount) - rim.position + 1).truncatingRemainder(dividingBy: 1)
+                        if delta < 0.24 {
+                            trail = delta / 0.24
+                            opacity = pow(1 - trail, 0.8) * rim.strength
+                        }
+                    }
+                    for channel in 0..<3 {
+                        let light = start[channel] * (1 - trail) + end[channel] * trail
+                        let color = foreground * (1 - opacity) + light * opacity
+                        bytes[offset + channel] = UInt8((color * Double(sourceBytes[offset + 3]) / 255).rounded())
+                    }
+                }
+            }
+            image.addRepresentation(rep)
+        }
+        image.isTemplate = false
+        image.accessibilityDescription = "happylulu"
+        orbitImages[frame] = image
+        return image
     }
     static func headerIcon(for state: LuluDisplayState, vacationEve: Bool = false) -> NSImage {
         if vacationEve, let image = vacationHeaderImages[state] { return image }
@@ -183,17 +278,7 @@ enum LuluBrand {
         NSColor.black.setStroke()
 
         // The two broad lobes join above the beak and taper inward below the eyes.
-        let outline = NSBezierPath()
-        outline.move(to: NSPoint(x: 45, y: 84))
-        outline.curve(to: NSPoint(x: 10, y: 50), controlPoint1: NSPoint(x: 21, y: 87), controlPoint2: NSPoint(x: 9, y: 72))
-        outline.curve(to: NSPoint(x: 39, y: 13), controlPoint1: NSPoint(x: 10, y: 28), controlPoint2: NSPoint(x: 20, y: 13))
-        outline.curve(to: NSPoint(x: 72, y: 31), controlPoint1: NSPoint(x: 52, y: 12), controlPoint2: NSPoint(x: 63, y: 22))
-        outline.curve(to: NSPoint(x: 105, y: 13), controlPoint1: NSPoint(x: 81, y: 22), controlPoint2: NSPoint(x: 92, y: 12))
-        outline.curve(to: NSPoint(x: 134, y: 50), controlPoint1: NSPoint(x: 124, y: 13), controlPoint2: NSPoint(x: 134, y: 28))
-        outline.curve(to: NSPoint(x: 99, y: 84), controlPoint1: NSPoint(x: 135, y: 72), controlPoint2: NSPoint(x: 123, y: 87))
-        outline.lineWidth = 10
-        outline.lineCapStyle = .round
-        outline.lineJoinStyle = .round
+        let outline = eyeOutline()
         outline.stroke()
 
         for (index, center) in [CGFloat(42), CGFloat(102)].enumerated() {
@@ -205,6 +290,21 @@ enum LuluBrand {
             }
         }
         drawBeak(state)
+    }
+
+    private static func eyeOutline() -> NSBezierPath {
+        let outline = NSBezierPath()
+        outline.move(to: NSPoint(x: 45, y: 84))
+        outline.curve(to: NSPoint(x: 10, y: 50), controlPoint1: NSPoint(x: 21, y: 87), controlPoint2: NSPoint(x: 9, y: 72))
+        outline.curve(to: NSPoint(x: 39, y: 13), controlPoint1: NSPoint(x: 10, y: 28), controlPoint2: NSPoint(x: 20, y: 13))
+        outline.curve(to: NSPoint(x: 72, y: 31), controlPoint1: NSPoint(x: 52, y: 12), controlPoint2: NSPoint(x: 63, y: 22))
+        outline.curve(to: NSPoint(x: 105, y: 13), controlPoint1: NSPoint(x: 81, y: 22), controlPoint2: NSPoint(x: 92, y: 12))
+        outline.curve(to: NSPoint(x: 134, y: 50), controlPoint1: NSPoint(x: 124, y: 13), controlPoint2: NSPoint(x: 134, y: 28))
+        outline.curve(to: NSPoint(x: 99, y: 84), controlPoint1: NSPoint(x: 135, y: 72), controlPoint2: NSPoint(x: 123, y: 87))
+        outline.lineWidth = 10
+        outline.lineCapStyle = .round
+        outline.lineJoinStyle = .round
+        return outline
     }
 
     private static func closedEye(center: CGFloat) {

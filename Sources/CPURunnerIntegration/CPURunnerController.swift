@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Combine
 import AppPluginCore
 import AppPluginHost
@@ -15,6 +16,20 @@ public protocol RunnerStatusDisplaying: AnyObject {
 public typealias RunnerScheduler = @MainActor (TimeInterval, @escaping @MainActor () -> Void) -> any RunnerScheduledTask
 public typealias RunnerDisplayFactory = @MainActor (@escaping @MainActor (RunnerAnimal) -> Void) -> any RunnerStatusDisplaying
 
+public enum RunnerOrbitAnimationPolicy {
+    public static let frameCount = 48
+
+    public static func rotationPeriod(usage: Double?) -> TimeInterval? {
+        guard let usage, usage.isFinite, (0...1).contains(usage) else { return nil }
+        return 4.8 - 3.9 * usage
+    }
+
+    public static func frameInterval(usage: Double?, reduceMotion: Bool, lowPower: Bool) -> TimeInterval? {
+        guard !reduceMotion, let period = rotationPeriod(usage: usage) else { return nil }
+        return 1 / min(lowPower ? 12 : 24, Double(frameCount) / period)
+    }
+}
+
 @MainActor
 private final class RunnerTimer: RunnerScheduledTask {
     private let timer: Timer
@@ -29,64 +44,21 @@ private final class RunnerTimer: RunnerScheduledTask {
 }
 
 @MainActor
-private final class RunnerStatusItem: NSObject, RunnerStatusDisplaying {
-    private var item: NSStatusItem?
-    private let chooseAnimal: @MainActor (RunnerAnimal) -> Void
-    private let localize: PluginLocalizer
-    private let cpuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private var choices: [RunnerAnimal: NSMenuItem] = [:]
-    private var selected: RunnerAnimal?
-    private var label: String?
-
-    init(localize: @escaping PluginLocalizer, chooseAnimal: @escaping @MainActor (RunnerAnimal) -> Void) {
-        self.localize = localize; self.chooseAnimal = chooseAnimal
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        super.init()
-        let menu = NSMenu()
-        cpuItem.isEnabled = false; menu.addItem(cpuItem); menu.addItem(.separator())
-        for (index, animal) in RunnerAnimal.allCases.enumerated() {
-            let option = NSMenuItem(title: localize(animal.koreanName, animal.englishName),
-                action: #selector(selectAnimal(_:)), keyEquivalent: String(index + 1))
-            option.target = self; option.representedObject = animal.rawValue
-            option.image = RunnerArtwork.image(for: animal, frame: 0)
-            choices[animal] = option; menu.addItem(option)
-        }
-        item?.menu = menu
-    }
-
-    func render(animal: RunnerAnimal, frame: Int, usageText: String, accessibilityLabel: String) {
-        guard let item else { return }
-        item.button?.image = RunnerArtwork.image(for: animal, frame: frame)
-        // Only the sampled value or selected animal changes the menu, not each animation frame.
-        if cpuItem.title == usageText, selected == animal, label == accessibilityLabel { return }
-        selected = animal; label = accessibilityLabel
-        item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = accessibilityLabel
-        item.button?.setAccessibilityLabel(accessibilityLabel)
-        cpuItem.title = usageText
-        for (candidate, option) in choices {
-            option.title = localize(candidate.koreanName, candidate.englishName)
-            option.state = candidate == animal ? .on : .off
-        }
-    }
-
-    @objc private func selectAnimal(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? String, let animal = RunnerAnimal(rawValue: value) else { return }
-        chooseAnimal(animal)
-    }
-
-    func remove() {
-        if let item { NSStatusBar.system.removeStatusItem(item) }
-        item = nil
-    }
-}
-
-@MainActor
-public final class CPURunnerController: ObservableObject, PluginController {
+public final class CPURunnerController: ObservableObject, PluginMenuBarImageProviding, PluginPanelProviding {
     public let descriptor: PluginDescriptor
+    public private(set) var menuBarImage: PluginMenuBarImage?
+    public private(set) var baseIconEffect: PluginBaseIconEffect?
+    public private(set) var baseIconAccessibilityLabel: String?
+    private let imageUpdates = PassthroughSubject<Void, Never>()
+    public var imageChanges: AnyPublisher<Void, Never> { imageUpdates.eraseToAnyPublisher() }
     @Published public private(set) var enabled = false
     @Published public private(set) var animal: RunnerAnimal
+    @Published public private(set) var presentation: RunnerPresentation
+    @Published public private(set) var palette: PluginOrbitPalette
     @Published public private(set) var usage: Double?
+    @Published public private(set) var metrics = SystemMetricsSnapshot.empty
+    public var panelView: AnyView { AnyView(RunnerMetricsSummaryView(model: self, localize: localize)) }
+    public var panelHeight: CGFloat { 184 }
     public private(set) var isActive = false
     public var isRunning: Bool { false }
     public var connectionState: PluginConnectionState {
@@ -104,12 +76,14 @@ public final class CPURunnerController: ObservableObject, PluginController {
     }
     private let settings: RunnerSettings
     private let sampler: CPUUsageSampler
-    private let displayFactory: RunnerDisplayFactory
+    private let metricsSampler: SystemMetricsSampler
+    private let displayFactory: RunnerDisplayFactory?
     private let schedule: RunnerScheduler
     private let reduceMotion: @MainActor () -> Bool
     private let lowPower: @MainActor () -> Bool
     private let observeSystemChanges: Bool
     private let localize: PluginLocalizer
+    private let now: @MainActor () -> TimeInterval
     private var display: (any RunnerStatusDisplaying)?
     private var sampleTimer: (any RunnerScheduledTask)?
     private var frameTimer: (any RunnerScheduledTask)?
@@ -119,26 +93,31 @@ public final class CPURunnerController: ObservableObject, PluginController {
     private var generation = 0
     private var animationGeneration = 0
     private var frameInterval: TimeInterval?
+    private var orbitProgress = 0.0
+    private var orbitTimestamp: TimeInterval?
+    private var orbitPeriod: TimeInterval?
 
     public convenience init(defaults: UserDefaults = .standard,
                             localize: @escaping PluginLocalizer = { korean, _ in korean }) {
         self.init(settings: RunnerSettings(defaults: defaults), sampler: CPUUsageSampler(),
-            displayFactory: { RunnerStatusItem(localize: localize, chooseAnimal: $0) },
             schedule: { RunnerTimer(interval: $0, action: $1) },
             reduceMotion: { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
             lowPower: { ProcessInfo.processInfo.isLowPowerModeEnabled }, localize: localize)
     }
 
     public init(settings: RunnerSettings, sampler: CPUUsageSampler,
-                displayFactory: @escaping RunnerDisplayFactory, schedule: @escaping RunnerScheduler,
+                metricsSampler: SystemMetricsSampler = SystemMetricsSampler(),
+                displayFactory: RunnerDisplayFactory? = nil, schedule: @escaping RunnerScheduler,
                 reduceMotion: @escaping @MainActor () -> Bool, lowPower: @escaping @MainActor () -> Bool,
                 observeSystemChanges: Bool = true,
+                now: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
                 localize: @escaping PluginLocalizer = { korean, _ in korean }) {
-        self.settings = settings; self.sampler = sampler; self.displayFactory = displayFactory
+        self.settings = settings; self.sampler = sampler; self.metricsSampler = metricsSampler; self.displayFactory = displayFactory
         self.schedule = schedule; self.reduceMotion = reduceMotion; self.lowPower = lowPower
         self.observeSystemChanges = observeSystemChanges; self.localize = localize
-        animal = settings.animal
-        descriptor = PluginDescriptor(id: CPURunnerModule.id, name: localize("CPU 러너", "CPU Runner"))
+        self.now = now
+        animal = settings.animal; presentation = settings.presentation; palette = settings.palette
+        descriptor = PluginDescriptor(id: CPURunnerModule.id, name: localize("시스템 러너", "System Runner"))
     }
 
     public func setModuleEnabled(_ value: Bool) {
@@ -152,6 +131,20 @@ public final class CPURunnerController: ObservableObject, PluginController {
         settings.animal = value; animal = value; frame = 0; render()
     }
 
+    public func selectPresentation(_ value: RunnerPresentation) {
+        guard presentation != value else { return }
+        settings.presentation = value; presentation = value; frame = 0; orbitProgress = 0
+        if value == .owlOrbit { display?.remove(); display = nil }
+        guard enabled, isActive, !asleep else { return }
+        updateAnimation(); render()
+    }
+
+    public func setOrbitPalette(_ value: PluginOrbitPalette) {
+        guard palette != value else { return }
+        settings.palette = value; palette = value
+        if presentation == .owlOrbit { render() }
+    }
+
     public func start() {
         guard enabled, !isActive else { return }
         isActive = true; asleep = false; generation += 1
@@ -162,7 +155,9 @@ public final class CPURunnerController: ObservableObject, PluginController {
     public func stop() {
         generation += 1; isActive = false; asleep = false
         cancelTimers(); sampler.reset(); usage = nil; frame = 0
+        metricsSampler.reset(); metrics = .empty
         display?.remove(); display = nil
+        clearPresentation()
         for (center, observer) in observers { center.removeObserver(observer) }
         observers.removeAll()
     }
@@ -176,6 +171,7 @@ public final class CPURunnerController: ObservableObject, PluginController {
         guard isActive, !asleep else { return }
         asleep = true; generation += 1
         cancelTimers(); sampler.reset(); usage = nil; frame = 0; render()
+        metricsSampler.reset(); metrics = .empty
     }
 
     public func resumeAfterSleep() {
@@ -190,7 +186,7 @@ public final class CPURunnerController: ObservableObject, PluginController {
 
     private func resumeMonitoring() {
         sampler.reset()
-        if display == nil { display = displayFactory { [weak self] in self?.selectAnimal($0) } }
+        metricsSampler.reset()
         sampleCPU()
         let current = generation
         sampleTimer = schedule(1) { [weak self] in
@@ -201,11 +197,18 @@ public final class CPURunnerController: ObservableObject, PluginController {
 
     private func sampleCPU() {
         usage = sampler.sample()
+        metrics = metricsSampler.sample()
         updateAnimation(); render()
     }
 
     private func updateAnimation() {
-        let next = RunnerAnimationPolicy.frameInterval(usage: usage, reduceMotion: reduceMotion(), lowPower: lowPower())
+        let reduced = reduceMotion(), power = lowPower()
+        let next = presentation == .owlOrbit
+            ? RunnerOrbitAnimationPolicy.frameInterval(usage: usage, reduceMotion: reduced, lowPower: power)
+            : RunnerAnimationPolicy.frameInterval(usage: usage, reduceMotion: reduced, lowPower: power)
+        let period = presentation == .owlOrbit && next != nil ? RunnerOrbitAnimationPolicy.rotationPeriod(usage: usage) : nil
+        if orbitPeriod != period { orbitTimestamp = period == nil ? nil : now(); orbitPeriod = period }
+        if next == nil { frame = 0; orbitProgress = 0; orbitTimestamp = nil }
         guard frameInterval != next else { return }
         frameTimer?.cancel(); frameTimer = nil; animationGeneration += 1; frameInterval = next
         guard let next else { frame = 0; return }
@@ -213,7 +216,15 @@ public final class CPURunnerController: ObservableObject, PluginController {
         frameTimer = schedule(next) { [weak self] in
             guard let self, self.generation == current, self.animationGeneration == animation,
                   self.isActive, !self.asleep else { return }
-            self.frame = (self.frame + 1) % RunnerArtwork.frameCount
+            if self.presentation == .owlOrbit, let period = self.orbitPeriod {
+                let timestamp = self.now()
+                if let previous = self.orbitTimestamp, timestamp.isFinite, previous.isFinite, timestamp >= previous {
+                    self.orbitProgress = (self.orbitProgress + (timestamp - previous) / period).truncatingRemainder(dividingBy: 1)
+                }
+                self.orbitTimestamp = timestamp
+            } else {
+                self.frame = (self.frame + 1) % RunnerArtwork.frameCount(for: self.animal)
+            }
             self.render()
         }
     }
@@ -222,12 +233,35 @@ public final class CPURunnerController: ObservableObject, PluginController {
         sampleTimer?.cancel(); sampleTimer = nil
         frameTimer?.cancel(); frameTimer = nil
         animationGeneration += 1; frameInterval = nil
+        orbitProgress = 0; orbitTimestamp = nil; orbitPeriod = nil
     }
 
     private func render() {
+        guard enabled, isActive else { return }
+        guard !asleep else { clearPresentation(); return }
+        if presentation == .owlOrbit {
+            // A completed cycle stays at phase zero despite floating-point rounding.
+            let phase = Double(Int((orbitProgress * Double(RunnerOrbitAnimationPolicy.frameCount) + 1e-9).rounded(.down))
+                % RunnerOrbitAnimationPolicy.frameCount) / Double(RunnerOrbitAnimationPolicy.frameCount)
+            menuBarImage = nil
+            baseIconEffect = .orbit(phase: phase, palette: palette)
+            baseIconAccessibilityLabel = localize("happylulu 부엉이 눈빛, \(usageText)", "happylulu owl orbit, \(usageText)")
+            imageUpdates.send()
+            return
+        }
+        baseIconEffect = nil; baseIconAccessibilityLabel = nil
+        if display == nil { display = displayFactory? { [weak self] in self?.selectAnimal($0) } }
         let name = localize(animal.koreanName, animal.englishName)
-        display?.render(animal: animal, frame: frame, usageText: usageText,
-            accessibilityLabel: localize("happylulu 러너, \(name), \(usageText)", "happylulu runner, \(name), \(usageText)"))
+        let label = localize("happylulu 러너, \(name), \(usageText)", "happylulu runner, \(name), \(usageText)")
+        menuBarImage = PluginMenuBarImage(image: RunnerArtwork.image(for: animal, frame: frame), accessibilityLabel: label)
+        imageUpdates.send()
+        display?.render(animal: animal, frame: frame, usageText: usageText, accessibilityLabel: label)
+    }
+
+    private func clearPresentation() {
+        guard menuBarImage != nil || baseIconEffect != nil || baseIconAccessibilityLabel != nil else { return }
+        menuBarImage = nil; baseIconEffect = nil; baseIconAccessibilityLabel = nil
+        imageUpdates.send()
     }
 
     private func installObservers() {

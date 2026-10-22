@@ -1,4 +1,5 @@
 import AppKit
+import CPURunnerIntegration
 import CryptoKit
 import ImageIO
 import UniformTypeIdentifiers
@@ -19,15 +20,17 @@ struct RunnerArtworkChecks {
         var animalSignatures = Set<String>()
         for animal in RunnerAnimal.allCases {
             var frameSignatures = Set<String>()
-            for frame in 0..<RunnerArtwork.frameCount {
+            let count = RunnerArtwork.frameCount(for: animal)
+            let size = RunnerArtwork.size(for: animal)
+            for frame in 0..<count {
                 let image = RunnerArtwork.image(for: animal, frame: frame)
-                try expect(image.size == NSSize(width: 26, height: 18), "Wrong logical canvas")
+                try expect(image.size == size, "Wrong logical canvas")
                 try expect(image.isTemplate, "Runner must remain a template image")
                 try expect(image.representations.count == 2, "Missing 1×/2× representations")
                 try expect(image === RunnerArtwork.image(for: animal, frame: frame), "Frame cache was not reused")
                 for scale in [1, 2] {
                     guard let rep = image.representations.compactMap({ $0 as? NSBitmapImageRep })
-                        .first(where: { $0.pixelsWide == 26 * scale && $0.pixelsHigh == 18 * scale }),
+                        .first(where: { $0.pixelsWide == Int(size.width) * scale && $0.pixelsHigh == Int(size.height) * scale }),
                         let bytes = rep.bitmapData,
                         let png = rep.representation(using: .png, properties: [:]) else {
                         throw Failure(description: "Missing bitmap for \(animal) \(frame) \(scale)×")
@@ -54,9 +57,9 @@ struct RunnerArtworkChecks {
                     }
                 }
             }
-            try expect(frameSignatures.count == RunnerArtwork.frameCount, "Animation needs distinct poses for \(animal)")
-            try expect(RunnerArtwork.image(for: animal, frame: -1) === RunnerArtwork.image(for: animal, frame: 7), "Negative frame wrapping")
-            try expect(RunnerArtwork.image(for: animal, frame: Int.min) === RunnerArtwork.image(for: animal, frame: 0), "Minimum frame wrapping")
+            try expect(frameSignatures.count == count, "Animation needs distinct poses for \(animal)")
+            try expect(RunnerArtwork.image(for: animal, frame: -1) === RunnerArtwork.image(for: animal, frame: count - 1), "Negative frame wrapping")
+            try expect(RunnerArtwork.image(for: animal, frame: Int.min) === RunnerArtwork.image(for: animal, frame: (Int.min % count + count) % count), "Minimum frame wrapping")
         }
         try expect(animalSignatures.count == 3, "Animal silhouettes must be distinct")
         for dark in [false, true] {
@@ -64,7 +67,7 @@ struct RunnerArtworkChecks {
             try png(board).write(to: output.appendingPathComponent(dark ? "runner-frames-dark.png" : "runner-frames-light.png"))
         }
         try makeGIF(output.appendingPathComponent("runner-preview.gif"))
-        print("PASS \(checks) artwork assertions; 3 animals × 8 poses × 2 scales")
+        print("PASS \(checks) artwork assertions; hamster/rabbit 8 poses, official RunCat 5 poses × 2 scales")
         print("Rendered: \(output.path)")
     }
 
@@ -83,7 +86,7 @@ struct RunnerArtworkChecks {
     @MainActor
     static func drawRunner(_ animal: RunnerAnimal, frame: Int, in rect: NSRect, dark: Bool) {
         let image = RunnerArtwork.image(for: animal, frame: frame)
-        let rep = image.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == 52 }!
+        let rep = image.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == Int(RunnerArtwork.size(for: animal).width) * 2 }!
         let context = NSGraphicsContext.current!.cgContext
         context.saveGState()
         context.interpolationQuality = .none
@@ -106,14 +109,14 @@ struct RunnerArtworkChecks {
         try bitmap(width: 1120, height: 470) {
             (dark ? NSColor(calibratedWhite: 0.09, alpha: 1) : .white).setFill()
             NSRect(x: 0, y: 0, width: 1120, height: 470).fill()
-            label("CPU 러너 · 실제 벡터 프레임", x: 28, y: 425, size: 24, dark: dark, bold: true)
-            label("각 동물 8프레임 · 확대와 실제 26×18 pt · 앱 적용 전 렌더 검사", x: 28, y: 399, size: 14, dark: dark)
+            label("시스템 러너 · 실제 프레임", x: 28, y: 425, size: 24, dark: dark, bold: true)
+            label("햄스터·토끼 8프레임 / RunCat 원본 고양이 5프레임 · 실제 크기와 확대", x: 28, y: 399, size: 14, dark: dark)
             for (row, animal) in RunnerAnimal.allCases.enumerated() {
                 let y = CGFloat(285 - row * 112)
                 label(animal.koreanName, x: 28, y: y + 35, size: 19, dark: dark, bold: true)
-                for frame in 0..<8 {
-                    drawRunner(animal, frame: frame, in: NSRect(x: 160 + frame * 115, y: Int(y), width: 104, height: 72), dark: dark)
-                    drawRunner(animal, frame: frame, in: NSRect(x: 198 + frame * 115, y: Int(y) - 28, width: 26, height: 18), dark: dark)
+                for frame in 0..<RunnerArtwork.frameCount(for: animal) {
+                    drawRunner(animal, frame: frame, in: NSRect(x: 160 + frame * 115, y: Int(y), width: Int(RunnerArtwork.size(for: animal).width) * 4, height: 72), dark: dark)
+                    drawRunner(animal, frame: frame, in: NSRect(x: 198 + frame * 115, y: Int(y) - 28, width: Int(RunnerArtwork.size(for: animal).width), height: 18), dark: dark)
                 }
             }
         }
@@ -121,19 +124,19 @@ struct RunnerArtworkChecks {
 
     @MainActor
     static func makeGIF(_ url: URL) throws {
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, 8, nil) else {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, 40, nil) else {
             throw Failure(description: "GIF allocation")
         }
         CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
-        for frame in 0..<8 {
+        for frame in 0..<40 {
             let rep = try bitmap(width: 780, height: 240) {
                 NSColor.white.setFill(); NSRect(x: 0, y: 0, width: 780, height: 240).fill()
-                label("happylulu CPU 러너 · 실제 프레임 미리보기", x: 28, y: 202, size: 20, dark: false, bold: true)
+                label("happylulu 시스템 러너 · 실제 앱 프레임", x: 28, y: 202, size: 20, dark: false, bold: true)
                 for (column, animal) in RunnerAnimal.allCases.enumerated() {
                     let x = CGFloat(60 + column * 250)
-                    drawRunner(animal, frame: frame, in: NSRect(x: x, y: 82, width: 156, height: 108), dark: false)
+                    drawRunner(animal, frame: frame, in: NSRect(x: x, y: 82, width: RunnerArtwork.size(for: animal).width * 6, height: 108), dark: false)
                     label(animal.koreanName, x: x + 47, y: 49, size: 17, dark: false, bold: true)
-                    drawRunner(animal, frame: frame, in: NSRect(x: x + 65, y: 22, width: 26, height: 18), dark: false)
+                    drawRunner(animal, frame: frame, in: NSRect(x: x + 65, y: 22, width: RunnerArtwork.size(for: animal).width, height: 18), dark: false)
                 }
             }
             CGImageDestinationAddImage(destination, rep.cgImage!, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.1]] as CFDictionary)

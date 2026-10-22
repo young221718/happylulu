@@ -98,7 +98,7 @@ struct AttendanceControlsView: View {
                 Text(L("퇴근까지 \(model.countdownText)", "Time to leave: \(model.countdownText)"))
             }
             if let status = model.postDepartureStatus {
-                if let minutes = status.extraMinutes { Text(model.extraLabel(minutes)) }
+                if let extra = model.postDepartureText { Text(extra) }
                 Text(model.mealStatusLabel(status))
                 Text(L("예정 퇴근 기준 안내이며 실제 근무나 식대 지급 승인을 뜻하지 않습니다.",
                        "Based on scheduled departure; this does not verify work or approve meal reimbursement."))

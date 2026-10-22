@@ -40,8 +40,9 @@ let package = Package(
         // Preparation only: this module is not registered or linked into HappyLulu.
         .target(name: "DaouOfficeWritePlugin"),
         .executableTarget(name: "DaouOfficeWriteChecks", dependencies: ["DaouOfficeWritePlugin"], path: "Tests/DaouOfficeWriteChecks"),
-        .target(name: "CPURunnerIntegration", dependencies: ["AppPluginCore", "AppPluginHost"]),
+        .target(name: "CPURunnerIntegration", dependencies: ["AppPluginCore", "AppPluginHost"], resources: [.copy("Resources/RunCat")]),
         .executableTarget(name: "CPURunnerChecks", dependencies: ["CPURunnerIntegration", "AppPluginCore", "AppPluginHost"], path: "Tests/CPURunnerChecks"),
+        .executableTarget(name: "SystemMetricsChecks", dependencies: ["CPURunnerIntegration"], path: "Tests/SystemMetricsChecks"),
         .executableTarget(name: "AfterSix", dependencies: ["AfterSixCore", "MacLaunchSupport", "CalendarSyncCore", "CalendarSyncServices", "AppPluginCore", "AppPluginHost", "CPURunnerIntegration",
             .product(name: "Sparkle", package: "Sparkle")] + optionalDependencies + usageDependencies,
             swiftSettings: pluginDefines,

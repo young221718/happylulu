@@ -22,6 +22,8 @@ cp "$binary_dir/HappyLulu" "$app_dir/Contents/MacOS/HappyLulu"
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
 cp Resources/HappyLuluBrand.png "$app_dir/Contents/Resources/"
 cp -R Resources/OwlStates "$app_dir/Contents/Resources/"
+ditto "$binary_dir/HappyLulu_CPURunnerIntegration.bundle" "$app_dir/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
+cp Resources/PrivacyInfo.xcprivacy "$app_dir/Contents/Resources/"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
 for language in ko en; do
     mkdir -p "$app_dir/Contents/Resources/$language.lproj"

@@ -61,7 +61,8 @@ final class AppModel: ObservableObject {
         showDepartureInMenuBar = show
     }
     private var countdownRefreshInterval: TimeInterval {
-        (departure.map { $0 > now } ?? false) ? countdownDisplay.refreshInterval : 1
+        ((departure.map { $0 > now } ?? false) || postDepartureStatus?.extraMinutes != nil)
+            ? countdownDisplay.refreshInterval : 1
     }
     private func startCountdownTimer() {
         timer?.invalidate()
@@ -72,6 +73,11 @@ final class AppModel: ObservableObject {
     }
     var postDepartureStatus: PostDepartureStatus? {
         attendance.postDepartureStatus(in: state, now: now, calendar: calendar)
+    }
+    var postDepartureText: String? {
+        guard postDepartureStatus?.extraMinutes != nil, let departure else { return nil }
+        let elapsed = countdownDisplay.elapsedText(seconds: now.timeIntervalSince(departure), korean: L("ko", "en") == "ko")
+        return L("추가 \(elapsed) 중", "Extra \(elapsed)")
     }
     var earlyLeaveMinutes: Int {
         if let arrival { return arrival.mode == .normal ? attendance.earlyLeaveMinutes(for: arrival) : 0 }
@@ -136,13 +142,13 @@ final class AppModel: ObservableObject {
                 let remaining = L("\(countdownText) 남음", "\(countdownText) left")
                 return showDepartureInMenuBar ? title + " · " + remaining : remaining
             }
+            if let extra = postDepartureText {
+                return showDepartureInMenuBar ? title + " · " + extra : extra
+            }
             return showDepartureInMenuBar ? title : L("퇴근 가능", "Ready to leave")
         }
         if todayDayType == .annualLeave { return L("연차/공가", "Leave day") }
         return isSkipped ? L("오늘 쉬는 날", "Day off today") : L("출근 대기", "Waiting for arrival")
-    }
-    func extraLabel(_ minutes: Int) -> String {
-        L("추가 \(minutes)분 중", "Extra \(minutes) min")
     }
     func mealStatusLabel(_ status: PostDepartureStatus) -> String {
         guard let departure else { return L("식대 기준", "Meal threshold") }

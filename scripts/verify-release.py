@@ -19,6 +19,9 @@ for resource in [root / 'Resources/HappyLuluBrand.png', *sorted((root / 'Resourc
     assert (app / 'Contents/Resources' / resource.relative_to(root / 'Resources')).read_bytes() == resource.read_bytes()
 for language in ('ko', 'en'):
     assert (app / f'Contents/Resources/{language}.lproj/InfoPlist.strings').read_bytes() == (root / f'Resources/{language}.lproj/InfoPlist.strings').read_bytes()
+assert (app / 'Contents/Resources/PrivacyInfo.xcprivacy').read_bytes() == (root / 'Resources/PrivacyInfo.xcprivacy').read_bytes()
+for resource in (root / 'Sources/CPURunnerIntegration/Resources/RunCat').iterdir():
+    assert (app / 'Contents/Resources/HappyLulu_CPURunnerIntegration.bundle/RunCat' / resource.name).read_bytes() == resource.read_bytes()
 assert set(subprocess.check_output(['lipo', '-archs', str(app / 'Contents/MacOS/HappyLulu')], text=True).split()) == {'arm64', 'x86_64'}
 for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
     assert safe_file(release, name).read_bytes() == (root / name).read_bytes()

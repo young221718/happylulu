@@ -17,6 +17,7 @@ with pathlib.Path(sys.argv[1]).open('wb') as stream:
 PY2
 swiftc -parse-as-library -swift-version 6 -I "$build_dir/Modules" \
   Sources/AfterSix/AppLanguage.swift Sources/AfterSix/LuluBrand.swift Sources/AfterSix/AppearanceModel.swift Tests/AppearanceModelProbe/main.swift \
-  "$build_dir"/AfterSixCore.build/*.swift.o -framework AppKit -framework CoreImage \
+  "$build_dir"/AfterSixCore.build/*.swift.o "$build_dir"/AppPluginCore.build/*.swift.o \
+  "$build_dir"/AppPluginHost.build/*.swift.o -framework AppKit -framework CoreImage -framework SwiftUI \
   -o "$app/Contents/MacOS/AppearanceProbe"
 "$app/Contents/MacOS/AppearanceProbe" "$probe_dir/data" "$PWD/Resources/HappyLuluIcon.png"

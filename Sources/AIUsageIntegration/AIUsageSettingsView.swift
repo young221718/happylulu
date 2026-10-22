@@ -44,27 +44,54 @@ public struct AIUsageSettingsView: View {
                 }.padding(8)
             }
             GroupBox(t("표시 및 갱신", "Display and refresh")) {
-                VStack(alignment: .leading, spacing: 14) {
-                    Picker(t("메뉴바 표시", "Menu bar label"), selection: Binding(
-                        get: { model.preferences.labelFormat }, set: { value in model.updatePreferences { $0.labelFormat = value } })) {
-                        Text("Codex + %").tag(LabelFormat.named)
-                        Text(t("%만", "% only")).tag(LabelFormat.percentage)
-                    }
-                    Picker(t("갱신 주기", "Refresh interval"), selection: Binding(
-                        get: { model.preferences.refreshMinutes }, set: { value in model.updatePreferences { $0.refreshMinutes = value } })) {
-                        ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in Text(t("\(minutes)분", "\(minutes) min")).tag(minutes) }
-                    }
-                    Toggle(t("잔여량 부족 알림", "Low allowance notification"), isOn: Binding(
-                        get: { model.preferences.notificationsEnabled }, set: { model.setNotifications($0) })).toggleStyle(.switch)
-                    if model.preferences.notificationsEnabled {
-                        Picker(t("알림 기준", "Notify below"), selection: Binding(
-                            get: { model.preferences.notificationThreshold }, set: { value in model.updatePreferences { $0.notificationThreshold = value } })) {
-                            ForEach([10, 20, 30], id: \.self) { value in Text("\(value)%").tag(value) }
+                VStack(alignment: .leading, spacing: 12) {
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
+                        GridRow {
+                            Text(t("메뉴바 표시", "Menu bar label"))
+                            menuBarPreview
+                            Picker(t("메뉴바 표시", "Menu bar label"), selection: Binding(
+                                get: { model.preferences.labelFormat }, set: { value in model.updatePreferences { $0.labelFormat = value } })) {
+                                Text("Codex + %").tag(LabelFormat.named)
+                                Text(t("Codex 아이콘 + %", "Codex icon + %")).tag(LabelFormat.icon)
+                                Text(t("%만", "% only")).tag(LabelFormat.percentage)
+                            }.labelsHidden().frame(width: 160)
                         }
+                        GridRow {
+                            Text(t("갱신 주기", "Refresh interval"))
+                            Text(t("\(model.preferences.refreshMinutes)분", "\(model.preferences.refreshMinutes) min"))
+                                .foregroundStyle(.secondary)
+                            Picker(t("갱신 주기", "Refresh interval"), selection: Binding(
+                                get: { model.preferences.refreshMinutes }, set: { value in model.updatePreferences { $0.refreshMinutes = value } })) {
+                                ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in Text(t("\(minutes)분", "\(minutes) min")).tag(minutes) }
+                            }.labelsHidden().frame(width: 160)
+                        }
+                        GridRow {
+                            Text(t("잔여량 부족 알림", "Low allowance notification"))
+                            Text(model.preferences.notificationsEnabled ? t("켬", "On") : t("끔", "Off"))
+                                .foregroundStyle(.secondary)
+                            Toggle(t("잔여량 부족 알림", "Low allowance notification"), isOn: Binding(
+                                get: { model.preferences.notificationsEnabled }, set: { model.setNotifications($0) }))
+                                .labelsHidden().toggleStyle(.switch)
+                        }
+                        if model.preferences.notificationsEnabled {
+                            GridRow {
+                                Text(t("알림 기준", "Notify below"))
+                                Text("\(model.preferences.notificationThreshold)%").foregroundStyle(.secondary)
+                                Picker(t("알림 기준", "Notify below"), selection: Binding(
+                                    get: { model.preferences.notificationThreshold }, set: { value in model.updatePreferences { $0.notificationThreshold = value } })) {
+                                    ForEach([10, 20, 30], id: \.self) { value in Text("\(value)%").tag(value) }
+                                }.labelsHidden().frame(width: 160)
+                            }
+                        }
+                    }
+                    if model.preferences.labelFormat == .icon, model.menuBarPreview.iconPNG == nil {
+                        Text(t("Codex 심볼을 표시할 수 없어 Codex 텍스트로 표시합니다.",
+                               "The Codex symbol is unavailable; showing Codex text."))
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }.padding(8)
             }
-            DisclosureGroup(t("Codex 연결", "Codex connection")) {
+            GroupBox(t("Codex 연결", "Codex connection")) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(model.executablePath).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -83,9 +110,24 @@ public struct AIUsageSettingsView: View {
                     Text(t("기존 Codex 로그인을 사용합니다. 다른 계정으로 로그인하면 Codex CLI 계정도 변경됩니다.",
                            "Uses your existing Codex sign-in. Signing in with another account also changes the Codex CLI account."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }.padding(.top, 10)
+                }.padding(8)
             }
         }
+    }
+    private var menuBarPreview: some View {
+        let item = model.menuBarPreview
+        return HStack(spacing: 4) {
+            if let data = item.iconPNG, let image = NSImage(data: data) {
+                Image(nsImage: image).renderingMode(item.iconIsTemplate ? .template : .original)
+                    .resizable().scaledToFit()
+                    .frame(width: item.iconIsTemplate ? 16 : 14, height: item.iconIsTemplate ? 16 : 14)
+                    .accessibilityHidden(true)
+            }
+            Text(item.title).monospacedDigit()
+        }
+        .frame(minWidth: 90, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.accessibilityLabel)
     }
     private func row(_ title: String, value: String) -> some View {
         HStack { Text(title); Spacer(); Text(value).monospacedDigit() }

@@ -259,6 +259,67 @@ final class LifecycleTests: XCTestCase {
         model.stop()
     }
 
+    func testIconLabelUsesCachedImageAndPreservesAccessibilityAndStaleValue() async throws {
+        let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
+        let provider = DeferredProvider()
+        let image = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=")!
+        var iconReads = 0
+        let model = AIUsageModel(defaults: defaults, localize: { _, en in en }, providerFactory: { _ in provider },
+            iconProvider: { iconReads += 1; return image })
+        defer { model.stop() }
+        model.updatePreferences { $0.labelFormat = .icon }
+        XCTAssertEqual(model.menuBarPreview.title, "—")
+        XCTAssertEqual(model.menuBarPreview.iconPNG, image)
+        XCTAssertNil(model.menuBarItem)
+        model.setEnabled(true); model.start()
+        try await eventually { await provider.count == 1 }; await provider.finish(1)
+        try await eventually { !model.isRunning }
+        XCTAssertEqual(model.menuBarItem?.title, "72%")
+        XCTAssertEqual(model.menuBarItem?.iconPNG, image)
+        XCTAssertEqual(model.menuBarItem?.iconIsTemplate, true)
+        XCTAssertEqual(model.menuBarItem?.accessibilityLabel, "Fixture weekly remaining 72%")
+        model.refreshData()
+        try await eventually { await provider.count == 2 }; await provider.finish(2, error: .timeout)
+        try await eventually { !model.isRunning }
+        XCTAssertEqual(model.menuBarItem?.title, "72% ·")
+        XCTAssertTrue(model.menuBarItem?.accessibilityLabel.contains("previous reading") == true)
+        model.updatePreferences { $0.labelFormat = .percentage }
+        XCTAssertEqual(model.menuBarItem?.title, "72% ·")
+        XCTAssertNil(model.menuBarItem?.iconPNG)
+        XCTAssertEqual(model.menuBarItem?.iconIsTemplate, false)
+        model.updatePreferences { $0.labelFormat = .named }
+        XCTAssertEqual(model.menuBarItem?.title, "Fixture 72% ·")
+        XCTAssertNil(model.menuBarItem?.iconPNG)
+        model.updatePreferences { $0.labelFormat = .icon }
+        XCTAssertEqual(model.menuBarItem?.iconPNG, image)
+        XCTAssertEqual(iconReads, 1)
+        model.refreshData()
+        try await eventually { await provider.count == 3 }; await provider.finish(3, error: .notLoggedIn)
+        try await eventually { !model.isRunning }
+        XCTAssertEqual(model.menuBarItem?.title, "—")
+        XCTAssertEqual(model.menuBarItem?.iconPNG, image)
+    }
+
+    func testMissingOrInvalidIconFallsBackToNameWithoutChangingSavedChoice() async throws {
+        for icon in [nil, Data("invalid image".utf8)] as [Data?] {
+            let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
+            let provider = DeferredProvider()
+            let model = AIUsageModel(defaults: defaults, providerFactory: { _ in provider }, iconProvider: { icon })
+            defer { model.stop() }
+            model.updatePreferences { $0.labelFormat = .icon; $0.refreshMinutes = 15 }
+            XCTAssertEqual(model.menuBarPreview.title, "Fixture —")
+            model.setEnabled(true); model.start()
+            try await eventually { await provider.count == 1 }; await provider.finish(1)
+            try await eventually { !model.isRunning }
+            XCTAssertEqual(model.menuBarItem?.title, "Fixture 72%")
+            XCTAssertNil(model.menuBarItem?.iconPNG)
+            XCTAssertEqual(model.preferences.labelFormat, .icon)
+            let restored = AIUsageModel(defaults: defaults, providerFactory: { _ in provider }, iconProvider: { nil })
+            XCTAssertEqual(restored.preferences.labelFormat, .icon)
+            XCTAssertEqual(restored.preferences.refreshMinutes, 15)
+        }
+    }
+
     func testPreferencesPersistWithoutTouchingAttendanceOrCodexUsageSettings() {
         let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
         defaults.set("preserved", forKey: "preferences")

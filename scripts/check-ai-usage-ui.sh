@@ -13,6 +13,7 @@ app="$probe_dir/UsageProbe.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$probe_dir/data"
 cp Resources/HappyLuluBrand.png "$app/Contents/Resources/"
 cp -R Resources/OwlStates "$app/Contents/Resources/"
+ditto "$build_dir/HappyLulu_CPURunnerIntegration.bundle" "$app/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
 python3 - Sources/AfterSix/AppearanceModel.swift "$probe_dir/AppearanceModel.swift" "$app/Contents/Info.plist" <<'PY'
 import pathlib, plistlib, sys, uuid
 source = pathlib.Path(sys.argv[1]).read_text()
@@ -44,7 +45,7 @@ swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0"
   "$build_dir"/CalendarSyncCore.build/*.swift.o "$build_dir"/AIUsagePlugin.build/*.swift.o \
   "$build_dir"/AIUsageIntegration.build/*.swift.o \
   "$build_dir"/CPURunnerIntegration.build/*.swift.o \
-  -framework AppKit -framework SwiftUI -framework CoreImage -framework Security \
+  -framework AppKit -framework SwiftUI -framework CoreImage -framework Security -framework IOKit -framework SystemConfiguration \
   -framework EventKit -framework ServiceManagement -framework UserNotifications -framework Sparkle -lsqlite3 \
   -o "$app/Contents/MacOS/UsageProbe"
 "$app/Contents/MacOS/UsageProbe" "$probe_dir/data" "$PWD/Resources/HappyLuluIcon.png"

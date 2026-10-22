@@ -122,8 +122,8 @@ final class PluginManagerModel: ObservableObject {
             PluginCatalogEntry(id: "leave-detection", name: L("휴가 자동 인식", "Leave recognition"), author: PluginAuthors.contributors,
                 summary: L("연결된 일정의 오전·오후 반차 인식", "Morning/afternoon half-day recognition from connected calendars"),
                 symbol: "leaf", available: true),
-            PluginCatalogEntry(id: "cpu-runner", name: L("CPU 러너", "CPU Runner"), author: PluginAuthors.contributors,
-                summary: L("CPU 사용량에 맞춰 달리는 햄스터·토끼·고양이", "A hamster, rabbit or cat that runs with CPU activity"),
+            PluginCatalogEntry(id: "cpu-runner", name: L("시스템 러너", "System Runner"), author: PluginAuthors.contributors,
+                summary: L("부엉이 눈빛과 CPU·메모리·디스크·네트워크·배터리", "An owl orbit with CPU, memory, disk, network and battery metrics"),
                 symbol: "pawprint", available: modules.contains { $0.id == "cpu-runner" })
         ]
         usageModuleIDs = modules.filter { $0.catalogMetadata?.providesUsage == true }.map { $0.id }
@@ -302,6 +302,13 @@ final class PluginManagerModel: ObservableObject {
         return registrations.compactMap { entry in
             guard isEnabled(entry.id), entry.controller.enabled else { return nil }
             return (entry.controller as? any PluginMenuBarProviding)?.menuBarItem
+        }
+    }
+    var panelProviders: [any PluginPanelProviding] {
+        guard externalIntegrationsAllowed else { return [] }
+        return registrations.compactMap { entry in
+            guard isEnabled(entry.id), entry.controller.enabled else { return nil }
+            return entry.controller as? any PluginPanelProviding
         }
     }
     func start() {

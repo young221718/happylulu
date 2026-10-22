@@ -154,3 +154,11 @@ Windows 소스는 별도 NuGet 패키지를 참조하지 않고 .NET10·Windows 
 ## Apple SDKs
 
 AppKit·SwiftUI·EventKit 등 시스템 프레임워크는 Apple SDK/플랫폼 약관을 따르며 이 저장소의 라이선스로 재라이선스하지 않습니다.
+
+## RunCat 고양이 프레임
+
+Copyright © 2019 Takuto Nakamura (Kyome22).
+
+Source: https://github.com/Kyome22/menubar_runcat/tree/82747b139cc32e13a7b713f8521f44c70317f7d4
+
+공식 앱의 cat_page0…4 PNG를 원본 바이트 그대로 포함합니다. 고양이 5프레임을 28×18pt에서 표시하며, happylulu의 CPU 속도 정책을 적용합니다. 출처·SHA-256은 RunCat/provenance.json, Apache License 2.0 전문은 RunCat/LICENSE.txt에 보존합니다. 앱에서는 Contents/Resources/HappyLulu_CPURunnerIntegration.bundle/RunCat 아래에 함께 들어갑니다. 공식 RunCat 앱과 별개의 소프트웨어입니다.
