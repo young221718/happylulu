@@ -47,9 +47,9 @@ Mac puts settings in one window with a sidebar, including Calendar.
 | Installed plugins | Calendar sync, Daouoffice connection and half-day recognition settings |
 | Updates | Version and automatic check/install preferences |
 
-In General settings, choose milliseconds, seconds, minutes, hours or hours/minutes for the remaining-time display in the menu bar and Work settings. Hours round up to one decimal: **90 minutes → 1.5 hours**, **30 minutes → 0.5 hours**. By default, the menu bar shows the expected departure time alongside the countdown (for example, `Leave 18:00 · 1.5 hr left`). With departure visibility on, only the expected departure time remains at or after departure. Preferences survive a restart.
+In General settings, choose milliseconds, seconds, minutes, hours or hours/minutes for the remaining-time display in the menu bar and Work settings. Hours round up to one decimal: **90 minutes → 1.5 hours**, **30 minutes → 0.5 hours**. By default, the menu bar shows the expected departure time alongside the countdown (for example, `Leave 18:00 · 1.5 hr left`). With departure visibility on, only the expected departure time remains for the first 30 minutes after departure. Then it also shows elapsed time in the selected unit (for example, `Leave 18:00 · Extra 1 hr 1 min`). Elapsed time rounds down to completed units. Preferences survive a restart.
 
-On Mac, **Show expected departure in menu bar** is on by default. Turn it off to hide the clock while keeping the countdown in your selected format (for example, `1.5 hr left`). Changes apply immediately and survive a restart. Once the expected departure time is reached with the option off, the menu bar shows `Ready to leave`. The today panel's departure time and attendance records stay unchanged.
+On Mac, **Show expected departure in menu bar** is on by default. Turn it off to hide the clock while keeping the countdown in your selected format (for example, `1.5 hr left`). Changes apply immediately and survive a restart. Once the expected departure time is reached with the option off, the menu bar shows `Ready to leave` for 30 minutes, then shows the elapsed time without the departure clock. The today panel's departure time and attendance records stay unchanged.
 
 ## How a day is calculated
 
@@ -67,7 +67,7 @@ Regular days finish two hours earlier on the last calendar Friday of the month. 
 
 Mac records the first valid **observed** login-item launch or screen unlock. Later unlocks preserve arrival, manual edits and day-off choices. Ordinary manual launch, wake and session activation do not create arrivals. The app does not reconstruct hours when it was closed or detect office location/Wi-Fi; an unlock at home may count.
 
-Day off clears today's arrival after confirmation and suspends automatic recording. Saving a manual arrival resumes it. Extra elapsed minutes appear 30 minutes after scheduled departure; a meal time threshold appears after two hours. These do not verify work or approve payment.
+Day off clears today's arrival after confirmation and suspends automatic recording. Saving a manual arrival resumes it. Elapsed time appears 30 minutes after scheduled departure in the menu bar, main panel, Work settings and tooltip. It follows the selected time unit; milliseconds refresh every 0.1 seconds. The meal time threshold remains two hours. These do not verify work or approve payment.
 
 ## Workday choices since Mac 1.5.15
 

@@ -2,6 +2,10 @@
 # Render actual app views using synthetic quota data and an isolated app identity.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+case "${HAPPY_LULU_MATERIAL_MODE:-automatic}" in
+  automatic|legacy) ;;
+  *) echo "HAPPY_LULU_MATERIAL_MODE must be automatic or legacy" >&2; exit 64 ;;
+esac
 if [[ "${HAPPY_LULU_SKIP_BUILD:-0}" != "1" ]]; then
   swift build --build-system native --product HappyLulu >/dev/null
 fi
@@ -13,6 +17,7 @@ app="$probe_dir/UsageProbe.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$probe_dir/data"
 cp Resources/HappyLuluBrand.png "$app/Contents/Resources/"
 cp -R Resources/OwlStates "$app/Contents/Resources/"
+ditto "$build_dir/HappyLulu_CPURunnerIntegration.bundle" "$app/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
 python3 - Sources/AfterSix/AppearanceModel.swift "$probe_dir/AppearanceModel.swift" "$app/Contents/Info.plist" <<'PY'
 import pathlib, plistlib, sys, uuid
 source = pathlib.Path(sys.argv[1]).read_text()
@@ -30,6 +35,7 @@ swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0"
   -I "$build_dir/Modules" -F "$frameworks" -Xlinker -rpath -Xlinker "$frameworks" \
   Sources/AfterSix/AppLanguage.swift Sources/AfterSix/AppModel.swift Sources/AfterSix/AppUpdater.swift \
   Sources/AfterSix/LuluBrand.swift Sources/AfterSix/ApplicationMenu.swift \
+  Sources/AfterSix/LuluMaterials.swift Sources/AfterSix/MenuBarPanel.swift Sources/AfterSix/SettingsWindowChrome.swift \
   Sources/AfterSix/CalendarSyncModel.swift Sources/AfterSix/HalfDayCalendarReader.swift \
   Sources/AfterSix/DefaultFeatureAdapter.swift Sources/AfterSix/PluginManagerModel.swift \
   Sources/AfterSix/BundledPlugins.swift Sources/AfterSix/FeatureCalendarModel.swift \
@@ -44,11 +50,21 @@ swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0"
   "$build_dir"/CalendarSyncCore.build/*.swift.o "$build_dir"/AIUsagePlugin.build/*.swift.o \
   "$build_dir"/AIUsageIntegration.build/*.swift.o \
   "$build_dir"/CPURunnerIntegration.build/*.swift.o \
-  -framework AppKit -framework SwiftUI -framework CoreImage -framework Security \
+  -framework AppKit -framework SwiftUI -framework CoreImage -framework Security -framework IOKit -framework SystemConfiguration \
   -framework EventKit -framework ServiceManagement -framework UserNotifications -framework Sparkle -lsqlite3 \
   -o "$app/Contents/MacOS/UsageProbe"
-"$app/Contents/MacOS/UsageProbe" "$probe_dir/data" "$PWD/Resources/HappyLuluIcon.png"
+status=0
+python3 - "$app/Contents/MacOS/UsageProbe" "$probe_dir/data" "$PWD/Resources/HappyLuluIcon.png" <<'PYTIMEOUT' || status=$?
+import subprocess, sys
+try:
+    result = subprocess.run(sys.argv[1:], timeout=120)
+except subprocess.TimeoutExpired:
+    print("FAIL usage UI: probe exceeded 120 seconds; last BEGIN line identifies the blocked operation", file=sys.stderr)
+    sys.exit(124)
+sys.exit(result.returncode if result.returncode >= 0 else 128 - result.returncode)
+PYTIMEOUT
 if [[ -n "${HAPPY_LULU_USAGE_EVIDENCE:-}" ]]; then
   mkdir -p "$HAPPY_LULU_USAGE_EVIDENCE"
   cp "$probe_dir/data/"*.png "$HAPPY_LULU_USAGE_EVIDENCE/"
 fi
+exit "$status"

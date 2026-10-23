@@ -3,6 +3,11 @@
 set -euo pipefail
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_dir"
+# SDKROOT also reaches the linker; compiler --sysroot alone can record the deployment target as the SDK.
+SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+export SDKROOT
+sdk_version="$(xcrun --sdk "$SDKROOT" --show-sdk-version)"
+printf 'macOS SDK: %s (%s)\n' "$sdk_version" "$SDKROOT"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! "$build" =~ ^[1-9][0-9]*$ ]]; then
@@ -20,9 +25,9 @@ mkdir -p "$project_dir/dist"
 staging_dir="$(mktemp -d "$project_dir/dist/.release-stage.XXXXXX")"
 app_dir="$staging_dir/happylulu.app"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
-python3 - "$staging_dir/build-source.json" <<'PY'
+python3 - "$staging_dir/build-source.json" "$sdk_version" <<'PY'
 import json,subprocess,sys
-source = {'schema': 1,
+source = {'schema': 1, 'sdkVersion': sys.argv[2],
           'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
           'cleanSource': not subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()}
 with open(sys.argv[1], 'w') as output:
@@ -38,6 +43,7 @@ done
 arm_dir="$(swift build --build-system native -c release --show-bin-path --scratch-path "$project_dir/.build/distribution-arm64" --triple arm64-apple-macosx13.0)"
 intel_dir="$(swift build --build-system native -c release --show-bin-path --scratch-path "$project_dir/.build/distribution-x86_64" --triple x86_64-apple-macosx13.0)"
 lipo -create "$arm_dir/HappyLulu" "$intel_dir/HappyLulu" -output "$app_dir/Contents/MacOS/HappyLulu"
+python3 scripts/macos_sdk.py "$app_dir/Contents/MacOS/HappyLulu" --sdk "$sdk_version" --minimum 13.0
 architectures=" $(lipo "$app_dir/Contents/MacOS/HappyLulu" -archs) "
 for architecture in arm64 x86_64; do
   case "$architectures" in *" $architecture "*) ;; *) printf 'Missing architecture: %s\n' "$architecture" >&2; exit 1;; esac
@@ -45,6 +51,8 @@ done
 cp Resources/Info.plist "$app_dir/Contents/Info.plist"
 cp Resources/HappyLuluBrand.png "$app_dir/Contents/Resources/"
 cp -R Resources/OwlStates "$app_dir/Contents/Resources/"
+ditto "$arm_dir/HappyLulu_CPURunnerIntegration.bundle" "$app_dir/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
+cp Resources/PrivacyInfo.xcprivacy "$app_dir/Contents/Resources/"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
 for language in ko en; do
     mkdir -p "$app_dir/Contents/Resources/$language.lproj"

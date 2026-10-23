@@ -80,11 +80,12 @@ public enum UsageError: LocalizedError {
 }
 
 public enum LabelFormat: String, Codable, CaseIterable, Sendable {
-    case named, percentage
+    case named, percentage, icon
 
-    public func title(remaining: Int?, stale: Bool = false) -> String {
+    public func title(remaining: Int?, stale: Bool = false, providerName: String = "Codex", iconAvailable: Bool = false) -> String {
         let value = remaining.map { "\($0)%" } ?? "—"
-        return (self == .named ? "Codex \(value)" : value) + (stale && remaining != nil ? " ·" : "")
+        let showName = self == .named || (self == .icon && !iconAvailable)
+        return (showName ? "\(providerName) \(value)" : value) + (stale && remaining != nil ? " ·" : "")
     }
 }
 

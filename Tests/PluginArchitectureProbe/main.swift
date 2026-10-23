@@ -212,21 +212,76 @@ private func checkMenuCountdownDisplay(root: URL) throws {
     require(model.menuTitle == "Leave 18:00", "After departure, preserve the clock without a negative countdown")
     model.setShowDepartureInMenuBar(false)
     require(model.menuTitle == "Ready to leave", "After departure, hidden clock must not return or show a negative countdown")
+    fixtureNow = model.departure!.addingTimeInterval(1800)
+    model.setCountdownDisplay(.seconds)
+    model.setShowDepartureInMenuBar(true)
+    require(model.menuTitle == "Leave 18:00 · Extra 1800 sec",
+            "After the 30-minute threshold, the menu must display live elapsed time")
+    fixtureNow = model.departure!.addingTimeInterval(1799.75)
+    model.refresh()
+    require(model.postDepartureText == nil && model.postDepartureStatus?.extraMinutes == nil,
+            "Elapsed display must retain the existing 30-minute threshold")
+    require(model.menuTitle == "Leave 18:00", "Before 30 minutes the departure clock must remain unchanged")
+    let elapsedSamples: [(CountdownDisplay, String, String)] = [
+        (.milliseconds, "추가 3661250밀리초 중", "Extra 3661250 ms"),
+        (.seconds, "추가 3661초 중", "Extra 3661 sec"),
+        (.minutes, "추가 61분 중", "Extra 61 min"),
+        (.hours, "추가 1시간 중", "Extra 1 hr"),
+        (.hoursMinutes, "추가 1시간 1분 중", "Extra 1 hr 1 min")
+    ]
+    for language in [LanguageChoice.korean, .english] {
+        defaults.set(language.rawValue, forKey: AppLanguage.key)
+        fixtureNow = arrivalTime.addingTimeInterval(9 * 3600 + 3661.25)
+        for (choice, korean, english) in elapsedSamples {
+            model.setCountdownDisplay(choice)
+            let extra = language == .korean ? korean : english
+            let clock = language == .korean ? "퇴근 18:00" : "Leave 18:00"
+            model.setShowDepartureInMenuBar(true)
+            require(model.postDepartureText == extra && model.menuTitle == clock + " · " + extra,
+                    "Shown departure must append the selected elapsed unit [\(language.rawValue), \(choice.rawValue)]")
+            require(makeModel().postDepartureText == extra && makeModel().menuTitle == model.menuTitle,
+                    "Elapsed units and visible departure must survive model restart")
+            model.setShowDepartureInMenuBar(false)
+            require(model.menuTitle == extra && makeModel().menuTitle == extra,
+                    "Hiding departure must preserve the live elapsed label after restart")
+        }
+    }
+    defaults.set(LanguageChoice.english.rawValue, forKey: AppLanguage.key)
+    fixtureNow = arrivalTime.addingTimeInterval(9 * 3600 + 1800)
+    model.setCountdownDisplay(.seconds)
+    require(model.menuTitle == "Extra 1800 sec" && model.postDepartureStatus?.extraMinutes == 30,
+            "Elapsed display must begin exactly at 30 completed minutes")
+    fixtureNow = fixtureNow.addingTimeInterval(1); model.refresh()
+    require(model.menuTitle == "Extra 1801 sec", "Elapsed seconds must advance after departure")
+    model.setCountdownDisplay(.milliseconds)
+    fixtureNow = fixtureNow.addingTimeInterval(0.25); model.refresh()
+    require(model.menuTitle == "Extra 1801250 ms", "Elapsed milliseconds must advance after departure")
+    fixtureNow = arrivalTime.addingTimeInterval(11 * 3600); model.refresh()
+    require(model.postDepartureStatus?.mealThresholdReached == true,
+            "Elapsed display must preserve the two-hour meal threshold")
+    fixtureNow = fixtureCalendar.date(byAdding: .day, value: 1, to: fixtureCalendar.startOfDay(for: fixtureNow))!
+    model.refresh()
+    require(model.postDepartureText == nil && model.menuTitle == "Waiting for arrival",
+            "A new day without arrival must clear yesterday's elapsed display")
+    fixtureNow = arrivalTime.addingTimeInterval(10 * 3600); model.refresh()
     let unchanged = try Data(contentsOf: store.url)
     require(unchanged == original, "Countdown display changes must not mutate attendance")
     let unchangedRouting = try Data(contentsOf: routingURL)
     require(unchangedRouting == originalRouting, "Menu visibility changes must preserve feature routing bytes")
     require(defaults.data(forKey: preservedPreferenceKey) == preservedPreference,
             "Menu visibility changes must preserve unrelated preference bytes")
-    require(model.setDayType(.annualLeave) && model.menuTitle == "Leave day", "Leave day must not show a countdown")
+    require(model.setDayType(.annualLeave) && model.menuTitle == "Leave day" && model.postDepartureText == nil,
+            "Leave day must not show a countdown or elapsed work time")
     model.skipToday()
-    require(model.menuTitle == "Day off today", "Skipped day must not show a countdown")
+    require(model.menuTitle == "Day off today" && model.postDepartureText == nil,
+            "Skipped day must not show a countdown or elapsed work time")
     let emptyModel = AppModel(store: StateStore(url: root.appendingPathComponent("menu-waiting.json")),
         featureRouter: manager.router, allowsLoginItemChanges: false,
         nowProvider: { fixtureNow }, calendarProvider: { fixtureCalendar })
-    require(emptyModel.menuTitle == "Waiting for arrival", "Missing arrival must not show a countdown")
+    require(emptyModel.menuTitle == "Waiting for arrival" && emptyModel.postDepartureText == nil,
+            "Missing arrival must not show a countdown or elapsed work time")
     withExtendedLifetime(observation) {}
-    print("PASS menu countdown/clock visibility: default-on, five units, Korean/English, off/on persistence and immediate publication, reload, hidden seconds/subseconds, departure boundary, leave/skip/waiting, attendance/routing/unrelated preference byte preservation")
+    print("PASS menu countdown/clock visibility: default-on, five units, Korean/English, off/on persistence and immediate publication, reload, hidden seconds/subseconds, 30-minute elapsed boundary and advancing units, restart/day rollover, leave/skip/waiting, attendance/routing/unrelated preference byte preservation")
 }
 
 @MainActor
@@ -909,6 +964,51 @@ private func checkRunnerCatalog(root: URL) throws {
     print("PASS CPU runner catalog: opt-in install, settings, no attendance routes, disabled restart and profile isolation")
 }
 
+@MainActor
+private func checkOvertimeTimer(root: URL) async throws {
+    let defaults = UserDefaults.standard
+    let keys = ["HappyLuluCountdownDisplay", AppLanguage.key]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    defer {
+        for (key, value) in zip(keys, saved) {
+            if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+        }
+    }
+    defaults.set(CountdownDisplay.milliseconds.rawValue, forKey: "HappyLuluCountdownDisplay")
+    defaults.set(LanguageChoice.english.rawValue, forKey: AppLanguage.key)
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let fixtureCalendar = calendar
+    let arrival = calendar.date(from: DateComponents(year: 2026, month: 10, day: 16, hour: 9))!
+    let initial = arrival.addingTimeInterval(9 * 3600 + 1800)
+    let wallStart = Date()
+    let store = StateStore(url: root.appendingPathComponent("overtime-timer.json"))
+    var state = AttendanceState(); state.didOfferLoginItem = true
+    let day = Attendance.dayKey(initial, calendar: calendar)
+    state.arrivals[day] = Arrival(day: day, time: arrival, source: .manual,
+        timeZoneID: calendar.timeZone.identifier, mode: .normal, modeSource: .manual, earlyLeaveOverrideMinutes: 0)
+    try store.save(state)
+    let before = try Data(contentsOf: store.url)
+    let manager = PluginManagerModel(defaultAdapter: ProbeAdapter("builtin"), routingStore: FeatureRoutingStore(url: nil))
+    let model = AppModel(store: store, featureRouter: manager.router, allowsLoginItemChanges: false,
+        nowProvider: { initial.addingTimeInterval(Date().timeIntervalSince(wallStart)) },
+        calendarProvider: { fixtureCalendar })
+    var updates: [Date] = []
+    let observation = model.$now.dropFirst().sink { updates.append($0) }
+    let titleBefore = model.menuTitle
+    model.start()
+    try await Task.sleep(for: .milliseconds(450))
+    let distinctUpdates = Set(updates)
+    require(distinctUpdates.count >= 2 && model.menuTitle != titleBefore,
+            "Real overtime millisecond timer must publish repeated updates within 450 ms")
+    require(model.postDepartureText?.hasSuffix(" ms") == true && model.postDepartureStatus?.extraMinutes == 30,
+            "Live timer must retain elapsed units and the scheduled departure calculation")
+    let after = try Data(contentsOf: store.url)
+    require(after == before, "Live elapsed timer must not write attendance")
+    withExtendedLifetime(observation) {}
+    print("PASS live overtime timer: repeated millisecond updates within 450ms, unchanged attendance")
+}
+
 @main
 struct PluginArchitectureChecks {
     @MainActor
@@ -925,6 +1025,7 @@ struct PluginArchitectureChecks {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         try checkMenuCountdownDisplay(root: root)
+        try await checkOvertimeTimer(root: root)
         try checkInjectedAttendanceClock(root: root)
         try await checkInjectedAsyncClock(root: root)
         try checkLegacyBuiltinMigration(root: root)

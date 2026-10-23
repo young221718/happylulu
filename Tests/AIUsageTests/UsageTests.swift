@@ -60,6 +60,15 @@ final class UsageTests: XCTestCase {
         XCTAssertEqual(LabelFormat.named.title(remaining: 72, stale: true), "Codex 72% ·")
     }
 
+    func testIconTitleRetainsUnknownAndStaleMeaningWithTextFallback() throws {
+        let format = try JSONDecoder().decode(LabelFormat.self, from: Data(#""icon""#.utf8))
+        XCTAssertEqual(format.title(remaining: 72, iconAvailable: true), "72%")
+        XCTAssertEqual(format.title(remaining: nil, iconAvailable: true), "—")
+        XCTAssertEqual(format.title(remaining: 72, stale: true, iconAvailable: true), "72% ·")
+        XCTAssertEqual(format.title(remaining: 72), "Codex 72%")
+        XCTAssertEqual(format.title(remaining: nil, stale: true), "Codex —")
+    }
+
     func testNotificationOncePerWindowAndThresholdAfterDelivery() {
         var gate = LowUsageAlertGate()
         let window = UsageWindow(usedPercent: 85, windowDurationMins: 10080, resetsAt: 2000)
@@ -73,6 +82,27 @@ final class UsageTests: XCTestCase {
                                        threshold: 20, enabled: true))
         let restored = LowUsageAlertGate(deliveredKey: key)
         XCTAssertNil(restored.pendingKey(for: window, threshold: 20, enabled: true))
+    }
+
+    func testIconPreferenceDecodesWithoutChangingExistingSettings() throws {
+        let stored = Data(#"{"refreshMinutes":15,"labelFormat":"icon","notificationsEnabled":true,"notificationThreshold":30,"cliPath":"/fixture/codex"}"#.utf8)
+        let preferences = try JSONDecoder().decode(Preferences.self, from: stored)
+        XCTAssertEqual(preferences.labelFormat.rawValue, "icon")
+        XCTAssertEqual(preferences.refreshMinutes, 15)
+        XCTAssertTrue(preferences.notificationsEnabled)
+        XCTAssertEqual(preferences.notificationThreshold, 30)
+        XCTAssertEqual(preferences.cliPath, "/fixture/codex")
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences)), preferences)
+    }
+
+    func testExistingLabelPreferencesKeepSavedMeaningAndDefault() throws {
+        XCTAssertEqual(Preferences().labelFormat, .named)
+        for format in ["named", "percentage"] {
+            let stored = Data("{\"refreshMinutes\":10,\"labelFormat\":\"\(format)\",\"notificationsEnabled\":false,\"notificationThreshold\":20,\"cliPath\":\"\"}".utf8)
+            let preferences = try JSONDecoder().decode(Preferences.self, from: stored)
+            XCTAssertEqual(preferences.labelFormat.rawValue, format)
+            XCTAssertEqual(preferences.refreshMinutes, 10)
+        }
     }
 
     func testPreferencesNormalizeBadStoredValues() {

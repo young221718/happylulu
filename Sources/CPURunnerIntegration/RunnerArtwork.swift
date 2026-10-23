@@ -5,15 +5,26 @@ import AppKit
 public enum RunnerArtwork {
     public static let frameCount = 8
     public static let size = NSSize(width: 26, height: 18)
+    public static func frameCount(for animal: RunnerAnimal) -> Int { animal == .cat ? 5 : frameCount }
+    public static func size(for animal: RunnerAnimal) -> NSSize { animal == .cat ? NSSize(width: 28, height: 18) : size }
+    private static let resources: Bundle = {
+        if let url = Bundle.main.resourceURL?.appendingPathComponent("HappyLulu_CPURunnerIntegration.bundle"),
+           let bundle = Bundle(url: url) { return bundle }
+        return Bundle.module
+    }()
     private static let frames = Dictionary(uniqueKeysWithValues: RunnerAnimal.allCases.map { animal in
-        (animal, (0..<frameCount).map { makeImage(for: animal, frame: $0) })
+        (animal, (0..<frameCount(for: animal)).map { makeImage(for: animal, frame: $0) })
     })
 
     public static func image(for animal: RunnerAnimal, frame: Int) -> NSImage {
-        frames[animal]![(frame % frameCount + frameCount) % frameCount]
+        let count = frameCount(for: animal)
+        return frames[animal]![(frame % count + count) % count]
     }
 
     private static func makeImage(for animal: RunnerAnimal, frame: Int) -> NSImage {
+        let size = size(for: animal)
+        let source = animal == .cat ? resources.url(forResource: "cat\(frame)", withExtension: "png", subdirectory: "RunCat")
+            .flatMap { NSImage(contentsOf: $0) } : nil
         let image = NSImage(size: size)
         for scale in [1, 2] {
             guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil,
@@ -26,7 +37,15 @@ public enum RunnerArtwork {
             NSGraphicsContext.current = context
             context.shouldAntialias = true
             context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
-            draw(animal, frame: frame)
+            if let source {
+                // Preserve original proportions with a 1pt safety margin for edge-touching source pixels.
+                let scale = min((size.width - 2) / source.size.width, (size.height - 2) / source.size.height)
+                let drawSize = NSSize(width: source.size.width * scale, height: source.size.height * scale)
+                source.draw(in: NSRect(x: (size.width - drawSize.width) / 2, y: (size.height - drawSize.height) / 2,
+                    width: drawSize.width, height: drawSize.height), from: .zero, operation: .sourceOver, fraction: 1)
+            } else {
+                draw(animal, frame: frame)
+            }
             NSGraphicsContext.restoreGraphicsState()
             image.addRepresentation(rep)
         }

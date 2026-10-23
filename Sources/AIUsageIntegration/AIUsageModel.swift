@@ -23,6 +23,8 @@ public final class AIUsageModel: ObservableObject, PluginController, PluginMenuB
     private let notificationAuthorization: @MainActor @Sendable () async -> Bool
     private let notificationDelivery: @MainActor @Sendable (String, String, String) async throws -> Void
     private let providerFactory: @Sendable (Preferences) -> any UsageProvider
+    private let iconProvider: @MainActor () -> Data?
+    private lazy var cachedIconPNG: Data? = iconProvider().flatMap { NSImage(data: $0) == nil ? nil : $0 }
     private var active = false
     private var timer: Timer?
     private var wakeObserver: NSObjectProtocol?
@@ -50,9 +52,10 @@ public final class AIUsageModel: ObservableObject, PluginController, PluginMenuB
                 }, notificationDelivery: @escaping @MainActor @Sendable (String, String, String) async throws -> Void = { id, title, body in
                     let content = UNMutableNotificationContent(); content.title = title; content.body = body
                     try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
-                }) {
+                }, iconProvider: (@MainActor () -> Data?)? = nil) {
         self.defaults = defaults; self.localize = localize; self.providerFactory = providerFactory
         self.notificationAuthorization = notificationAuthorization; self.notificationDelivery = notificationDelivery
+        self.iconProvider = iconProvider ?? { CodexMenuBarIcon.loadPNG() }
         var saved = defaults.data(forKey: "HappyLuluAIUsage.preferences.v1")
             .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
         saved.normalize(); preferences = saved
@@ -72,12 +75,18 @@ public final class AIUsageModel: ObservableObject, PluginController, PluginMenuB
     public var analysis: UsageAnalysis { snapshot == nil ? UsageHistory().analysis() : history.analysis() }
     public var menuBarItem: PluginMenuBarItem? {
         guard active, enabled else { return nil }
+        return menuBarPreview
+    }
+    public var menuBarPreview: PluginMenuBarItem {
         let name = providerFactory(preferences).name
         let value = snapshot.map { "\($0.weekly.remainingPercent)%" } ?? "—"
-        let title = (preferences.labelFormat == .named ? name + " " : "") + value + (isStale && snapshot != nil ? " ·" : "")
+        let icon = preferences.labelFormat == .icon ? cachedIconPNG : nil
+        let title = preferences.labelFormat.title(remaining: snapshot?.weekly.remainingPercent,
+            stale: isStale, providerName: name, iconAvailable: icon != nil)
         return PluginMenuBarItem(id: descriptor.id, title: title,
             accessibilityLabel: name + " " + text("주간 잔여량", "weekly remaining") + " " + value +
-                (isStale ? text(" · 이전 조회 값", " · previous reading") : ""))
+                (isStale ? text(" · 이전 조회 값", " · previous reading") : ""),
+            iconPNG: icon, iconIsTemplate: icon != nil)
     }
     public func setEnabled(_ value: Bool) {
         enabled = value

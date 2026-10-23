@@ -19,14 +19,23 @@ with pathlib.Path(sys.argv[1]).open('wb') as stream:
         CFBundleExecutable='VacationProbe', CFBundleName='VacationProbe', CFBundlePackageType='APPL',
         LSUIElement=True), stream)
 PY
-# This fixture compiles only the presentation and core; it never starts the real app or its services.
+# This fixture compiles presentation and shared contracts; it never starts the real app or its services.
 swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
   -module-cache-path "$probe_dir/module-cache" -emit-module -emit-library -module-name AfterSixCore \
   -emit-module-path "$probe_dir/modules/AfterSixCore.swiftmodule" \
   Sources/AfterSixCore/*.swift -o "$probe_dir/modules/libAfterSixCore.dylib"
 swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
+  -module-cache-path "$probe_dir/module-cache" -emit-module -emit-library -module-name AppPluginCore \
+  -emit-module-path "$probe_dir/modules/AppPluginCore.swiftmodule" \
+  Sources/AppPluginCore/*.swift -o "$probe_dir/modules/libAppPluginCore.dylib"
+swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
   -module-cache-path "$probe_dir/module-cache" -I "$probe_dir/modules" -L "$probe_dir/modules" \
-  -lAfterSixCore -Xlinker -rpath -Xlinker "$probe_dir/modules" \
+  -lAppPluginCore -emit-module -emit-library -module-name AppPluginHost \
+  -emit-module-path "$probe_dir/modules/AppPluginHost.swiftmodule" \
+  Sources/AppPluginHost/*.swift -o "$probe_dir/modules/libAppPluginHost.dylib"
+swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
+  -module-cache-path "$probe_dir/module-cache" -I "$probe_dir/modules" -L "$probe_dir/modules" \
+  -lAfterSixCore -lAppPluginHost -Xlinker -rpath -Xlinker "$probe_dir/modules" \
   Sources/AfterSix/LuluBrand.swift Tests/VacationAppearanceProbe/main.swift \
-  -framework AppKit -o "$app/Contents/MacOS/VacationProbe"
+  -framework AppKit -framework SwiftUI -o "$app/Contents/MacOS/VacationProbe"
 "$app/Contents/MacOS/VacationProbe" "$output"

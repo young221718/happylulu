@@ -18,6 +18,43 @@ sys.dont_write_bytecode = True
 import release_delivery as delivery
 
 
+class MacOSSDKChecks(unittest.TestCase):
+    good = """HappyLulu (architecture arm64):
+Load command 11
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform MACOS
+    minos 13.0
+      sdk 27.0
+   ntools 1
+     tool LD
+  version 27037.1
+"""
+
+    def test_selected_sdk_and_minimum_allow_equivalent_version_forms(self):
+        import macos_sdk
+        macos_sdk.validate_build_versions(self.good, "27", "13.0.0")
+
+    def test_observed_legacy_link_sdk_is_rejected(self):
+        import macos_sdk
+        with self.assertRaisesRegex(ValueError, "SDK mismatch"):
+            macos_sdk.validate_build_versions(self.good.replace("sdk 27.0", "sdk 13.0"), "27.0", "13.0")
+
+    def test_one_bad_universal_slice_is_rejected(self):
+        import macos_sdk
+        intel = self.good.replace("arm64", "x86_64").replace("sdk 27.0", "sdk 13.0")
+        with self.assertRaisesRegex(ValueError, "SDK mismatch"):
+            macos_sdk.validate_build_versions(self.good + intel, "27.0", "13.0")
+
+    def test_missing_sdk_or_incorrect_minimum_is_rejected(self):
+        import macos_sdk
+        for output in ("", self.good.replace("      sdk 27.0\n", ""),
+                       self.good.replace("LC_BUILD_VERSION", "LC_OTHER"),
+                       self.good.replace("minos 13.0", "minos 14.0")):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                macos_sdk.validate_build_versions(output, "27.0", "13.0")
+
+
 class ReleaseDeliveryChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

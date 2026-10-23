@@ -1,11 +1,13 @@
 """Verify Mac release metadata, localized resources, signatures and archive bytes."""
 import hashlib
+import json
 import plistlib
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 sys.dont_write_bytecode = True
+from macos_sdk import verify_binary
 from release_delivery import APP_BUNDLE, archive_bundle_check, checksums, names, safe_file
 root = Path(__file__).resolve().parent.parent
 release = Path(sys.argv[1]).resolve()
@@ -19,7 +21,14 @@ for resource in [root / 'Resources/HappyLuluBrand.png', *sorted((root / 'Resourc
     assert (app / 'Contents/Resources' / resource.relative_to(root / 'Resources')).read_bytes() == resource.read_bytes()
 for language in ('ko', 'en'):
     assert (app / f'Contents/Resources/{language}.lproj/InfoPlist.strings').read_bytes() == (root / f'Resources/{language}.lproj/InfoPlist.strings').read_bytes()
+assert (app / 'Contents/Resources/PrivacyInfo.xcprivacy').read_bytes() == (root / 'Resources/PrivacyInfo.xcprivacy').read_bytes()
+for resource in (root / 'Sources/CPURunnerIntegration/Resources/RunCat').iterdir():
+    assert (app / 'Contents/Resources/HappyLulu_CPURunnerIntegration.bundle/RunCat' / resource.name).read_bytes() == resource.read_bytes()
 assert set(subprocess.check_output(['lipo', '-archs', str(app / 'Contents/MacOS/HappyLulu')], text=True).split()) == {'arm64', 'x86_64'}
+source = json.loads((release / 'build-source.json').read_text())
+# Older artifacts have no SDK record; compare recorded provenance when present, never the verifier's SDK.
+if 'sdkVersion' in source:
+    verify_binary(app / 'Contents/MacOS/HappyLulu', source['sdkVersion'], info['LSMinimumSystemVersion'])
 for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
     assert safe_file(release, name).read_bytes() == (root / name).read_bytes()
     assert (app / 'Contents/Resources' / name).read_bytes() == (root / name).read_bytes()

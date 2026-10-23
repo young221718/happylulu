@@ -1,0 +1,32 @@
+{
+  "cat0.png": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/Menubar%20RunCat/Assets.xcassets/cat_page0.imageset/cat0.png",
+    "sha256": "52da0d6f9d1ba8d2c0d5aee692f4d8278418f684bd35dafe95ad766265d6c0e1",
+    "bytes": 4387
+  },
+  "cat1.png": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/Menubar%20RunCat/Assets.xcassets/cat_page1.imageset/cat1.png",
+    "sha256": "801e3571b11fd16b3efbc1f65b651df871c2830aadd76da53e600c727927f9b5",
+    "bytes": 4423
+  },
+  "cat2.png": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/Menubar%20RunCat/Assets.xcassets/cat_page2.imageset/cat2.png",
+    "sha256": "02eb14ae0f25f585bfe68834880a7cc9c9a9c1590d67a5f1bac2a5f26191a5a9",
+    "bytes": 4367
+  },
+  "cat3.png": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/Menubar%20RunCat/Assets.xcassets/cat_page3.imageset/cat3.png",
+    "sha256": "f7eb0ecfe1144d6232dfd9160b96fe452125ded56d3f6d59d7c6e371a537ceb9",
+    "bytes": 4403
+  },
+  "cat4.png": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/Menubar%20RunCat/Assets.xcassets/cat_page4.imageset/cat4.png",
+    "sha256": "55458fc0e83ba7f5f5764945beb8ad3c33dd702f2b2e76040a9d29ee7c7c115e",
+    "bytes": 4338
+  },
+  "LICENSE.txt": {
+    "source": "https://raw.githubusercontent.com/Kyome22/menubar_runcat/82747b139cc32e13a7b713f8521f44c70317f7d4/LICENSE",
+    "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+    "bytes": 10173
+  }
+}
