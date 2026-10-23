@@ -16,6 +16,67 @@ final class MemorySecrets: PluginSecretStore, @unchecked Sendable {
     func remove(for key: String) throws { lock.withLock { values[key] = nil } }
 }
 
+
+final class BlockingSecrets: PluginSecretStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private let releaseSignal = DispatchSemaphore(value: 0)
+    private var beganValue = false
+    private var finishedValue = false
+    private var mainThreadValue = false
+    let fails: Bool
+    init(fails: Bool = false) { self.fails = fails }
+    var began: Bool { lock.withLock { beganValue } }
+    var finished: Bool { lock.withLock { finishedValue } }
+    var ranOnMainThread: Bool { lock.withLock { mainThreadValue } }
+    func load(for key: String) throws -> String? {
+        lock.withLock { beganValue = true; mainThreadValue = Thread.isMainThread }
+        _ = releaseSignal.wait(timeout: .now() + 2)
+        lock.withLock { finishedValue = true }
+        if fails { throw PluginFailure.credentials }
+        return "held-fixture-secret"
+    }
+    func release() { releaseSignal.signal() }
+    func save(_ password: String, for key: String) throws { fatalError("Blocked startup must not write credentials") }
+    func remove(for key: String) throws { fatalError("Blocked startup must not remove credentials") }
+}
+
+
+final class BlockingSaveSecrets: PluginSecretStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var stored: String?
+    private var beganValue = false
+    private var onMain = false
+    private var savesValue = 0
+    private var removesValue = 0
+    let holdRead: Bool
+    let rollbackFails: Bool
+    init(password: String?, holdRead: Bool, rollbackFails: Bool = false) {
+        stored = password; self.holdRead = holdRead; self.rollbackFails = rollbackFails
+    }
+    var began: Bool { lock.withLock { beganValue } }
+    var value: String? { lock.withLock { stored } }
+    var ranOnMainThread: Bool { lock.withLock { onMain } }
+    var saves: Int { lock.withLock { savesValue } }
+    var removes: Int { lock.withLock { removesValue } }
+    func load(for key: String) throws -> String? {
+        lock.withLock { onMain = onMain || Thread.isMainThread; if holdRead { beganValue = true } }
+        if holdRead { _ = signal.wait(timeout: .now() + 2) }
+        return lock.withLock { stored }
+    }
+    func save(_ password: String, for key: String) throws {
+        let hold = password == "replacement-fixture"
+        lock.withLock { onMain = onMain || Thread.isMainThread; if hold { beganValue = true } }
+        if hold { _ = signal.wait(timeout: .now() + 2) }
+        if !hold && rollbackFails { throw PluginFailure.credentials }
+        lock.withLock { stored = password; savesValue += 1 }
+    }
+    func remove(for key: String) throws {
+        lock.withLock { onMain = onMain || Thread.isMainThread; stored = nil; removesValue += 1 }
+    }
+    func release() { signal.signal() }
+}
+
 struct UnreadableSecrets: PluginSecretStore {
     func load(for key: String) throws -> String? { throw PluginFailure.credentials }
     func save(_ password: String, for key: String) throws { fatalError("Unreadable fixture must not save credentials") }
@@ -482,6 +543,86 @@ private func checkCaptchaModelCancellation(folder: URL) async throws {
     print("PASS CAPTCHA model: stale image/login cancellation, account edits, disable and stop")
 }
 
+
+@MainActor
+private func checkBlockingCredentialLifecycle(folder: URL) async throws {
+    for action in ["disable", "module", "edit", "stop"] {
+        let store = DaouOfficeConfigurationStore(url: folder.appendingPathComponent(UUID().uuidString + "/config.json"))
+        try store.save(DaouOfficeConfiguration(enabled: true, address: "https://example.daouoffice.com", loginID: "employee"))
+        let secrets = BlockingSecrets(fails: action == "stop")
+        let creations = ClientCreations()
+        let model = DaouOfficePluginModel(store: store, secrets: secrets, loadSavedPasswordAtInitialization: false,
+            makeClient: {
+                creations.increment()
+                return DaouOfficeAPIClient(configuration: $0, secrets: $1, transport: PausedTransport())
+            })
+        let began = Date()
+        model.start()
+        require(Date().timeIntervalSince(began) < 0.2, "Optional startup synchronously blocked on Keychain")
+        try await waitUntil("Saved credential lookup never began") { secrets.began }
+        require(!secrets.ranOnMainThread, "Keychain lookup ran on the UI thread")
+        var heartbeat = false
+        Task { @MainActor in heartbeat = true }
+        try await waitUntil("Credential lookup blocked the main actor") { heartbeat }
+        switch action {
+        case "disable": model.setEnableRequested(false)
+        case "module": model.setModuleEnabled(false)
+        case "edit": model.loginID = "another.employee"
+        default: model.stop()
+        }
+        secrets.release()
+        try await waitUntil("Cancelled credential lookup did not finish") { secrets.finished }
+        try await Task.sleep(for: .milliseconds(30))
+        require(!model.hasSavedPassword && model.failure == nil && model.snapshot == nil && !model.isRunning,
+            "Late credential result changed cancelled plugin state")
+        require(creations.value == 0 && model.api.snapshot(for: "daouoffice") == nil,
+            "Late credential result connected a cancelled plugin")
+        model.stop()
+    }
+    print("PASS credential isolation: main-actor heartbeat during blocked lookup; disable/module/account edit/stop reject late results")
+}
+
+
+@MainActor
+private func checkCancelledCredentialSave(folder: URL) async throws {
+    for (holdRead, original, rollbackFails) in [(true, "original-fixture" as String?, false),
+            (false, "original-fixture", false), (false, nil, false), (false, "original-fixture", true)] {
+        let store = DaouOfficeConfigurationStore(url: folder.appendingPathComponent(UUID().uuidString + "/config.json"))
+        let secrets = BlockingSaveSecrets(password: original, holdRead: holdRead, rollbackFails: rollbackFails)
+        let creations = ClientCreations()
+        let model = DaouOfficePluginModel(store: store, secrets: secrets, makeClient: {
+            creations.increment()
+            return DaouOfficeAPIClient(configuration: $0, secrets: $1, transport: PausedTransport())
+        })
+        model.setEnableRequested(true)
+        model.address = "https://example.daouoffice.com"; model.loginID = "employee"
+        model.password = "replacement-fixture"
+        let began = Date()
+        model.saveAndRefresh()
+        require(Date().timeIntervalSince(began) < 0.2, "Explicit save blocked the main actor on Keychain")
+        try await waitUntil("Credential save did not reach the held operation") { secrets.began }
+        require(!secrets.ranOnMainThread, "Credential read/write ran on the main thread")
+        model.setEnableRequested(false)
+        require(model.isRunning, "Updater lost an in-flight credential transaction before rollback")
+        model.setEnableRequested(true)
+        model.password = "second-fixture"
+        model.saveAndRefresh()
+        require(!model.canSave, "A second save can race with the cancelled transaction rollback")
+        secrets.release()
+        try await waitUntil("Cancelled credential save did not finish cleanup") { !model.isRunning }
+        require(secrets.value == (rollbackFails ? "replacement-fixture" : original) && !secrets.ranOnMainThread,
+            "Cancelled save did not restore the old credential off the main thread")
+        let stored = try store.load()
+        require(stored == nil, "Cancelled save wrote enabled connection metadata")
+        require(!model.enabled && !model.hasSavedPassword && model.failure == (rollbackFails ? .credentials : nil) && creations.value == 0,
+            "Cancelled save applied stale connection state or started authentication")
+        require(holdRead ? secrets.saves == 0 : secrets.saves == (original == nil || rollbackFails ? 1 : 2), "Cancelled save repeated or skipped a credential mutation")
+        require(secrets.removes == (original == nil ? 1 : 0), "New credential rollback failed to remove only its own unsaved value")
+        model.stop()
+    }
+    print("PASS credential save isolation: blocked read/write stays responsive; cancellation prevents metadata/network, serializes cleanup, restores/removes only its transaction and surfaces rollback failure")
+}
+
 @MainActor
 private func checkSavedPasswordPresence(folder: URL) async throws {
     let config = try DaouOfficeConfiguration(enabled: false, address: "https://example.daouoffice.com", loginID: "employee")
@@ -501,8 +642,10 @@ private func checkSavedPasswordPresence(folder: URL) async throws {
             "Existing disabled configuration claims a missing or empty saved password")
         model.start()
         model.setEnableRequested(true)
+        try await waitUntil("Saved-password presence check did not finish") { !model.isRunning }
         require(!model.canSave, "An empty draft can save a connection with no stored password")
         model.saveAndRefresh()
+        try await waitUntil("Missing credential save did not finish") { !model.isRunning }
         let blankRequests = await transport.captured()
         require(blankRequests.isEmpty && creations.value == 0 && !model.isRunning && model.failure == .missingCredentials,
             "Enabling or saving with no password initiated authentication")
@@ -523,6 +666,7 @@ private func checkSavedPasswordPresence(folder: URL) async throws {
     let unreadableStore = DaouOfficeConfigurationStore(url: folder.appendingPathComponent(UUID().uuidString + "/config.json"))
     try unreadableStore.save(config)
     let unreadable = DaouOfficePluginModel(store: unreadableStore, secrets: UnreadableSecrets())
+    try await waitUntil("Unreadable saved-password lookup did not finish") { !unreadable.isRunning }
     require(!unreadable.hasSavedPassword && !unreadable.canUseSavedPassword && unreadable.failure == .credentials,
         "Saved-password read failure was hidden or mistaken for a configuration error")
     unreadable.stop()
@@ -533,6 +677,8 @@ private func checkSavedPasswordPresence(folder: URL) async throws {
 func checks() async throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("HappyLulu-plugin-model-" + UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: folder) }
+    try await checkBlockingCredentialLifecycle(folder: folder)
+    try await checkCancelledCredentialSave(folder: folder)
     let store = DaouOfficeConfigurationStore(url: folder.appendingPathComponent("config.json"))
     let secrets = MemorySecrets()
     let paused = PausedTransport()
@@ -544,6 +690,7 @@ func checks() async throws {
     model.setEnableRequested(true)
     model.address = "https://example.daouoffice.com"; model.loginID = "employee"; model.password = "fixture-secret"
     model.saveAndRefresh()
+    try await waitUntil("Save did not enable the background fetch") { model.enabled }
     require(model.enabled && model.isRunning && model.password.isEmpty, "Save did not begin a background fetch and clear draft secret")
     while !(await paused.began) { await Task.yield() }
     let config = try store.load()!
@@ -563,6 +710,7 @@ func checks() async throws {
     reopened.start()
     require(secrets.loadCount == loadsBeforeRestart, "Starting a disconnected module queried saved credentials")
     reopened.setEnableRequested(true)
+    try await waitUntil("Lazy credential lookup did not finish") { !reopened.isRunning }
     require(reopened.canSave && reopened.password.isEmpty, "Enabling after disconnect and restart requires retyping the saved password")
     require(secrets.loadCount == loadsBeforeRestart + 1 && !reopened.enabled && !reopened.isRunning,
         "Explicit enabling did not lazily load the credential or initiated authentication before save")
@@ -580,6 +728,7 @@ func checks() async throws {
     failed.setEnableRequested(true); failed.address = config.baseURL.absoluteString
     failed.loginID = config.loginID; failed.password = "replacement-secret"
     failed.saveAndRefresh()
+    try await waitUntil("Failed metadata save did not finish rollback") { !failed.isRunning }
     require(!failed.enabled && failed.failure == .configuration, "Failed metadata save started networking")
     let preserved = try secrets.load(for: config.credentialKey)
     require(preserved == "fixture-secret", "Failed save did not roll back password")

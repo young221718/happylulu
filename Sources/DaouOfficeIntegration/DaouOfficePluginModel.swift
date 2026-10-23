@@ -30,6 +30,9 @@ final class DaouOfficePluginModel: ObservableObject {
     private var configuration: DaouOfficeConfiguration?
     private var timer: Timer?
     private var task: Task<Void, Never>?
+    private var credentialLookup: Task<Void, Never>?
+    private var credentialSave: Task<Void, Never>?
+    private var credentialSaveWorker: Task<String?, Error>?
     private var generation = 0
     private var failures = 0
     private var moduleEnabled = true
@@ -48,19 +51,21 @@ final class DaouOfficePluginModel: ObservableObject {
     var canSave: Bool {
         registered && enableRequested && !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             !loginID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            (!password.isEmpty || canUseSavedPassword) && !isRunning && !captchaRequired
+            (!password.isEmpty || canUseSavedPassword) && !isRunning && credentialSave == nil && !captchaRequired
     }
     private var matchesSavedConnection: Bool {
         guard let configuration,
               let draft = try? DaouOfficeConfiguration(enabled: true, address: address, loginID: loginID) else { return false }
         return draft.credentialKey == configuration.credentialKey && password.isEmpty
     }
-    var canRefresh: Bool { moduleEnabled && enabled && !isRunning && captchaChallenge == nil && matchesSavedConnection }
+    var canRefresh: Bool { moduleEnabled && enabled && !isRunning && credentialSave == nil && captchaChallenge == nil && matchesSavedConnection }
     var canSubmitCaptcha: Bool {
         moduleEnabled && enabled && !isRunning && captchaChallenge != nil && matchesSavedConnection &&
             !captchaAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     var canReloadCaptcha: Bool { moduleEnabled && enabled && !isRunning && captchaChallenge != nil && matchesSavedConnection }
+
+    private enum CredentialRollbackFailure: Error { case failed }
 
     private enum Operation {
         case refresh
@@ -89,16 +94,34 @@ final class DaouOfficePluginModel: ObservableObject {
     }
 
     private func loadSavedPassword() {
-        guard !savedPasswordLoaded, let configuration else { return }
-        savedPasswordLoaded = true
-        do { hasSavedPassword = try secrets.load(for: configuration.credentialKey)?.isEmpty == false }
-        catch { failure = .credentials }
+        guard !savedPasswordLoaded, credentialLookup == nil, credentialSave == nil, let configuration else { return }
+        let current = generation
+        let key = configuration.credentialKey
+        let secrets = secrets
+        isRunning = true
+        credentialLookup = Task { [weak self] in
+            let result = await Task.detached {
+                Result { try secrets.load(for: key)?.isEmpty == false }
+            }.value
+            guard let self, self.generation == current, self.moduleEnabled,
+                  self.configuration?.credentialKey == key, !Task.isCancelled else { return }
+            self.credentialLookup = nil
+            self.savedPasswordLoaded = true
+            self.isRunning = false
+            switch result {
+            case .success(let present): self.hasSavedPassword = present
+            case .failure: self.failure = .credentials
+            }
+            if self.started && self.enabled && self.enableRequested && self.matchesSavedConnection {
+                self.connect(configuration)
+                self.refresh()
+            }
+        }
     }
 
     func start() {
         guard registered, moduleEnabled, !started else { return }
         started = true
-        if enabled { loadSavedPassword() }
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, let next = self.nextRunAt, next <= Date(), self.enabled else { return }
@@ -106,7 +129,10 @@ final class DaouOfficePluginModel: ObservableObject {
             }
         }
         if let timer { RunLoop.main.add(timer, forMode: .common) }
-        if enabled, let config = configuration { connect(config); refresh() }
+        if enabled {
+            if savedPasswordLoaded, let config = configuration { connect(config); refresh() }
+            else { loadSavedPassword() }
+        }
     }
 
     func setEnableRequested(_ value: Bool) {
@@ -123,28 +149,76 @@ final class DaouOfficePluginModel: ObservableObject {
     }
 
     func saveAndRefresh() {
-        guard registered, moduleEnabled, enableRequested, !isRunning else { return }
-        do {
-            let config = try DaouOfficeConfiguration(enabled: true, address: address, loginID: loginID)
+        guard registered, moduleEnabled, enableRequested, !isRunning, credentialSave == nil else { return }
+        let config: DaouOfficeConfiguration
+        do { config = try DaouOfficeConfiguration(enabled: true, address: address, loginID: loginID) }
+        catch { failure = error as? PluginFailure ?? .configuration; return }
+        let replacement = password
+        let draftAddress = address, draftLoginID = loginID
+        let secrets = secrets
+        stopRefresh()
+        let current = generation
+        isRunning = true
+        let worker = Task.detached {
             let oldPassword = try secrets.load(for: config.credentialKey)
-            guard !password.isEmpty || oldPassword?.isEmpty == false else { throw PluginFailure.missingCredentials }
-            let replacingPassword = !password.isEmpty
-            if replacingPassword { try secrets.save(password, for: config.credentialKey) }
-            do { try store.save(config) }
-            catch {
-                if replacingPassword {
-                    if let oldPassword { try secrets.save(oldPassword, for: config.credentialKey) }
-                    else { try secrets.remove(for: config.credentialKey) }
+            try Task.checkCancellation()
+            guard !replacement.isEmpty || oldPassword?.isEmpty == false else { throw PluginFailure.missingCredentials }
+            if !replacement.isEmpty { try secrets.save(replacement, for: config.credentialKey) }
+            return oldPassword
+        }
+        credentialSaveWorker = worker
+        credentialSave = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let oldPassword = try await worker.value
+                let valid = self.generation == current && self.moduleEnabled && self.enableRequested
+                    && self.address == draftAddress && self.loginID == draftLoginID
+                    && self.password == replacement
+                if valid {
+                    do { try self.store.save(config) }
+                    catch {
+                        try await self.restorePassword(oldPassword, replacing: replacement, key: config.credentialKey)
+                        throw error
+                    }
+                } else {
+                    try await self.restorePassword(oldPassword, replacing: replacement, key: config.credentialKey)
+                    self.finishCredentialSave()
+                    return
                 }
-                throw error
+                self.finishCredentialSave()
+                self.isRunning = false
+                self.configuration = config; self.address = config.baseURL.absoluteString; self.loginID = config.loginID
+                self.password = ""; self.hasSavedPassword = true; self.savedPasswordLoaded = true
+                self.enabled = true; self.snapshot = nil; self.failure = nil; self.failures = 0
+                self.connect(config)
+                self.refresh()
+            } catch {
+                self.finishCredentialSave()
+                // A failed rollback is a real credential-preservation error, even after disable.
+                if error is CredentialRollbackFailure { self.failure = .credentials; return }
+                guard self.generation == current else { return }
+                self.isRunning = false
+                self.failure = error as? PluginFailure ?? .credentials
             }
-            stopRefresh()
-            configuration = config; address = config.baseURL.absoluteString; loginID = config.loginID
-            password = ""; hasSavedPassword = true; enabled = true; snapshot = nil
-            failure = nil; failures = 0
-            connect(config)
-            refresh()
-        } catch { failure = error as? PluginFailure ?? .credentials }
+        }
+    }
+
+    private func restorePassword(_ oldPassword: String?, replacing replacement: String, key: String) async throws {
+        guard !replacement.isEmpty else { return }
+        let secrets = secrets
+        do {
+            try await Task.detached {
+                if let oldPassword { try secrets.save(oldPassword, for: key) }
+                else { try secrets.remove(for: key) }
+            }.value
+        } catch { throw CredentialRollbackFailure.failed }
+    }
+
+    private func finishCredentialSave() {
+        objectWillChange.send()
+        credentialSaveWorker = nil
+        credentialSave = nil
+        isRunning = false
     }
 
     private func connect(_ config: DaouOfficeConfiguration) {
@@ -255,15 +329,18 @@ final class DaouOfficePluginModel: ObservableObject {
     }
 
     private func draftChanged() {
-        guard captchaRequired || isRunning else { return }
+        guard captchaRequired || isRunning || credentialLookup != nil || credentialSave != nil else { return }
         stopRefresh()
         failure = nil
     }
 
     private func stopRefresh() {
         generation += 1; task?.cancel(); task = nil
+        credentialLookup?.cancel(); credentialLookup = nil
+        // SecItem calls cannot be interrupted; keep save ownership until any rollback finishes.
+        credentialSaveWorker?.cancel()
         if registered { registry.deactivate(plugin.descriptor.id) }
-        isRunning = false; nextRunAt = nil; diagnostic = nil
+        isRunning = credentialSave != nil; nextRunAt = nil; diagnostic = nil
         captchaChallenge = nil; captchaRequired = false; captchaAnswer = ""
         lastLoginDiagnostic = nil; captchaLoginRejected = false
     }
