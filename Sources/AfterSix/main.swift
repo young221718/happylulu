@@ -15,6 +15,7 @@ let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdent
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
+    private var menuPanel: MenuBarPanel?
     private let calendarSync = CalendarSyncModel(runtimeAllowed: false, storeURL: runtimeProfile.syncURL)
     private let pluginPresentations = PluginSettingsPresentationRegistry()
     private lazy var plugins: PluginManagerModel = {
@@ -31,12 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     private let updater = AppUpdater()
     private let settingsNavigation = SettingsNavigation()
     private var settingsWindow: NSWindow?
+    private var settingsWindowChrome: SettingsWindowChrome?
     private var observation: AnyCancellable?
     private var languageObservation: AnyCancellable?
     private var pluginObservation: AnyCancellable?
     private var imageObservation: AnyCancellable?
     private var statusAppearanceObservations: [NSKeyValueObservation] = []
     private var statusInteractionMonitor: Any?
+    private var menuPanelObservations: [NSObjectProtocol] = []
     private var trackingStatusInteraction = false
     private var renderedStatusDark: Bool?
     private var renderedStatusHighlighted: Bool?
@@ -84,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 if event.type == .leftMouseUp { self.trackingStatusInteraction = false }
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
-                    if self.popover.isShown { self.statusItem.button?.highlight(true) }
+                    if self.popover.isShown || self.menuPanel?.isVisible == true { self.statusItem.button?.highlight(true) }
                     self.refreshStatusAppearance()
                 }
                 return event
@@ -93,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         popover.behavior = .transient
         popover.delegate = self
         popover.contentSize = NSSize(width: 364, height: 350)
-        popover.contentViewController = NSHostingController(rootView: PanelView(model: model, calendarSync: calendarSync, plugins: plugins, onOpenHistory: { [weak self] in
+        let panelContent = PanelView(model: model, calendarSync: calendarSync, plugins: plugins, onOpenHistory: { [weak self] in
             self?.openSettings(section: .history)
         }, onOpenSettings: { [weak self] in
             self?.openSettings()
@@ -102,7 +105,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }, onOpenPlugin: { [weak self] id in
             self?.settingsNavigation.pluginID = id
             self?.openSettings(section: .plugin)
-        }))
+        })
+        if LuluGlass.isSupported {
+            menuPanel = MenuBarPanel(content: NSHostingController(rootView:
+                panelContent.clipShape(RoundedRectangle(cornerRadius: 24))))
+            for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+                menuPanelObservations.append(NotificationCenter.default.addObserver(forName: name, object: menuPanel, queue: .main) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        self.statusItem.button?.highlight(self.menuPanel?.isVisible == true && self.menuPanel?.isKeyWindow == true)
+                        self.refreshStatusAppearance()
+                    }
+                })
+            }
+        } else {
+            popover.contentViewController = NSHostingController(rootView: panelContent)
+        }
         observation = model.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateTitle() }
         }
@@ -139,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         updater.canInstallNow = { [weak self] in
             guard let self else { return false }
             return !self.model.isProcessingAttendance && !self.calendarSync.isRunning && !self.plugins.isRunning
-                && !NSApplication.shared.isActive
+                && !NSApplication.shared.isActive && self.menuPanel?.isVisible != true
                 && !NSApplication.shared.windows.contains { $0.isVisible && $0.level == .normal }
         }
         if runtimeProfile.allowsAutomaticActivity { updater.start() }
@@ -168,7 +186,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                   let provider = entry.controller as? any PluginPanelProviding else { return height }
             return height + provider.panelHeight
         }
-        popover.contentSize = NSSize(width: 364, height: CGFloat(350 + 40 * items.count) + pluginPanelHeight)
+        let panelSize = NSSize(width: 364, height: CGFloat(350 + 40 * items.count) + pluginPanelHeight)
+        popover.contentSize = panelSize
+        menuPanel?.updateContentSize(panelSize)
+        menuPanel?.reposition()
         var toolTip = model.departure.map { L("출근 \(model.timeLabel(model.arrival!.time)) · 퇴근 예정 \(model.timeLabel($0))", "Arrived \(model.timeLabel(model.arrival!.time)) · expected departure \(model.timeLabel($0))") }
             ?? (model.luluDisplayState == .waiting
                 ? L("happylulu · 일반 06:00~10:00(08시 이전은 08시 기록), 오전 반차 13:00~15:00 로그인·잠금 해제를 기다립니다", "happylulu · waiting for login/unlock: regular 06:00–10:00 (before 08:00 recorded at 08:00), morning off 13:00–15:00")
@@ -229,12 +250,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     @objc func togglePanel() {
+        if menuPanel?.isVisible == true { menuPanel?.dismiss(); return }
         if popover.isShown { popover.performClose(nil); return }
         guard let button = statusItem.button else { return }
         model.refresh()
         NSApplication.shared.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        if let menuPanel {
+            menuPanel.show(relativeTo: button)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
         updateMenuBarImage()
     }
 
@@ -249,6 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     private func openSettings(section: SettingsSection? = nil) {
         if let section { settingsNavigation.selection = section }
+        menuPanel?.dismiss()
         if popover.isShown { popover.performClose(nil) }
         NSApplication.shared.setActivationPolicy(.regular)
         if settingsWindow == nil {
@@ -256,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                   backing: .buffered, defer: false)
             window.title = L("happylulu 설정", "happylulu Settings")
+            settingsWindowChrome = SettingsWindowChrome(window: window, appearance: .shared)
             window.delegate = self
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(rootView: SettingsView(
@@ -278,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     func applicationWillTerminate(_ notification: Notification) {
         if let statusInteractionMonitor { NSEvent.removeMonitor(statusInteractionMonitor) }
+        menuPanelObservations.forEach(NotificationCenter.default.removeObserver)
         plugins.stop(); calendarSync.setRuntimeAllowed(false)
     }
 

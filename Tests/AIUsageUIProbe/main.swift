@@ -7,6 +7,10 @@ import AIUsagePlugin
 import AIUsageIntegration
 import CPURunnerIntegration
 
+private func reportUsageProbe(_ message: String) {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+}
+
 private struct PreviewUsageProvider: UsageProvider {
     let name = "Codex"
     func fetch() async throws -> UsageSnapshot {
@@ -77,9 +81,46 @@ private enum PreviewRunnerModule: PluginModule {
     }
 }
 
+@MainActor
+private final class UsageProbeDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        reportUsageProbe("BEGIN usage UI applicationDidFinishLaunching")
+        NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor in
+            do { try await AIUsageUIProbe.check(); exit(0) }
+            catch { print("FAIL usage UI: \(error)"); exit(1) }
+        }
+    }
+}
+
+@MainActor
+private final class UsageMenuObservation: NSObject {
+    var menu: NSMenu?
+    @objc func didBeginTracking(_ notification: Notification) {
+        menu = notification.object as? NSMenu
+        reportUsageProbe("BEGIN usage menu tracking")
+        // A synchronous menu loop may run inside the main-queue Task below.
+        // Schedule in its tracking mode so cancellation does not need queue reentry.
+        menu?.perform(#selector(NSMenu.cancelTracking), with: nil, afterDelay: 0,
+                      inModes: [.eventTracking, .default])
+    }
+}
+
+@MainActor
+private final class UsageRoutingObservation { var openedPlugin: String? }
+
 @main
 struct AIUsageUIProbe {
-    @MainActor static func main() async throws {
+    @MainActor static func main() {
+        reportUsageProbe("BEGIN usage UI app")
+        let app = NSApplication.shared
+        let delegate = UsageProbeDelegate()
+        app.setActivationPolicy(.accessory)
+        app.delegate = delegate
+        withExtendedLifetime(delegate) { app.run() }
+    }
+
+    @MainActor static func check() async throws {
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
         precondition(Bundle.main.bundleIdentifier!.hasPrefix("local.happylulu.usage-probe."))
         let application = NSApplication.shared
@@ -125,12 +166,16 @@ struct AIUsageUIProbe {
         let navigation = SettingsNavigation()
         let settings = SettingsView(model: model, updater: AppUpdater(), calendarSync: sync, plugins: plugins,
             featureCalendar: FeatureCalendarModel(router: plugins.router), pluginPresentations: presentations, navigation: navigation)
+        let routing = UsageRoutingObservation()
         let panel = PanelView(model: model, calendarSync: sync, plugins: plugins,
-            onOpenHistory: {}, onOpenSettings: {})
-        for theme in [AppearancePalette.softMint, .charcoal] {
+            onOpenHistory: {}, onOpenSettings: {}, onOpenPlugin: { routing.openedPlugin = $0 })
+        var variants: [(AppearancePalette, ColorScheme, String)] = [(.softMint, .light, "light"), (.charcoal, .dark, "dark")]
+        if AppearanceModel.supportsNativeAppearance {
+            variants += [(.nativeGlass, .light, "native-light"), (.nativeGlass, .dark, "native-dark")]
+        }
+        for (theme, scheme, suffix) in variants {
+            application.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
             AppearanceModel.shared.selectPalette(theme)
-            let suffix = theme == .softMint ? "light" : "dark"
-            let scheme: ColorScheme = theme == .softMint ? .light : .dark
             navigation.selection = .general
             plugins.setShowUsage(false)
             try await render(settings, size: NSSize(width: 920, height: 720), name: "general-off-" + suffix,
@@ -155,16 +200,18 @@ struct AIUsageUIProbe {
             try await render(settings, size: NSSize(width: 820, height: 700), name: "usage-settings-icon-" + suffix,
                 directory: output, scheme: scheme)
             precondition(plugins.panelProviders.count == 1 && plugins.panelProviders[0].panelHeight == 184)
+            routing.openedPlugin = nil
             try await render(panel, size: NSSize(width: 364, height: 574), name: "panel-" + suffix,
-                directory: output, scheme: scheme)
+                directory: output, scheme: scheme, routing: routing)
+            precondition(routing.openedPlugin == AIUsageModule.id, "Usage row must open its plugin settings")
             PreviewRunnerModule.model.selectPresentation(.animal)
-            try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme)
+            try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme, variantSuffix: suffix)
             PreviewRunnerModule.model.selectPresentation(.owlOrbit)
             precondition(PreviewRunnerModule.model.menuBarImage == nil && PreviewRunnerModule.model.baseIconEffect != nil)
             navigation.pluginID = CPURunnerModule.id; navigation.selection = .plugin
             try await render(settings, size: NSSize(width: 820, height: 760), name: "owl-settings-" + suffix,
                 directory: output, scheme: scheme)
-            try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme)
+            try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme, variantSuffix: suffix)
             PreviewRunnerModule.model.setOrbitPalette(PluginOrbitPalette(startRGB: 0xFF7A59, endRGB: 0xFFC857))
             try await render(settings, size: NSSize(width: 820, height: 760), name: "owl-colors-custom-" + suffix,
                 directory: output, scheme: scheme)
@@ -181,7 +228,7 @@ struct AIUsageUIProbe {
                 precondition(model.postDepartureText == elapsed && model.menuTitle == "퇴근 18:00 · " + elapsed)
                 try await render(panel, size: NSSize(width: 364, height: 574), name: "overtime-\(minute)-" + suffix,
                     directory: output, scheme: scheme)
-                try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme,
+                try await renderStatusButton(model: model, plugins: plugins, directory: output, scheme: scheme, variantSuffix: suffix,
                     namePrefix: "overtime-\(minute)-")
             }
             now = noon
@@ -197,11 +244,12 @@ struct AIUsageUIProbe {
         print("PASS usage UI: actual settings/full attendance panel, isolated synthetic 72%/CPU35%/memory/storage/network/battery, expanded Codex connection, owl orbit and cat, light/dark, minimum settings size, packaged runner assets, display-off, stop and unchanged attendance")
         print("PASS native status button: owl orbit without extra animal, preserved owl/cat group, inline Codex icon/72%, aqua/darkAqua, native highlight flags, \(PreviewUsageModule.iconSource)")
         print("PASS overtime presentation: injected clock advances 90 to 91 minutes, shared elapsed text in panel/menu, light/dark, unchanged attendance")
+        print("PASS usage panel: existing/native light/dark, 574pt metrics panel, usage-row routing and Settings/Quit menu")
         print("LIMIT native status button: cached button views do not capture the window-managed selection background")
     }
 
     @MainActor private static func renderStatusButton(model: AppModel, plugins: PluginManagerModel,
-        directory: URL, scheme: ColorScheme, namePrefix: String = "") async throws {
+        directory: URL, scheme: ColorScheme, variantSuffix: String, namePrefix: String = "") async throws {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         defer { NSStatusBar.system.removeStatusItem(item) }
         let button = item.button!
@@ -253,7 +301,7 @@ struct AIUsageUIProbe {
                 button.cacheDisplay(in: button.bounds, to: bitmap)
             }
             guard let png = bitmap.representation(using: .png, properties: [:]) else { fatalError("No status button PNG") }
-            let name = namePrefix + "status-button-\(presentationName)-\(scheme == .dark ? "dark" : "light")-\(highlighted ? "highlighted" : "normal")"
+            let name = namePrefix + "status-button-\(presentationName)-\(variantSuffix)-\(highlighted ? "highlighted" : "normal")"
             try png.write(to: directory.appendingPathComponent(name + ".png"))
             let native = NSImage(size: button.bounds.size)
             native.addRepresentation(bitmap)
@@ -269,19 +317,76 @@ struct AIUsageUIProbe {
         }
     }
     @MainActor private static func render<V: View>(_ view: V, size: NSSize, name: String,
-        directory: URL, scheme: ColorScheme) async throws {
-        let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: -10000, y: -10000), size: size),
-            styleMask: [.titled], backing: .buffered, defer: false)
+        directory: URL, scheme: ColorScheme, routing: UsageRoutingObservation? = nil) async throws {
+        reportUsageProbe("BEGIN usage render: \(name)")
+        let materialMode: LuluMaterialMode =
+            ProcessInfo.processInfo.environment["HAPPY_LULU_MATERIAL_MODE"] == "legacy" ? .legacy : .automatic
+        let controller = NSHostingController(rootView: view.environment(\.luluMaterialMode, materialMode))
+        let isPanel = name.hasPrefix("panel-") || name.hasPrefix("overtime-")
+        let window: NSWindow = isPanel && LuluGlass.isSupported
+            ? MenuBarPanel(content: controller, size: size)
+            : NSWindow(contentRect: NSRect(origin: NSPoint(x: -10000, y: -10000), size: size),
+                       styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        let host = NSHostingView(rootView: view.environment(\.colorScheme, scheme))
-        window.contentView = host; window.orderFront(nil)
+        window.contentViewController = controller
+        window.setContentSize(size)
+        let chrome = isPanel ? nil : SettingsWindowChrome(window: window, appearance: .shared)
+        defer { withExtendedLifetime(chrome) {}; window.orderOut(nil); window.contentViewController = nil; window.close() }
+        let host = controller.view
+        let live = ProcessInfo.processInfo.environment["HAPPY_LULU_USAGE_LIVE"] == "1"
+            && name.contains("native-") && !name.hasPrefix("general-")
+        if live { window.center() }
+        else { window.setFrameOrigin(NSPoint(x: -10000, y: -10000)) }
+        window.makeKeyAndOrderFront(nil)
         try await Task.sleep(for: .milliseconds(200))
         host.layoutSubtreeIfNeeded()
         guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { fatalError("No bitmap") }
-        window.appearance?.performAsCurrentDrawingAppearance { host.cacheDisplay(in: host.bounds, to: bitmap) }
+        window.effectiveAppearance.performAsCurrentDrawingAppearance { host.cacheDisplay(in: host.bounds, to: bitmap) }
         guard let png = bitmap.representation(using: .png, properties: [:]) else { fatalError("No PNG") }
         try png.write(to: directory.appendingPathComponent(name + ".png"))
-        window.orderOut(nil)
+        if live && CGPreflightScreenCaptureAccess() {
+            let screenshot = directory.appendingPathComponent(name + ".window.png")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            process.arguments = ["-x", "-o", "-l", String(window.windowNumber), screenshot.path]
+            try process.run(); process.waitUntilExit()
+            precondition(process.terminationStatus == 0)
+            print("PASS usage live capture: \(screenshot.lastPathComponent)")
+        }
+        if let routing {
+            let point = host.convert(NSPoint(x: 180, y: 251), to: nil)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+                window.sendEvent(event)
+            }
+            try await Task.sleep(for: .milliseconds(50))
+            precondition(routing.openedPlugin == AIUsageModule.id, "Usage row click must reach the plugin callback")
+            // AppKit menu placement requires an on-screen anchor, even when
+            // the rest of this synthetic fixture is rendered offscreen.
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+            try await Task.sleep(for: .milliseconds(100))
+            let menuObservation = UsageMenuObservation()
+            NotificationCenter.default.addObserver(menuObservation, selector: #selector(UsageMenuObservation.didBeginTracking(_:)),
+                name: NSMenu.didBeginTrackingNotification, object: nil)
+            defer { NotificationCenter.default.removeObserver(menuObservation) }
+            let menuPoint = host.convert(NSPoint(x: 334, y: 30), to: nil)
+            reportUsageProbe("BEGIN usage menu click: \(name)")
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = NSEvent.mouseEvent(with: type, location: menuPoint, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+                window.sendEvent(event)
+            }
+            reportUsageProbe("END usage menu dispatch: \(name)")
+            try await Task.sleep(for: .milliseconds(50))
+            let menuTitles = menuObservation.menu?.items.filter { !$0.isSeparatorItem }.map(\.title)
+            precondition(menuTitles == ["설정", "종료"],
+                         "Settings/Quit menu missing for \(name): \(String(describing: menuTitles)); visible=\(window.isVisible), key=\(window.isKeyWindow)")
+            print("PASS usage panel menu and routing: \(name)")
+        }
+        reportUsageProbe("PASS usage render: \(name)")
     }
 }
