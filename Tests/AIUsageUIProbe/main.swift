@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 import AppPluginCore
 import AppPluginHost
 import AfterSixCore
@@ -42,7 +43,17 @@ private enum PreviewUsageModule: PluginModule {
 
 @MainActor
 private final class PreviewRunnerScheduledTask: RunnerScheduledTask {
-    func cancel() {}
+    private var timer: Timer?
+    init(interval: TimeInterval? = nil, action: (@MainActor () -> Void)? = nil) {
+        if let interval, let action {
+            let timer = Timer(timeInterval: interval, repeats: true) { _ in
+                Task { @MainActor in action() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        }
+    }
+    func cancel() { timer?.invalidate(); timer = nil }
 }
 
 @MainActor
@@ -66,8 +77,11 @@ private enum PreviewRunnerModule: PluginModule {
         }), now: { sampleTime })
         let model = CPURunnerController(settings: RunnerSettings(), sampler: CPUUsageSampler(readTicks: {
             ticks += 1
+            if AIUsageUIProbe.interactive { sampleTime += 1 }
             return CPUUsageTicks(user: ticks * 35, system: 0, nice: 0, idle: ticks * 65)
-        }), metricsSampler: metrics, schedule: { _, _ in PreviewRunnerScheduledTask() },
+        }), metricsSampler: metrics, schedule: { interval, action in
+            PreviewRunnerScheduledTask(interval: AIUsageUIProbe.interactive ? interval : nil, action: action)
+        },
             reduceMotion: { false }, lowPower: { false }, observeSystemChanges: false, localize: context.localize)
         model.selectAnimal(.cat)
         model.selectPresentation(.animal)
@@ -83,13 +97,26 @@ private enum PreviewRunnerModule: PluginModule {
 
 @MainActor
 private final class UsageProbeDelegate: NSObject, NSApplicationDelegate {
+    private var interactiveSession: InteractiveUsageSession?
     func applicationDidFinishLaunching(_ notification: Notification) {
         reportUsageProbe("BEGIN usage UI applicationDidFinishLaunching")
         NSApp.activate(ignoringOtherApps: true)
+        if AIUsageUIProbe.interactive {
+            do { interactiveSession = try InteractiveUsageSession(output: URL(fileURLWithPath: CommandLine.arguments[1])) }
+            catch {
+                reportUsageProbe("FAIL interactive UI: \(error)")
+                UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
+                exit(1)
+            }
+            return
+        }
         Task { @MainActor in
             do { try await AIUsageUIProbe.check(); exit(0) }
             catch { print("FAIL usage UI: \(error)"); exit(1) }
         }
+    }
+    func applicationWillTerminate(_ notification: Notification) {
+        interactiveSession?.stop()
     }
 }
 
@@ -111,11 +138,18 @@ private final class UsageRoutingObservation { var openedPlugin: String? }
 
 @main
 struct AIUsageUIProbe {
+    static var interactive: Bool { CommandLine.arguments.last == "--interactive" }
     @MainActor static func main() {
+        guard CommandLine.arguments.count == (interactive ? 4 : 3),
+              !interactive || (ProcessInfo.processInfo.environment["CI", default: ""].isEmpty
+                && ProcessInfo.processInfo.environment["GITHUB_ACTIONS", default: ""].isEmpty) else {
+            reportUsageProbe("FAIL usage UI: expected data/icon paths and optional --interactive; interactive is forbidden in CI")
+            exit(64)
+        }
         reportUsageProbe("BEGIN usage UI app")
         let app = NSApplication.shared
         let delegate = UsageProbeDelegate()
-        app.setActivationPolicy(.accessory)
+        app.setActivationPolicy(interactive ? .regular : .accessory)
         app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }
@@ -388,5 +422,218 @@ struct AIUsageUIProbe {
             print("PASS usage panel menu and routing: \(name)")
         }
         reportUsageProbe("PASS usage render: \(name)")
+    }
+}
+
+
+/// A held test application owns only its unique bundle preferences and temporary fixture files.
+@MainActor
+private final class InteractiveUsageSession: NSObject {
+    private let output: URL
+    private let plugins: PluginManagerModel
+    private let sync: CalendarSyncModel
+    private let model: AppModel
+    private let presentations = PluginSettingsPresentationRegistry()
+    private let navigation = SettingsNavigation()
+    private let updater = AppUpdater()
+    private let images = PluginMenuBarImageGroup()
+    private var panel: MenuBarPanel?
+    private var settings: NSWindow?
+    private var settingsChrome: SettingsWindowChrome?
+    private var statusItem: NSStatusItem?
+    private var observations: [AnyCancellable] = []
+    private var clockTimer: Timer?
+    private let clock: FixtureClock
+
+    private final class FixtureClock {
+        var date: Date
+        let initial: Date
+        init(_ date: Date) { self.date = date; initial = date }
+    }
+
+    init(output: URL) throws {
+        self.output = output
+        precondition(Bundle.main.bundleIdentifier?.hasPrefix("local.happylulu.usage-probe.") == true)
+        AppLanguage.shared.select(.korean)
+        AppearanceModel.shared.selectPalette(.softMint)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+        let noon = calendar.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 12))!
+        let clock = FixtureClock(noon)
+        self.clock = clock
+        let store = StateStore(url: output.appendingPathComponent("attendance.json"))
+        var state = AttendanceState()
+        state.didOfferLoginItem = true
+        state.detectHalfDaysFromCalendar = false
+        let day = Attendance.dayKey(noon, calendar: calendar)
+        state.arrivals[day] = Arrival(day: day, time: noon.addingTimeInterval(-3 * 3600), source: .manual,
+                                    timeZoneID: calendar.timeZone.identifier, modeSource: .manual)
+        try store.save(state)
+        sync = CalendarSyncModel(runtimeAllowed: false, storeURL: output.appendingPathComponent("calendar.sqlite"))
+        plugins = PluginManagerModel(defaultAdapter: DefaultFeatureAdapter(),
+            routingStore: FeatureRoutingStore(url: output.appendingPathComponent("routing.json")),
+            catalogStore: PluginCatalogStore(url: output.appendingPathComponent("catalog.json")))
+        model = AppModel(store: store, featureRouter: plugins.router, allowsLoginItemChanges: false,
+                         nowProvider: { clock.date }, calendarProvider: { calendar })
+        super.init()
+        plugins.configureCatalog(sync: sync, presentations: presentations,
+                                 modules: [PreviewUsageModule.self, PreviewRunnerModule.self])
+        precondition(Set(plugins.catalog.map(\.id)) == [AIUsageModule.id, CPURunnerModule.id],
+                     "Interactive QA must compile the restricted fixture catalog")
+        for id in ["mac-calendar", "daouoffice", "leave-detection"] {
+            plugins.install(id)
+            precondition(!plugins.isInstalled(id), "External plugin installation must be unavailable in this fixture")
+        }
+        plugins.start()
+        plugins.setShowUsage(true)
+        plugins.install(PreviewRunnerModule.id)
+        plugins.setEnabled(PreviewRunnerModule.id, true)
+        PreviewRunnerModule.advanceSample()
+        PreviewRunnerModule.model.selectPresentation(.owlOrbit)
+        precondition(!sync.runtimeAllowed && !model.allowsLoginItemChanges)
+        images.setProviders([PreviewRunnerModule.model])
+        NSApp.mainMenu = makeApplicationMenu()
+        let qaMenu = NSMenu(title: "Synthetic QA")
+        for (title, action) in [("Open attendance panel", #selector(openPanel)),
+                                ("Open settings", #selector(openSettings)),
+                                ("Clock: noon", #selector(resetClock)),
+                                ("Clock: departure +90 min", #selector(overtime90)),
+                                ("Clock: departure +91 min", #selector(overtime91))] {
+            let item = qaMenu.addItem(withTitle: title, action: action, keyEquivalent: "")
+            item.target = self
+        }
+        let qaItem = NSMenuItem(title: qaMenu.title, action: nil, keyEquivalent: "")
+        qaItem.submenu = qaMenu
+        NSApp.mainMenu?.addItem(qaItem)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = item
+        item.button?.target = self
+        item.button?.action = #selector(togglePanel)
+        item.button?.imagePosition = .imageLeading
+        item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        observations = [model.objectWillChange, plugins.objectWillChange, AppearanceModel.shared.objectWillChange,
+                        AppLanguage.shared.objectWillChange].map { publisher in
+            publisher.sink { [weak self] in Task { @MainActor in self?.updateStatus() } }
+        }
+        observations.append(images.changes.sink { [weak self] in self?.updateStatus() })
+        clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.clock.date = self.clock.date.addingTimeInterval(1)
+                self.model.refresh()
+            }
+        }
+        openSettings()
+        updateStatus()
+        reportUsageProbe("READY SYNTHETIC QA: Codex remaining72%, CPU35%, fake resources; system integrations/notifications unavailable")
+    }
+
+    private var materialMode: LuluMaterialMode {
+        ProcessInfo.processInfo.environment["HAPPY_LULU_MATERIAL_MODE"] == "legacy" ? .legacy : .automatic
+    }
+
+    private static let bannerHeight: CGFloat = 30
+    private var panelSize: NSSize {
+        NSSize(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count)
+            + plugins.panelProviders.reduce(0) { $0 + $1.panelHeight } + Self.bannerHeight)
+    }
+
+    private var banner: some View {
+        Text("SYNTHETIC QA · 가상 출근 기록 / Codex 72% / CPU 35% · 외부 연동 없음")
+            .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+            .padding(8).frame(maxWidth: .infinity).frame(height: Self.bannerHeight).background(Color.indigo)
+    }
+
+    @objc private func openSettings() {
+        if settings == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 760),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "HappyLulu QA Synthetic — Settings"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: VStack(spacing: 0) {
+                banner
+                SettingsView(model: model, updater: updater, calendarSync: sync, plugins: plugins,
+                    featureCalendar: FeatureCalendarModel(router: plugins.router),
+                    pluginPresentations: presentations, navigation: navigation)
+            }.environment(\.luluMaterialMode, materialMode).environment(\.openURL, OpenURLAction { url in
+                reportUsageProbe("SYNTHETIC QA: external link suppressed: \(url.scheme ?? "unknown")")
+                return .handled
+            }))
+            settingsChrome = SettingsWindowChrome(window: window, appearance: .shared, mode: materialMode)
+            window.center()
+            settings = window
+        }
+        panel?.dismiss()
+        NSApp.activate(ignoringOtherApps: true)
+        settings?.makeKeyAndOrderFront(nil)
+    }
+
+    private func navigateToSettings(section: SettingsSection, plugin: String? = nil) {
+        navigation.selection = section
+        navigation.pluginID = plugin
+        openSettings()
+    }
+
+    @objc private func togglePanel() {
+        if panel?.isVisible == true { panel?.dismiss() }
+        else { openPanel() }
+    }
+
+    @objc private func openPanel() {
+        guard let button = statusItem?.button else { return }
+        if panel == nil {
+            let controller = NSHostingController(rootView: VStack(spacing: 0) {
+                banner
+                PanelView(model: model, calendarSync: sync, plugins: plugins,
+                    onOpenHistory: { [weak self] in self?.navigateToSettings(section: .history) },
+                    onOpenSettings: { [weak self] in self?.openSettings() },
+                    onOpenCalendar: { [weak self] in self?.navigateToSettings(section: .plugins) },
+                    onOpenPlugin: { [weak self] id in self?.navigateToSettings(section: .plugin, plugin: id) })
+            }.environment(\.luluMaterialMode, materialMode))
+            panel = MenuBarPanel(content: controller, size: panelSize)
+            panel?.title = "HappyLulu QA Synthetic — Attendance"
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        panel?.show(relativeTo: button)
+    }
+
+    @objc private func resetClock() { clock.date = clock.initial; model.refresh() }
+    @objc private func overtime90() { setOvertime(minutes: 90) }
+    @objc private func overtime91() { setOvertime(minutes: 91) }
+    private func setOvertime(minutes: Int) {
+        guard let departure = model.departure else { return }
+        clock.date = departure.addingTimeInterval(Double(minutes * 60))
+        model.refresh()
+        reportUsageProbe("SYNTHETIC QA clock: departure +\(minutes) min")
+    }
+
+    private func updateStatus() {
+        panel?.updateContentSize(panelSize)
+        guard let button = statusItem?.button else { return }
+        let base: NSImage
+        if case .orbit(let phase, let palette)? = images.baseIconEffect {
+            base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve,
+                orbitPhase: phase, appearance: button.effectiveAppearance,
+                highlighted: button.cell?.isHighlighted == true, palette: palette)
+        } else {
+            base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve)
+        }
+        button.image = images.image(base: base)
+        button.attributedTitle = PluginMenuBarTitle.attributed(base: "QA · " + model.menuTitle,
+            items: plugins.menuBarItems, font: button.font!, appearance: button.effectiveAppearance)
+        button.setAccessibilityLabel("HappyLulu synthetic QA, " + model.menuTitle)
+        button.sizeToFit()
+        statusItem?.length = ceil(button.frame.width)
+        precondition(!sync.runtimeAllowed)
+    }
+
+    func stop() {
+        clockTimer?.invalidate()
+        plugins.stop()
+        sync.setRuntimeAllowed(false)
+        panel?.dismiss()
+        if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
+        UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
+        reportUsageProbe("STOPPED SYNTHETIC QA: fixture preferences removed; temporary files are owned by the launcher")
     }
 }
