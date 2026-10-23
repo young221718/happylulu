@@ -5,7 +5,12 @@ import AppPluginCore
 import ObjectiveC
 
 private struct FixtureSecrets: PluginSecretStore {
-    func load(for key: String) throws -> String? { "fixture-password" }
+    let credentialLoad = DispatchSemaphore(value: 0)
+    func load(for key: String) throws -> String? {
+        credentialLoad.wait()
+        credentialLoad.signal()
+        return "fixture-password"
+    }
     func save(_ password: String, for key: String) throws { fatalError("Unexpected credential write") }
     func remove(for key: String) throws { fatalError("Unexpected credential removal") }
 }
@@ -127,7 +132,9 @@ final class PasteProbeDelegate: NSObject, NSApplicationDelegate {
         let savedAddress = "https://fixture.daouoffice.com/"
         try store.save(DaouOfficeConfiguration(enabled: true, address: savedAddress, loginID: "fixture"))
         let original = try Data(contentsOf: store.url)
-        let model = DaouOfficePluginModel(store: store, secrets: FixtureSecrets(),
+        let secrets = FixtureSecrets()
+        defer { secrets.credentialLoad.signal() }
+        let model = DaouOfficePluginModel(store: store, secrets: secrets,
             localize: { _, english in english },
             makeClient: { DaouOfficeAPIClient(configuration: $0, secrets: $1,
                 transport: HeldTransport(), log: nil) })
@@ -163,6 +170,12 @@ final class PasteProbeDelegate: NSObject, NSApplicationDelegate {
             try capture(host, name: "missing-address")
             return
         }
+        check(model.isRunning && !field.isEnabled, "address input is disabled while saved credentials load")
+        secrets.credentialLoad.signal()
+        // Field discovery can finish before the asynchronous credential lookup and SwiftUI update.
+        let idleDeadline = Date().addingTimeInterval(2)
+        while (model.isRunning || !field.isEnabled) && Date() < idleDeadline { pump(host) }
+        check(!model.isRunning && model.hasSavedPassword, "saved credentials finish loading before editing")
         check(field.isEnabled && field.isEditable, "idle address input is enabled and editable")
         window.makeFirstResponder(field)
         field.selectText(nil)
