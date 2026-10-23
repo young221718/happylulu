@@ -2,11 +2,17 @@
 set -euo pipefail
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$project_dir"
+# SDKROOT also reaches the linker; compiler --sysroot alone can record the deployment target as the SDK.
+SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+export SDKROOT
+sdk_version="$(xcrun --sdk "$SDKROOT" --show-sdk-version)"
+printf 'macOS SDK: %s (%s)\n' "$sdk_version" "$SDKROOT"
 for required in LICENSE THIRD_PARTY_NOTICES.md; do
     test -s "$required" || { printf 'Missing release document: %s\n' "$required" >&2; exit 1; }
 done
 swift build --build-system native -c release --product HappyLulu --disable-local-rpath
 binary_dir="$(swift build --build-system native -c release --show-bin-path)"
+python3 scripts/macos_sdk.py "$binary_dir/HappyLulu" --sdk "$sdk_version" --minimum 13.0
 app_dir="$project_dir/dist/happylulu.app"
 for existing_app in "$project_dir/dist/"*.app; do
     # A case-insensitive volume otherwise keeps the old physical folder name.
