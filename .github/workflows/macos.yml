@@ -44,6 +44,7 @@ jobs:
     env:
       # CI verifies packaging without accessing a developer's signing keys.
       HAPPY_LULU_SIGNING_IDENTITY: '-'
+      QA_REPORT_DIR: .build/qa/ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - name: Check scripts and app metadata
@@ -52,59 +53,28 @@ jobs:
           plutil -lint Resources/Info.plist
           git diff --check
           python3 scripts/check-release-delivery.py
-      - name: Check attendance and calendar logic
+      - name: Check QA runner reporting
         run: |
-          swift run --build-system native AfterSixChecks
-          swift run --build-system native AfterSixParityChecks Tests/Shared/attendance.json
-          swift run --build-system native CalendarSyncChecks
-          swift run --build-system native CalendarSyncServiceChecks
-      - name: Check optional AI usage integration
+          python3 scripts/check-qa-runner.py
+          python3 -B -m unittest discover -s scripts/tests -p 'test_ai_usage_ui_cli.py' -v
+      - name: Run full isolated QA pipeline
+        run: python3 scripts/run-qa.py --profile full --report-dir "$QA_REPORT_DIR"
+      - name: Publish QA job summary
+        if: always()
         run: |
-          if [[ "${HAPPY_LULU_DISABLE_AI_USAGE:-}" != "1" && -d Sources/AIUsagePlugin && -d Sources/AIUsageIntegration ]]; then
-            swift test --build-system native --filter AIUsageTests
-            bash scripts/check-codex-symbol.sh
-            bash scripts/check-ai-usage-ui.sh
+          if [[ -f "$QA_REPORT_DIR/summary.md" ]]; then
+            cat "$QA_REPORT_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'AI usage module is excluded; common app checks still run.'
+            echo 'QA report unavailable: pipeline did not start or report creation failed.' >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Check Liquid Glass and legacy rendering
-        run: |
-          HAPPY_LULU_MATERIAL_MODE=legacy bash scripts/check-design-render.sh
-          HAPPY_LULU_MATERIAL_MODE=automatic bash scripts/check-design-render.sh
-          HAPPY_LULU_MATERIAL_MODE=automatic HAPPY_LULU_RENDER_PALETTE=charcoal bash scripts/check-design-render.sh
-          HAPPY_LULU_RENDER_PALETTE=nativeGlass HAPPY_LULU_RENDER_SCHEME=light bash scripts/check-design-render.sh
-          HAPPY_LULU_RENDER_PALETTE=nativeGlass HAPPY_LULU_RENDER_SCHEME=dark HAPPY_LULU_RENDER_EXPANDED=1 bash scripts/check-design-render.sh
-      - name: Check isolated calendar and updater integration
-        run: |
-          swift run --build-system native CPURunnerChecks
-          swift run --build-system native SystemMetricsChecks
-          bash scripts/check-daouoffice-write.sh
-          bash scripts/check-runner-artwork.sh
-          bash scripts/check-owl-orbit.sh
-          bash scripts/check-calendar-model.sh
-          bash scripts/check-calendar-diagnostics.sh
-          bash scripts/check-calendar-runtime.sh
-          bash scripts/check-automatic-install.sh
-          bash scripts/check-runtime-profile.sh
-          bash scripts/check-clock-paste.sh
-          bash scripts/check-panel-focus.sh
-          bash scripts/check-appearance-model.sh
-          bash scripts/check-settings-navigation.sh
-          HAPPY_LULU_MATERIAL_MODE=legacy bash scripts/check-settings-navigation.sh
-          bash scripts/check-material-policy.sh
-          bash scripts/check-plugin-architecture.sh
-          bash scripts/check-vacation-eve.sh
-          bash scripts/check-vacation-appearance.sh
-          bash scripts/check-plugin-isolation.sh
-      - name: Check optional Daouoffice integration
-        run: |
-          if [[ "${HAPPY_LULU_DISABLE_DAOUOFFICE:-}" != "1" && -d Sources/DaouOfficePlugin && -d Sources/DaouOfficeIntegration ]]; then
-            swift run --build-system native AppPluginChecks
-            bash scripts/check-daouoffice-model.sh
-            bash scripts/check-edit-menu.sh
-          else
-            echo 'Daouoffice module is excluded; common app checks still run.'
-          fi
+      - name: Upload QA report, logs and synthetic render evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HappyLulu-qa-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.QA_REPORT_DIR }}/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Package and verify Universal app without private keys
         run: |
           bash scripts/package-release.sh

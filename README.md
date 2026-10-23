@@ -76,7 +76,7 @@ HappyLulu는 개인 편의 도구입니다. 회사의 공식 근태 시스템이
 
 ## 기여
 
-[이슈](https://github.com/young221718/happylulu-app/issues)에서 개선할 점을 먼저 이야기해 주세요. 변경은 이슈 → 작업 브랜치 → 검사·독립 검토 → PR 순서로 진행합니다. [빌드·검사 안내](docs/USER-GUIDE.md#개발과-검증)를 확인하고 개인 기록·키·계정정보와 생성 앱은 Git에 넣지 않습니다.
+[이슈](https://github.com/young221718/happylulu-app/issues)에서 개선할 점을 먼저 이야기해 주세요. 변경은 이슈 → 작업 브랜치 → 검사·독립 검토 → PR 순서로 진행합니다. [빌드·검사 안내](docs/USER-GUIDE.md#개발과-검증)와 [QA 파이프라인](docs/QA.md)을 확인하고 개인 기록·키·계정정보와 생성 앱은 Git에 넣지 않습니다.
 
 개발 기준과 PR 대상은 **공통 `main`**입니다. 새 공통 기능은 Mac·Windows 양쪽의 구현과 검증을 맞추고, 현재 차이와 남은 작업은 [기능 현황](docs/PLATFORM-STATUS.md)에 기록합니다.
 
