@@ -4,16 +4,17 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import json
 import hashlib
-import plistlib
 import re
 
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 REPO = "https://github.com/young221718/happylulu-app"
-with (ROOT.parent / "Resources/Info.plist").open("rb") as source:
-    metadata = plistlib.load(source)
-MAC_VERSION = metadata["CFBundleShortVersionString"]
-MAC_BUILD = metadata["CFBundleVersion"]
+# App candidates can advance before their downloads are publicly released.
+metadata = json.loads((ROOT / "public-release.json").read_text())
+MAC_VERSION = metadata["mac_version"]
+MAC_BUILD = metadata["mac_build"]
+assert re.fullmatch(r"\d+\.\d+\.\d+", MAC_VERSION), "Invalid public Mac version"
+assert re.fullmatch(r"[1-9]\d*", MAC_BUILD), "Invalid public Mac build"
 MAC_SLUG = f"macos-{MAC_VERSION}"
 MAC_TAG = f"macos-v{MAC_VERSION}-build{MAC_BUILD}"
 # Release metadata and the approved site assets share one cache version.
@@ -138,10 +139,11 @@ legacy_routes = ("index.html", "en/index.html", "download/index.html", "features
                  "calendar/index.html", "install/index.html", "faq/index.html",
                  "releases/index.html", "en/releases/index.html")
 features = ("attendance", "arrival-time", "workday-modes", "countdown", "history", "calendar",
-            "plugins", "daouoffice", "leave-recognition", "appearance", "overtime", "updates")
+            "plugins", "daouoffice", "leave-recognition", "appearance", "overtime", "updates",
+            "system-monitor", "ai-usage")
 releases = {MAC_SLUG: MAC_TAG, "macos-1.5.18": "macos-v1.5.18-build34", "macos-1.5.17": "macos-v1.5.17-build33", "macos-1.5.16": "macos-v1.5.16-build32", "macos-1.5.15": "macos-v1.5.15-build31", "macos-1.5.14": "macos-v1.5.14-build30",
             "windows-1.5.13": "windows-v1.5.13"}
-assert len(pages) == 50, "Preserve 48 existing routes and add both Mac 1.5.19 details"
+assert len(pages) == 54, "Preserve 50 existing routes and add bilingual System Runner and Codex guides"
 for route in legacy_routes:
     assert (DIST / route).resolve() in pages, route
 for prefix in ("", "en/"):
@@ -250,6 +252,22 @@ for prefix, language in (("", "ko"), ("en/", "en")):
                 assert {"highlights", "improvements", "scope", "downloads"} <= page.ids, route
                 assert REPO + "/releases/tag/" + releases[slug] in page.links, route
                 assert any(link.startswith(f"/{prefix}features/") for link in page.links), route
+# Unreleased feature documentation must never read as a public release promise.
+for prefix in ("", "en/"):
+    for route in ("features/index.html", "features/system-monitor/index.html", "features/ai-usage/index.html",
+                  "features/plugins/index.html", "features/appearance/index.html", "features/overtime/index.html",
+                  "features/countdown/index.html", "guide/index.html"):
+        document = (DIST / prefix / route).resolve()
+        page = pages[document]
+        assert any(fields.get("data-doc-stage") == "local-preview" for _, fields in page.elements), document
+        text = document.read_text()
+        notice = "공개 Mac 1.5.19 build35" if not prefix else "public Mac 1.5.19 build35"
+        assert notice in text and "Windows 1.5.13" in text, f"Explain the preview/download boundary: {document}"
+    home = pages[(DIST / prefix / "index.html").resolve()]
+    assert f"/{prefix}features/#local-preview" in home.links, "Keep a compact path from home to new feature docs"
+    guide = pages[(DIST / prefix / "guide/index.html").resolve()]
+    assert "#local-preview" in guide.links and "local-preview" in guide.ids, "New settings need a guide entry"
+
 links = []
 for document, page in pages.items():
     for asset in ("/style.css", "/app.js"):
@@ -292,7 +310,7 @@ for entry in ("index.html", "en/index.html", "download/index.html"):
         assets += (f"HappyLulu-{MAC_VERSION}-universal.zip", "SHA256SUMS.txt")
     for asset in assets:
         expected = REPO + f"/releases/download/{MAC_TAG}/" + asset
-        assert expected in page.links, f"Primary Mac download must match app metadata: {entry} {asset}"
+        assert expected in page.links, f"Primary Mac download must match public release: {entry} {asset}"
     assert REPO + "/releases/download/windows-v1.5.13/HappyLulu-1.5.13-windows-x64-runtime-required.zip" in page.links, entry
 # Versioned release bodies stay byte-protected; only common shells and badges may change.
 # The 1.5.18 baseline is captured before preparing 1.5.19, including its existing brand casing.
@@ -326,7 +344,7 @@ for prefix, phrases in (("", ("퇴근 18:00 · 91분 남음", "즉시", "밀리�
         assert phrase in countdown, f"Explain current menu-bar units and cadence: {prefix} {phrase}"
     for route in ("index.html", "guide/index.html", "features/countdown/index.html"):
         document = (DIST / prefix / route).read_text()
-        assert f"/{prefix}releases/{MAC_SLUG}/" in document, f"Current release link must match app metadata: {prefix}{route}"
+        assert f"/{prefix}releases/{MAC_SLUG}/" in document, f"Current release link must match public release: {prefix}{route}"
 # Describe the new departure visibility preference separately from the countdown unit.
 for prefix, phrases in (("", ("메뉴바에 퇴근 예정 시각 표시", "기본은 켜짐", "91분 남음", "퇴근 가능", "재시작", "즉시")),
                         ("en/", ("Show expected departure in menu bar", "on by default", "91 min left", "Ready to leave", "restart", "immediately"))):
