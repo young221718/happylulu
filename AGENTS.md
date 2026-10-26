@@ -19,6 +19,14 @@ and Korean user documentation belong to this repository.
   without an explicit feature request.
 - Preserve the existing `AfterSix` storage path and bundle identifier unless
   a migration is deliberately implemented and verified.
+- Keep the installed production app named `happylulu`. Development and QA GUI
+  apps must use only `happylulu-dev` and the fixed existing bundle identifier
+  `local.chanyoung.HappyLulu.Dev.manual-leave.20261015`; never create or launch
+  additional QA, date-suffixed, or UUID app identities. Preserve the existing
+  Dev data path. Synthetic QA must isolate its data and preferences, must never
+  delete the fixed Dev preferences, and must reject concurrent Dev sessions.
+  Use `scripts/check-ai-usage-ui.sh` for the synthetic fixture and verify that
+  the menu-bar app list has no extra entries after local GUI checks.
 - Do not count wake or session activation as an unlock event. Do not fabricate
   historical attendance when the app was not running.
 - Never lock, log out, or reboot the user's Mac to run validation without

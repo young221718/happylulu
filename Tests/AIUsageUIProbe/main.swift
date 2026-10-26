@@ -28,7 +28,8 @@ private enum PreviewUsageModule: PluginModule {
     static var model: AIUsageModel!
     static let iconSource = "official-monochrome-glyph"
     static func register(in context: PluginHostContext) throws {
-        let model = AIUsageModel(localize: context.localize, providerFactory: { _ in PreviewUsageProvider() })
+        let model = AIUsageModel(defaults: ProbePreferences.shared, localize: context.localize,
+            providerFactory: { _ in PreviewUsageProvider() })
         model.updatePreferences { $0.labelFormat = .icon }
         precondition(model.menuBarPreview.iconPNG != nil && model.menuBarPreview.iconIsTemplate,
             "The production Codex glyph must render; a synthetic icon cannot validate it")
@@ -75,7 +76,7 @@ private enum PreviewRunnerModule: PluginModule {
         }, battery: {
             BatteryMetrics(presence: .present, percent: 76, isCharging: true, isExternalPower: true)
         }), now: { sampleTime })
-        let model = CPURunnerController(settings: RunnerSettings(), sampler: CPUUsageSampler(readTicks: {
+        let model = CPURunnerController(settings: RunnerSettings(defaults: ProbePreferences.shared), sampler: CPUUsageSampler(readTicks: {
             ticks += 1
             if AIUsageUIProbe.interactive { sampleTime += 1 }
             return CPUUsageTicks(user: ticks * 35, system: 0, nice: 0, idle: ticks * 65)
@@ -105,7 +106,6 @@ private final class UsageProbeDelegate: NSObject, NSApplicationDelegate {
             do { interactiveSession = try InteractiveUsageSession(output: URL(fileURLWithPath: CommandLine.arguments[1])) }
             catch {
                 reportUsageProbe("FAIL interactive UI: \(error)")
-                UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
                 exit(1)
             }
             return
@@ -147,6 +147,15 @@ struct AIUsageUIProbe {
             exit(64)
         }
         reportUsageProbe("BEGIN usage UI app")
+        precondition(Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
+            && Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String == "happylulu-dev"
+            && Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "happylulu-dev",
+            "GUI QA must use the single happylulu-dev identity")
+        guard NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier!)
+            .allSatisfy({ $0.processIdentifier == ProcessInfo.processInfo.processIdentifier }) else {
+            reportUsageProbe("FAIL usage UI: happylulu-dev is already running; quit it before synthetic QA")
+            exit(73)
+        }
         let app = NSApplication.shared
         let delegate = UsageProbeDelegate()
         app.setActivationPolicy(interactive ? .regular : .accessory)
@@ -156,7 +165,6 @@ struct AIUsageUIProbe {
 
     @MainActor static func check() async throws {
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
-        precondition(Bundle.main.bundleIdentifier!.hasPrefix("local.happylulu.usage-probe."))
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
         application.mainMenu = makeApplicationMenu()
@@ -169,7 +177,6 @@ struct AIUsageUIProbe {
         for frame in 0..<5 {
             precondition(runnerBundle.url(forResource: "cat\(frame)", withExtension: "png", subdirectory: "RunCat") != nil)
         }
-        defer { UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!) }
         AppLanguage.shared.select(.korean)
         let store = StateStore(url: output.appendingPathComponent("attendance.json"))
         var state = AttendanceState(); state.didOfferLoginItem = true; state.detectHalfDaysFromCalendar = false
@@ -426,7 +433,7 @@ struct AIUsageUIProbe {
 }
 
 
-/// A held test application owns only its unique bundle preferences and temporary fixture files.
+/// A held test application uses memory preferences and temporary fixture files.
 @MainActor
 private final class InteractiveUsageSession: NSObject {
     private let output: URL
@@ -453,7 +460,6 @@ private final class InteractiveUsageSession: NSObject {
 
     init(output: URL) throws {
         self.output = output
-        precondition(Bundle.main.bundleIdentifier?.hasPrefix("local.happylulu.usage-probe.") == true)
         AppLanguage.shared.select(.korean)
         AppearanceModel.shared.selectPalette(.softMint)
         var calendar = Calendar(identifier: .gregorian)
@@ -548,7 +554,7 @@ private final class InteractiveUsageSession: NSObject {
         if settings == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 760),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            window.title = "HappyLulu QA Synthetic — Settings"
+            window.title = "happylulu-dev — Synthetic Settings"
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(rootView: VStack(spacing: 0) {
                 banner
@@ -591,7 +597,7 @@ private final class InteractiveUsageSession: NSObject {
                     onOpenPlugin: { [weak self] id in self?.navigateToSettings(section: .plugin, plugin: id) })
             }.environment(\.luluMaterialMode, materialMode))
             panel = MenuBarPanel(content: controller, size: panelSize)
-            panel?.title = "HappyLulu QA Synthetic — Attendance"
+            panel?.title = "happylulu-dev — Synthetic Attendance"
         }
         NSApp.activate(ignoringOtherApps: true)
         panel?.show(relativeTo: button)
@@ -633,7 +639,6 @@ private final class InteractiveUsageSession: NSObject {
         sync.setRuntimeAllowed(false)
         panel?.dismiss()
         if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
-        UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier!)
-        reportUsageProbe("STOPPED SYNTHETIC QA: fixture preferences removed; temporary files are owned by the launcher")
+        reportUsageProbe("STOPPED SYNTHETIC QA: memory preferences discarded; temporary files are owned by the launcher")
     }
 }
