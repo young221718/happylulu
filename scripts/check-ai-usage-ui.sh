@@ -1,5 +1,5 @@
 #!/bin/bash
-# Render actual app views using synthetic quota data and an isolated app identity.
+# Render actual app views using synthetic data under the single development identity.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 interactive=0
@@ -21,41 +21,69 @@ case "${HAPPY_LULU_MATERIAL_MODE:-automatic}" in
   automatic|legacy) ;;
   *) echo "HAPPY_LULU_MATERIAL_MODE must be automatic or legacy" >&2; exit 64 ;;
 esac
+probe_root="${TMPDIR:-/tmp}"
+probe_dir="${probe_root%/}/happylulu-dev-synthetic"
+lock_dir="$probe_dir.lock"
+umask 077
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  echo "happylulu-dev synthetic QA is already running (lock: $lock_dir)" >&2
+  exit 73
+fi
+if [[ -e "$probe_dir" || -L "$probe_dir" ]]; then
+  echo "happylulu-dev synthetic QA has leftover files; preserve or remove $probe_dir before retrying" >&2
+  rmdir "$lock_dir"
+  exit 73
+fi
+lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+cleanup() {
+  local result=$?
+  if [[ -n "${app:-}" && -x "$app/Contents/MacOS/UsageProbe" ]]; then
+    if ! "$lsregister" -u "$app"; then
+      echo "FAIL happylulu-dev cleanup: unregister failed; bundle and lock preserved at $probe_dir" >&2
+      exit 1
+    fi
+  fi
+  rm -rf "$probe_dir"
+  rmdir "$lock_dir"
+  exit "$result"
+}
+trap cleanup EXIT
+mkdir -p "$probe_dir"
 if [[ "${HAPPY_LULU_SKIP_BUILD:-0}" != "1" ]]; then
   swift build --build-system native --product HappyLulu >/dev/null
 fi
 build_dir="$(swift build --build-system native --show-bin-path)"
 frameworks="$PWD/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64"
-probe_dir="$(mktemp -d "${TMPDIR:-/tmp/}HappyLulu-usage-ui.XXXXXX")"
-bundle_id=""
-cleanup() {
-  if [[ -n "$bundle_id" ]]; then
-    /usr/bin/defaults delete "$bundle_id" >/dev/null 2>&1 || true
-  fi
-  rm -rf "$probe_dir"
-}
-trap cleanup EXIT
-app="$probe_dir/UsageProbe.app"
-if [[ "$interactive" == "1" ]]; then app="$probe_dir/HappyLulu QA Synthetic.app"; fi
+app="$probe_dir/happylulu-dev.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$probe_dir/data"
 cp Resources/HappyLuluBrand.png "$app/Contents/Resources/"
 cp -R Resources/OwlStates "$app/Contents/Resources/"
 ditto "$build_dir/HappyLulu_CPURunnerIntegration.bundle" "$app/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
 python3 - Sources/AfterSix/AppearanceModel.swift "$probe_dir/AppearanceModel.swift" "$app/Contents/Info.plist" <<'PY'
-import pathlib, plistlib, sys, uuid
+import pathlib, plistlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 needle = 'static let shared = AppearanceModel()'
 assert source.count(needle) == 1
 replacement = '''static let shared = AppearanceModel(store: AppearanceStore(rootDirectory: URL(fileURLWithPath: CommandLine.arguments[1]), bundleIdentifier: Bundle.main.bundleIdentifier!), originalIcon: NSImage(contentsOfFile: CommandLine.arguments[2])!)'''
 pathlib.Path(sys.argv[2]).write_text(source.replace(needle, replacement))
+for name, count in [('AppLanguage', 3), ('AppModel', 2)]:
+    source = pathlib.Path('Sources/AfterSix/' + name + '.swift').read_text()
+    assert source.count('UserDefaults.standard') == count
+    if name == 'AppModel':
+        for old, new in [('CountdownDisplay.saved()', 'CountdownDisplay.saved(in: ProbePreferences.shared)'),
+                         ('choice.save()', 'choice.save(in: ProbePreferences.shared)')]:
+            assert source.count(old) == 1
+            source = source.replace(old, new)
+    pathlib.Path(sys.argv[2]).with_name(name + '.swift').write_text(
+        source.replace('UserDefaults.standard', 'ProbePreferences.shared'))
 with pathlib.Path(sys.argv[3]).open('wb') as stream:
-    plistlib.dump(dict(CFBundleIdentifier='local.happylulu.usage-probe.' + uuid.uuid4().hex,
-        CFBundleExecutable='UsageProbe', CFBundleName='UsageProbe', CFBundlePackageType='APPL',
+    plistlib.dump(dict(CFBundleIdentifier='local.chanyoung.HappyLulu.Dev.manual-leave.20261015',
+        CFBundleExecutable='UsageProbe', CFBundleName='happylulu-dev', CFBundleDisplayName='happylulu-dev', CFBundlePackageType='APPL',
         LSUIElement=True, HappyLuluUpdateServiceEnabled=False), stream)
 PY
 bundle_id="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")"
 plugin_manager_source="Sources/AfterSix/PluginManagerModel.swift"
-probe_sources=(Tests/AIUsageUIProbe/main.swift)
+probe_sources=(Tests/AIUsageUIProbe/main.swift Tests/AIUsageUIProbe/ProbePreferences.swift)
 if [[ "$interactive" == "1" ]]; then
   # Copies restrict this held fixture only; automatic checks compile unchanged production views.
   python3 - "$probe_dir" <<'PYFIXTURE'
@@ -71,9 +99,9 @@ needle = '.labelsHidden().toggleStyle(.switch)'
 assert source.count(needle) == 1
 source = source.replace(needle, needle + '.disabled(true).help("Synthetic QA: system notification permission is not exercised")')
 (probe / 'AIUsageSettingsView.swift').write_text(source)
-plist = probe / 'HappyLulu QA Synthetic.app/Contents/Info.plist'
+plist = probe / 'happylulu-dev.app/Contents/Info.plist'
 info = plistlib.loads(plist.read_bytes())
-info.update(CFBundleName='HappyLulu QA Synthetic', CFBundleDisplayName='HappyLulu QA Synthetic', LSUIElement=False)
+info.update(LSUIElement=False)
 plist.write_bytes(plistlib.dumps(info))
 PYFIXTURE
   plugin_manager_source="$probe_dir/PluginManagerModel.swift"
@@ -82,7 +110,7 @@ fi
 swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
   -module-cache-path "$PWD/.build/ai-usage-ui-module-cache" \
   -I "$build_dir/Modules" -F "$frameworks" -Xlinker -rpath -Xlinker "$frameworks" \
-  Sources/AfterSix/AppLanguage.swift Sources/AfterSix/AppModel.swift Sources/AfterSix/AppUpdater.swift \
+  "$probe_dir/AppLanguage.swift" "$probe_dir/AppModel.swift" Sources/AfterSix/AppUpdater.swift \
   Sources/AfterSix/LuluBrand.swift Sources/AfterSix/ApplicationMenu.swift \
   Sources/AfterSix/LuluMaterials.swift Sources/AfterSix/MenuBarPanel.swift Sources/AfterSix/SettingsWindowChrome.swift \
   Sources/AfterSix/CalendarSyncModel.swift Sources/AfterSix/HalfDayCalendarReader.swift \
@@ -106,7 +134,7 @@ if [[ "$interactive" == "1" ]]; then
   echo "SYNTHETIC QA — no live Codex, Calendar, Keychain, login-item or update services"
   echo "QA app: $app"
   echo "QA data: $probe_dir/data"
-  echo "QA preferences: $bundle_id (removed on exit)"
+  echo "QA preferences: memory only; existing $bundle_id preferences are preserved"
   echo "Quit the QA app (Command-Q or panel → Quit) to stop and remove this fixture."
   python3 - "$app/Contents/MacOS/UsageProbe" "$probe_dir/data" "$PWD/Resources/HappyLuluIcon.png" --interactive <<'PYINTERACTIVE'
 import subprocess, sys

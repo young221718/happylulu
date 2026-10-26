@@ -8,6 +8,8 @@ Mac에서 반복 실행하는 자동 회귀 검사, 격리된 실제 뷰의 화�
 
 ## 자동 실행
 
+개인 Mac에서는 실행 전에 모든 GUI 경로가 단일 `happylulu-dev` 이름·식별자를 지키는지 확인한다. 현재 별도 앱을 만드는 Design·Navigation·EditMenu·PanelFocus·Appearance·Vacation·AutoInstall·Login·SignedAuto·RuntimeProfile 경로와 이를 포함한 QA 실행기는 전환 전까지 개인 Mac에서 실행하지 않는다. 이번 변경은 AI 사용량 QA의 고정 정체성 적용이며 전체 QA 전환은 후속 작업이다. 기존 검사 계약을 삭제하거나 `skip`으로 통과 처리하지 않고, 전환 후에도 같은 검증을 유지한다.
+
 ```sh
 python3 scripts/check-qa-runner.py
 python3 -B -m unittest discover -s scripts/tests -p 'test_ai_usage_ui_cli.py' -v
@@ -36,7 +38,11 @@ python3 scripts/run-qa.py --profile full
 bash scripts/check-ai-usage-ui.sh --interactive
 ```
 
-이 명령은 실제 `PanelView`·`SettingsView`를 사용하는 일회용 QA 앱을 유지한다. 새 임시 식별자와 데이터 폴더, 가짜 Codex 사용량·시스템 지표·근무 기록을 사용한다. 설치된 happylulu의 기록이나 설정을 시험 입력으로 바꾸지 않는다. 자동 검사와 달리 명시적으로 이 옵션을 준 경우에만 창을 유지하며 CI에서는 거부한다.
+이 명령은 실제 `PanelView`·`SettingsView`를 사용하는 `happylulu-dev`를 유지한다. 개발·QA GUI 앱은 이 이름과 기존 고정 식별자 `local.chanyoung.HappyLulu.Dev.manual-leave.20261015`만 사용한다. QA·날짜·UUID를 붙인 별도 앱 식별자를 만들거나 실행하지 않는다. 이 AI 사용량 자동 검사도 같은 앱 정체성을 사용한다.
+
+합성 앱 경로는 사용자 임시 폴더의 `happylulu-dev-synthetic/happylulu-dev.app`으로 고정한다. 실행 잠금으로 다른 checkout의 합성 QA와 동시에 실행하지 않으며, 같은 Dev 식별자의 앱이 실행 중이면 종료를 요청하고 시작을 거부한다. 이전 실행의 파일이나 잠금이 남았으면 내용을 보존·정리한 뒤 다시 실행한다. 종료 시 정확한 합성 앱 경로를 Launch Services에서 등록 해제한 뒤 앱과 임시 데이터를 제거한다. 등록 해제에 실패하면 실패를 보고하고 재시도용 앱·잠금을 보존한다. 다른 설치 앱이나 등록 전체를 초기화하지 않는다.
+
+가짜 Codex 사용량·시스템 지표·근무 기록은 합성 데이터 폴더에 두고, 언어·퇴근 시각 표시·러너·AI 사용량 설정은 메모리에서만 사용한다. 기존 정식/Dev 환경설정 도메인을 지우거나 합성 값으로 덮어쓰지 않는다. 자동 검사와 달리 명시적으로 `--interactive`를 준 경우에만 창을 유지하며 CI에서는 거부한다.
 
 QA 앱의 외부 권한·계정 흐름은 검사 대상에서 분리한다. 캘린더 실행, 로그인 항목 변경, 자동 업데이트, 실서비스 조회를 시작하지 않는다. 선택 가능한 외부 플러그인을 제한하고 알림 권한 변경은 비활성화한다. 실제 계정과 비밀번호는 입력하지 않는다. QA 앱에서의 성공은 개인 계정 연결 성공을 뜻하지 않는다.
 
