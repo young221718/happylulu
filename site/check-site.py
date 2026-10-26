@@ -18,7 +18,7 @@ assert re.fullmatch(r"[1-9]\d*", MAC_BUILD), "Invalid public Mac build"
 MAC_SLUG = f"macos-{MAC_VERSION}"
 MAC_TAG = f"macos-v{MAC_VERSION}-build{MAC_BUILD}"
 # Release metadata and the approved site assets share one cache version.
-ASSET_TAG = f"{MAC_TAG}-site-release-20261022-hover"
+ASSET_TAG = f"{MAC_TAG}-site-release-20261026"
 
 # Brand copy is lowercase; literal filenames, URLs and storage paths keep their case.
 BRAND_WORD = re.compile(r"(?<![A-Za-z0-9_./\\-])(?:happylulu|lulu)(?![A-Za-z0-9_]|[./\\-][A-Za-z0-9])", re.I)
@@ -141,9 +141,9 @@ legacy_routes = ("index.html", "en/index.html", "download/index.html", "features
 features = ("attendance", "arrival-time", "workday-modes", "countdown", "history", "calendar",
             "plugins", "daouoffice", "leave-recognition", "appearance", "overtime", "updates",
             "system-monitor", "ai-usage")
-releases = {MAC_SLUG: MAC_TAG, "macos-1.5.18": "macos-v1.5.18-build34", "macos-1.5.17": "macos-v1.5.17-build33", "macos-1.5.16": "macos-v1.5.16-build32", "macos-1.5.15": "macos-v1.5.15-build31", "macos-1.5.14": "macos-v1.5.14-build30",
+releases = {MAC_SLUG: MAC_TAG, "macos-1.5.19": "macos-v1.5.19-build35", "macos-1.5.18": "macos-v1.5.18-build34", "macos-1.5.17": "macos-v1.5.17-build33", "macos-1.5.16": "macos-v1.5.16-build32", "macos-1.5.15": "macos-v1.5.15-build31", "macos-1.5.14": "macos-v1.5.14-build30",
             "windows-1.5.13": "windows-v1.5.13"}
-assert len(pages) == 54, "Preserve 50 existing routes and add bilingual System Runner and Codex guides"
+assert len(pages) == 56, "Preserve 54 existing routes and add the bilingual Mac 1.5.20 release"
 for route in legacy_routes:
     assert (DIST / route).resolve() in pages, route
 for prefix in ("", "en/"):
@@ -252,17 +252,17 @@ for prefix, language in (("", "ko"), ("en/", "en")):
                 assert {"highlights", "improvements", "scope", "downloads"} <= page.ids, route
                 assert REPO + "/releases/tag/" + releases[slug] in page.links, route
                 assert any(link.startswith(f"/{prefix}features/") for link in page.links), route
-# Unreleased feature documentation must never read as a public release promise.
+# Shipped feature documentation must identify the public Mac release and platform scope.
 for prefix in ("", "en/"):
     for route in ("features/index.html", "features/system-monitor/index.html", "features/ai-usage/index.html",
                   "features/plugins/index.html", "features/appearance/index.html", "features/overtime/index.html",
                   "features/countdown/index.html", "guide/index.html"):
         document = (DIST / prefix / route).resolve()
         page = pages[document]
-        assert any(fields.get("data-doc-stage") == "local-preview" for _, fields in page.elements), document
+        assert any(fields.get("data-doc-stage") == "released" for _, fields in page.elements), document
         text = document.read_text()
-        notice = "공개 Mac 1.5.19 build35" if not prefix else "public Mac 1.5.19 build35"
-        assert notice in text and "Windows 1.5.13" in text, f"Explain the preview/download boundary: {document}"
+        notice = "Mac 1.5.20 build36"
+        assert notice in text and "Windows 1.5.13" in text, f"Explain shipped Mac features and Windows scope: {document}"
     home = pages[(DIST / prefix / "index.html").resolve()]
     assert f"/{prefix}features/#local-preview" in home.links, "Keep a compact path from home to new feature docs"
     guide = pages[(DIST / prefix / "guide/index.html").resolve()]
@@ -313,8 +313,10 @@ for entry in ("index.html", "en/index.html", "download/index.html"):
         assert expected in page.links, f"Primary Mac download must match public release: {entry} {asset}"
     assert REPO + "/releases/download/windows-v1.5.13/HappyLulu-1.5.13-windows-x64-runtime-required.zip" in page.links, entry
 # Versioned release bodies stay byte-protected; only common shells and badges may change.
-# The 1.5.18 baseline is captured before preparing 1.5.19, including its existing brand casing.
+# Historical baselines are captured before promoting a new release, including existing brand casing.
 historical_release_bodies = {
+    'releases/macos-1.5.19/index.html': 'fbbfcee40df17dd1b371ae5d5e5d05efe9eabcc5aa8f817463bb6478fd4ee285',
+    'en/releases/macos-1.5.19/index.html': '5d669af643a8dd48a61488829764768cd01b1a724034dcc45864c741de5eeb4b',
     'releases/macos-1.5.18/index.html': '32dafc2a26dad805ee1c8b22220f492a3fa80c79229a95dda0ec4652f56d929d',
     'en/releases/macos-1.5.18/index.html': '26e50e846a93dca7796bd9f489f97d463d9fc791412418432f6ee42882a772b0',
     'releases/macos-1.5.17/index.html': '83600dd07884ebfc989e76ba5cb799fff912a96edaca8a3cb84a8850e579f08e',
@@ -352,16 +354,17 @@ for prefix, phrases in (("", ("메뉴바에 퇴근 예정 시각 표시", "기�
         text = (DIST / prefix / route).read_text()
         for phrase in phrases:
             assert phrase in text, f"Explain departure visibility, ready-to-leave label and saved preference: {prefix}{route} {phrase}"
-# The latest release explains the shipped Mac changes and separates install evidence.
-for prefix, phrases in (("", ("부엉이 8상태", "다음 날", "승인된 종일", "10분 전부터", "출처 기준 날짜가 끝날 때까지", "15분", "선글라스와 모자", "3열", "활성 입력 필드", "실행 취소", "전체 선택", "윤곽선", "포커스", "캐시", "고정 자체 인증서", "Sparkle", "공증은 적용하지 않았습니다", "Windows 최신 공개 버전은 1.5.13")),
-                        ("en/", ("eight owl states", "next day", "approved full-day", "starts 10 minutes before", "source-local midnight", "15 minutes", "sunglasses and a hat", "three columns", "active input field", "Undo, Redo, Cut, Copy, Paste and Select All", "outline", "focus", "cache", "fixed self-signed certificate", "Sparkle", "notarization are not applied", "Windows release remains 1.5.13"))):
+# The latest release explains the new optional modules, overtime, platform scope and actual install evidence.
+for prefix, phrases in (("", ("CPU", "메모리", "네트워크", "배터리", "Codex", "30분", "0.1초", "macOS 26", "고정 자체 인증서", "Sparkle", "공증은 적용하지 않았습니다", "로컬 설치·재실행", "별도 미검증")),
+                        ("en/", ("CPU", "memory", "network", "battery", "Codex", "30 minutes", "0.1 seconds", "macOS 26", "fixed self-signed certificate", "Sparkle", "notarization are not applied", "Local installation", "separately unverified"))):
     current = (DIST / prefix / f"releases/{MAC_SLUG}/index.html").read_text()
     for phrase in phrases:
         assert phrase in current, f"Explain current Mac changes and limits: {prefix} {phrase}"
 for home in ("index.html", "en/index.html"):
     source = (DIST / home).read_text()
     caption = re.search(r"<figcaption>(.*?)</figcaption>", source, re.S)
-    assert caption and f"Mac {MAC_VERSION} · build {MAC_BUILD}" in caption[1], f"Preview must match current Mac release: {home}"
+    assert caption and "Mac 1.5.19 · build 35" in caption[1], f"Keep the existing screenshot version accurate: {home}"
+    assert ("이전 Mac 1.5.19" if home == "index.html" else "earlier Mac 1.5.19") in caption[1], f"Identify the previous-version illustration: {home}"
     assert "34.5" not in caption[1], f"Remove the previous local preview label: {home}"
 assert not any("/downloads/" in urlsplit(link).path for link in links), "Use GitHub release assets"
 for path in DIST.rglob("*"):
