@@ -2,7 +2,7 @@
 
 [Overview](../README.en.md) · [Downloads](../README.en.md#downloads) · [한국어](USER-GUIDE.md)
 
-Detailed installation, workday calculations, settings, calendars, records and updates. This guide describes **the public Mac 1.5.18 build34 release**. Public downloads are Mac 1.5.18 build34 and Windows 1.5.13.
+Installation, workday calculations, settings, calendars, records and updates for **main `58fe8df`, 2026-10-23**. Repository download metadata lists **Mac 1.5.19 build35 and Windows 1.5.13**. System Runner, AI Usage, subsequent overtime refresh changes and Liquid Glass are merged follow-up features; this does not place them in public Mac 1.5.19 build35. Release notes define each published version. This documentation update does not verify download HTTP responses or publish a release.
 
 [Getting started](#three-small-steps) · [Workday calculations](#how-a-day-is-calculated) · [Calendars](#calendars-when-you-need-them) · [Records and updates](#records-and-updates) · [Development and evidence](#development-and-evidence)
 
@@ -19,15 +19,15 @@ HappyLulu is a personal convenience tool, not the company's official attendance 
 
 | Edition | Version | Status |
 | --- | --- | --- |
-| [Public Mac download](https://github.com/young221718/happylulu-app/releases/tag/macos-v1.5.18-build34) | **1.5.18 · build34** | macOS 13+ · Universal DMG/ZIP · manual installation |
+| [Public Mac download](https://github.com/young221718/happylulu-app/releases/tag/macos-v1.5.19-build35) | **1.5.19 · build35** | macOS 13+ · Universal DMG/ZIP · manual installation |
 | [Public Windows download](https://github.com/young221718/happylulu-app/releases/tag/windows-v1.5.13) | **1.5.13** | Windows 10/11 x64 · .NET 10 Desktop Runtime required |
 
-The guide below describes **Mac 1.5.18**. Check the [Mac](../RELEASE-NOTES.md) and [Windows](../windows/RELEASE-NOTES.md) notes for features in each public version. Mac and Windows attendance records do not sync with each other.
+The guide below describes **the current Mac implementation on main**; publication of follow-up features is separate. Check the [Mac](../RELEASE-NOTES.md) and [Windows](../windows/RELEASE-NOTES.md) notes for features in each public version. Mac and Windows attendance records do not sync with each other.
 
 ## Three small steps
 
 1. **Download and give it a home.** On Mac, move the app from the DMG or ZIP to Applications or ~/Applications. On Windows, install the Desktop Runtime and extract the entire ZIP to a permanent folder. Quit the old app before replacing it in the same location.
-2. **Click the smiling clock.** Open the menu bar or tray panel. Enter your arrival and workday mode if you have already arrived.
+2. **Click happylulu.** Open the menu bar or tray panel. Enter your arrival and workday mode if you have already arrived.
 3. **Make it yours.** Choose work and break hours, language and countdown format. Calendar setup is optional.
 
 Mac first launch attempts login-item registration and may require system approval. A disabled preference stays disabled. Windows startup is enabled explicitly in settings. Follow the installation steps above and the [Windows README](../windows/README.en.md).
@@ -38,18 +38,27 @@ Mac puts settings in one window with a sidebar, including Calendar.
 
 | View | Controls |
 | --- | --- |
-| Menu bar panel | Arrival, expected departure, workday choices, inline time edits and today’s events |
-| General | Language, time format, menu bar departure visibility and login startup |
-| Appearance | Five themes, custom colors, five icons and image import |
+| Menu bar panel | Arrival, expected departure, workday choices, inline edits, today’s events, enabled usage/system summaries, and the `…` Settings/Quit menu |
+| General | Language, time format, menu bar departure visibility, Show usage and login startup; label, preview and right-hand control columns |
+| Appearance | Six color themes, Native Liquid Glass on supported systems, custom colors, five icons and image import |
 | Work | Work and break hours, manual arrival and day off |
 | Attendance | Monthly arrival calendar, date details and record folder |
 | Plugin management | Install/enable bundled optional modules and view developers |
-| Installed plugins | Calendar sync, Daouoffice connection and half-day recognition settings |
+| Installed plugins | Calendar sync, Daouoffice, half-day recognition, System Runner and AI Usage when included in the build |
 | Updates | Version and automatic check/install preferences |
 
 In General settings, choose milliseconds, seconds, minutes, hours or hours/minutes for the remaining-time display in the menu bar and Work settings. Hours round up to one decimal: **90 minutes → 1.5 hours**, **30 minutes → 0.5 hours**. By default, the menu bar shows the expected departure time alongside the countdown (for example, `Leave 18:00 · 1.5 hr left`). With departure visibility on, only the expected departure time remains for the first 30 minutes after departure. Then it also shows elapsed time in the selected unit (for example, `Leave 18:00 · Extra 1 hr 1 min`). Elapsed time rounds down to completed units. Preferences survive a restart.
 
 On Mac, **Show expected departure in menu bar** is on by default. Turn it off to hide the clock while keeping the countdown in your selected format (for example, `1.5 hr left`). Changes apply immediately and survive a restart. Once the expected departure time is reached with the option off, the menu bar shows `Ready to leave` for 30 minutes, then shows the elapsed time without the departure clock. The today panel's departure time and attendance records stay unchanged.
+
+## Optional features merged into main
+
+- **System Runner:** Settings → Plugin management → System Runner → Install, then enable it. Open its settings from Installed plugins. The default Owl orbit keeps the eye shapes fixed while light rotates around their outlines with CPU activity. Choose start/end colors or restore defaults. Animal mode offers a hamster, rabbit or cat. The panel and settings show CPU, memory, startup disk, physical-network transfer rates and battery; CPU alone controls animation speed. Reduce Motion stops movement. [Details (Korean)](CPU-RUNNER.md)
+- **AI Usage:** Enable General → Show usage, or install and enable AI Usage in Plugin management. Open it from Installed plugins, Usage settings in General, or the panel usage row. Choose Codex text + %, icon + %, or % only. Defaults are text + %, a five-minute refresh, and notifications off. It reuses the Codex CLI ChatGPT sign-in; API-key accounts do not provide a weekly allowance. Signing in with another account also changes the CLI account. [Connection and display details (Korean)](AI-MODEL-USAGE.md)
+- **Appearance and menus:** Supported builds on macOS 26+ apply glass materials, an arrowless panel and unified titlebar to existing themes. Native Liquid Glass separately follows system colors and appearance. Older macOS retains the previous UI; Reduce Transparency and Increase Contrast use opaque surfaces. The panel `…` menu contains Settings and Quit; the settings sidebar ends with a User guide link. [Material details (Korean)](liquid-glass.md)
+- **Leave tomorrow:** A fresh source reading that confirms approved full-day leave tomorrow can add a hat/sunglasses decoration ten minutes before today’s scheduled departure. Readings must be at most fifteen minutes old. Half days and ambiguous dates are excluded. This never submits a leave request.
+
+These optional Mac modules start disabled after installation. Show usage also installs and enables the available AI module when needed. Disabling a module preserves attendance, preferences and calendar/leave routing. Windows 1.5.13 does not include these modules.
 
 ## How a day is calculated
 
@@ -110,7 +119,7 @@ swift run --build-system native CalendarSyncServiceChecks
 bash scripts/build-app.sh
 ```
 
-Mac PR CI checks core logic, isolated integration, ad-hoc app packaging and Sparkle configuration without private signing keys. See [UPDATES.md](../UPDATES.md) for local fixed signing, signed installation tests and Universal release checks.
+Mac PR CI uses the [QA runner and reports (Korean)](QA.md) for core and isolated integration checks, followed by ad-hoc app packaging and Sparkle configuration without private signing keys. Partial automated coverage, actual clicks/paste, permissions and live services remain separate evidence. See [UPDATES.md](../UPDATES.md) for local fixed signing, signed installation tests and Universal release checks.
 
 Automated checks, app builds, actual device behavior and web-server readback are separate evidence. Track [validation](../VALIDATION.md), [Mac device checks #4](https://github.com/young221718/happylulu-app/issues/4) and [login startup #13](https://github.com/young221718/happylulu-app/issues/13).
 
