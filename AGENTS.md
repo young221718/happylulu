@@ -1,65 +1,56 @@
 # HappyLulu Agent Guide
 
-## Scope
+## Scope and start
 
-HappyLulu is a native Swift macOS menu bar utility. Source, tests, packaging,
-and Korean user documentation belong to this repository.
+HappyLulu is a native Swift macOS menu bar utility. This Git repository owns its
+source, tests, packaging and product documentation. Check the latest request,
+actual checkout identity, branch and dirty state before editing.
 
-## Working rules
+Read [working rules](rules/README.md) and the applicable
+[development and preservation rules](rules/development.md) before work.
+Use [the repository Wiki](wiki/README.md) to find local knowledge and every document.
+Read only the documents and ancestor guides relevant to the target path.
 
-- Read the current Git status and checkout identity before editing. Preserve
-  unrelated changes and user attendance data.
-- When used inside Hive, `develop/` is the baseline directory on `main`.
-  New manually managed feature checkouts use direct sibling `<task>/` directories
-  and `codex/` branches; preserve existing checkout and branch names. Compare
-  their common Git directory before reuse.
-- Use the smallest useful workflow. Material behavior changes require an
-  independent review after relevant checks; simple docs need no extra agents.
-- Keep attendance on the local Mac. Do not add network collection or accounts
-  without an explicit feature request.
-- Preserve the existing `AfterSix` storage path and bundle identifier unless
-  a migration is deliberately implemented and verified.
-- Keep the installed production app named `happylulu`. Development and QA GUI
-  apps must use only `happylulu-dev` and the fixed existing bundle identifier
-  `local.chanyoung.HappyLulu.Dev.manual-leave.20261015`; never create or launch
-  additional QA, date-suffixed, or UUID app identities. Preserve the existing
-  Dev data path. Synthetic QA must isolate its data and preferences, must never
-  delete the fixed Dev preferences, and must reject concurrent Dev sessions.
-  Use `scripts/check-ai-usage-ui.sh` for the synthetic fixture and verify that
-  the menu-bar app list has no extra entries after local GUI checks.
-- Do not count wake or session activation as an unlock event. Do not fabricate
-  historical attendance when the app was not running.
-- Never lock, log out, or reboot the user's Mac to run validation without
-  explicit authorization.
-- Keep `.build/`, `dist/`, app bundles, credentials, and personal state out of
-  Git. `Resources/HappyLuluIcon.png` is the reviewed application source asset.
-- Require an explicit user request for this repository and publication action
-  before pushing, creating or updating a PR, releasing, or deploying. A request
-  for local changes or successful checks alone does not authorize publication.
-- User documentation and reports are normally Korean; keep this guide English.
+## Route by task
 
-## Checks
+| Task | Read before changing |
+| --- | --- |
+| Feature or behavior | [Automated contracts](spec/README.md), [feature specification](docs/FEATURE-SPEC.md), then affected source/tests |
+| UI, interaction or assets | [Design index](design/README.md), feature specification and existing acceptance criteria |
+| Rules, docs or paths | [Working rules](rules/README.md), Wiki index and affected document owners |
+| Validation and reporting | [Development checks](rules/development.md#검사-선택과-결과), [QA](docs/QA.md) and the [macOS workflow](.github/workflows/macos.yml) |
+| Build, update or publication | [Publication restrictions](rules/development.md#작업과-데이터-보존), [QA identity](rules/development.md#개발-앱과-qa-정체성), [deployment](DEPLOYMENT.md) |
+| Platform scope | [Mac/Windows status](docs/PLATFORM-STATUS.md), [validation limits](docs/PLATFORM-VALIDATION.md) |
 
-```sh
-swift run --build-system native AfterSixChecks
-bash scripts/build-app.sh
-bash -n scripts/build-app.sh
-plutil -lint Resources/Info.plist
-git diff --check
-```
+## Critical local entrypoints
 
-Use the existing macOS Command Line Tools; do not install dependencies merely
-to run checks. Unit checks, build/signature validation, actual unlock detection,
-and login-after-reboot behavior are separate evidence. Record their limits.
+Preserve production `happylulu`, attendance data and existing dirty work.
+Development/GUI QA may use only `happylulu-dev` with fixed bundle ID
+`local.chanyoung.HappyLulu.Dev.manual-leave.20261015`; read the full
+[identity and data restrictions](rules/development.md#개발-앱과-qa-정체성) before running scripts.
+Do not run older GUI QA paths until their fixed-identity compliance is confirmed.
+Local checks do not authorize a push, PR, release, installation or deployment.
 
-## Safe personal maintenance
+## Common and nested guidance
 
-- Keep attention on the requested repository and demonstrated defects. Use small,
-  testable changes; preserve the operator's data and unfinished work.
-- Reproduce a defect with a failing check before fixing it. Run relevant regression
-  checks and obtain independent review for behavior changes before claiming done.
-- Inspect branch ancestry, dirty/ignored files, and active work before integration.
-  Preserve unique commits and unfinished checkouts. Clean up only confirmed merged,
-  clean, inactive task branches within explicit cleanup authorization.
-- Report executed checks, review findings, commit/merge evidence, and remaining
-  blockers. Completion requires verified results. Deployment needs its own request.
+In workspace-chanyoung, [common rules](../../../rules/README.md) apply to their
+stated scope and [the root Wiki](../../../wiki/index.md) owns shared knowledge.
+These workspace-relative paths may be absent in a standalone clone; the local
+rules, spec, Wiki and design entrypoints above remain the execution contract.
+Record missing common context without expanding the authorized scope.
+
+Nested guides add only local differences; preserve applicable parent restrictions.
+Independent Git roots must provide their own routes and must not assume automatic
+loading of workspace-root instructions. See [recursive rules](rules/README.md#공통-규칙과-재귀-적용).
+Keep AGENTS.md as navigation: 150 lines recommended, 200 lines maximum, no separate
+byte cap. Put detailed rules, contracts and historical records in their owners.
+
+## Chat records
+
+Use the [Space start guide](https://chatgpt.com/space/page_fc9829154fa08191afb97a2aacfe93c4)
+for one chat index and goal-based topic records under
+[chat history](https://chatgpt.com/space/page_f2c1bdce022c8191b165e1a55e4edb07).
+Space tracks work; repository rules and technical documents remain local owners.
+If access fails, record the missing context in the permitted local task TODO,
+continue independent authorized work and leave evidence-dependent actions pending.
+Preserve ongoing goals, existing records and links; keep private data out of shared notes.

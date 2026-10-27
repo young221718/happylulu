@@ -63,6 +63,8 @@ HappyLulu는 개인 편의 도구입니다. 회사의 공식 근태 시스템이
 
 | 안내 | 내용 |
 | --- | --- |
+| [레포 위키와 전체 문서 목차](wiki/README.md) | 사용법·의사결정·기술 문서를 주제별로 찾는 시작점 |
+| [작업 규칙](rules/README.md) · [자동 검증 스펙](spec/README.md) · [디자인 목차](design/README.md) | 변경 절차, 유지할 동작과 테스트, 화면·자산의 소유 문서 |
 | [사용자 가이드](docs/USER-GUIDE.md) | 설치, 설정, 근무 계산, 기록과 알려진 범위 |
 | [CPU 러너 개발 후보](docs/CPU-RUNNER.md) | Mac 메뉴바의 햄스터·토끼·고양이 선택형 플러그인. 공개 버전 미포함 |
 | [Windows 가이드](windows/README.md) | 런타임, 트레이, 자동 실행과 빌드 |
