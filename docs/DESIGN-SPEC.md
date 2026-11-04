@@ -46,7 +46,7 @@
 - **뺀 기능/요소:** 기능 제거 없음. 근무유형 옆 부엉이 장식 제거를 유지하고, 일반근무·룰루데이·오전반차·오후반차·연차/공가의 캡슐 아래 중복 설명줄을 제거한다. 출근 대기·예정 퇴근 시각 경과·오늘 쉬는 날은 추가 상태 설명을 유지한다.
 - **추가/변경:** 메뉴바는 26×18 pt 단색 template 눈·부리 8종, 패널의 `HappyLulu` 왼쪽은 같은 상태의 28×28 pt 컬러 얼굴 PNG 8종을 사용한다. 오전 반차는 보는 사람 기준 왼쪽 눈, 오후 반차는 오른쪽 눈을 감는다. 룰루데이는 양쪽 눈웃음과 열린 부리, 예정 시각 경과는 눈웃음과 닫힌 부리로 구분한다. 문자와 접근성 이름도 상태에 연결한다.
 - **Dock·설정:** 선택한 전체 올루루+시계 PNG를 기본 앱/Dock 아이콘으로 적용한 로컬 build 34.3 설치 이력을 반영한다. `Resources/HappyLuluIcon.png`와 `Resources/HappyLuluBrand.png`는 선택 원본과 동일한 SHA256 `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084`다. 설정 사이드바는 24×24 pt 정적 브랜드 그림이며 상태별 얼굴과 구분한다. 기존 사용자 아이콘 선택·개인화 경로를 유지한다. 사이트 자산 교체는 별도 대기다.
-- **원본·제작:** [첨부 원본과 8종 자산·제작 기록](../../../../디자인/happylulu/2026-10-21-design-update/state-assets/README.md)을 보존한다. 컬러 얼굴은 첨부 표를 참조해 built-in imagegen으로 재구성한 투명 PNG이며 원본 픽셀을 그대로 잘라낸 결과가 아니다. 메뉴바는 코드 벡터로 재구성한다. 런타임 PNG는 `Resources/OwlStates/`에 포함한다.
+- **원본·제작:** [첨부 원본과 8종 자산·제작 기록](../../../../design/happylulu/2026-10-21-design-update/state-assets/README.md)을 보존한다. 컬러 얼굴은 첨부 표를 참조해 built-in imagegen으로 재구성한 투명 PNG이며 원본 픽셀을 그대로 잘라낸 결과가 아니다. 메뉴바는 코드 벡터로 재구성한다. 런타임 PNG는 `Resources/OwlStates/`에 포함한다.
 - **로컬 검증:** 8종 26×18 pt 메뉴바·28 pt 컬러 헤더의 1×/2× 외관 검사, 3시간대 패널 입력, 설정 28/28 클릭을 통과했다. 기본/근무유형 펼침 각각 한영 8상태 패널 16장·설정 4장·밝고 어두운 1×/2× 보드 4장의 렌더를 통과하고 화면을 검토했다. 보드가 처음 비어 보인 원인은 검사 도구의 `calibratedWhite` tint 변환이었다. 제품 심볼은 정상이었으며 도구를 `deviceRGB`로 수정하고 64개 영역의 명암·빈 알파·경계를 검사했다. 이전 tint는 명암 0으로 실패(exit 133), 수정 후 통과를 확인했다.
 - **설치·보존:** arm64 release 빌드와 기존 고정 인증서 서명을 확인한 1.5.18 / 로컬 build 34.5 / `2026-10-21-state-icons`를 `~/Applications/HappyLulu.app`에 설치·재실행했다. 후보/설치 번들 일치·엄격한 서명·단일 프로세스 PID 26953을 확인했다. 재실행 후 출근/플러그인·외관 전체·일반 설정·캘린더 DB/WAL 보존 대조는 모두 참이다. 복구본 `~/Applications/.HappyLulu-backups/20261021-173213`을 보존했고 로컬 번들의 자동 업데이트 서비스는 비활성이다.
 - **미검증·범위:** CUA 연결 timeout으로 실제 데스크톱 메뉴 조작·VoiceOver는 미검증이다. fixture 렌더를 실제 데스크톱 사용 증거로 대신하지 않는다. Windows·원격 CI·로그인/재부팅 검증은 실행하지 않았다. 기준 HEAD와 기존 로컬 미커밋 변경을 유지하며 commit/push/PR/릴리즈/사이트 배포는 하지 않았다.
@@ -61,7 +61,7 @@
 - **검증/설치:** 3시간대 패널 입력, 설정 28/28 클릭, 한영 8상태 기본/펼침 및 설정 최소 크기 렌더, arm64 빌드와 독립 검토를 통과했다. 설정 검사에 새 소스 의존성이 빠진 오류를 재현한 뒤 목록을 고쳐 통과를 확인했다. 1.5.18 / 로컬 build 34.2 / `2026-10-21-header`를 `~/Applications/HappyLulu.app`에 설치·재실행했다. 설치본 일치·기존 인증서 서명·단일 실행 프로세스 확인.
 - **보존/범위:** 기존 앱을 복구 보관했다. 재실행 후 출근/플러그인·외관 전체·일반 설정·캘린더 DB/WAL 보존을 대조했다. 자동 업데이트 서비스는 로컬 번들에서 비활성이다. commit/push/PR/릴리즈/사이트 배포 없음. 실제 데스크톱 메뉴 조작·VoiceOver는 미검증이다.
 
-[후속 적용 화면과 검증](../../../../디자인/happylulu/2026-10-21-design-update/local-app-header-update/README.md)
+[후속 적용 화면과 검증](../../../../design/happylulu/2026-10-21-design-update/local-app-header-update/README.md)
 
 ## 2026-10-21 최초 승인 로컬 적용 이력 · 34.1
 
@@ -74,9 +74,9 @@
 - **검증:** Core, 공통 계산20건, 외관/1×·2× 경계 회귀, 3시간대 패널 입력, 붙여넣기, 프로필 격리, 설정28/28클릭, 한영 8상태 364×350 및 설정920×720/820×620 렌더, arm64 빌드와 독립 검토 통과. 설치 번들 일치·엄격한 서명·새 프로세스 실행 확인. 출근/플러그인·일반 설정·캘린더 DB/WAL·사용자 이미지 보존을 재실행 후 대조했다. SQLite 임시 공유 메모리만 달라졌다.
 - **남은 검증:** 실제 데스크톱 메뉴 조작·VoiceOver·잠금해제/재부팅·Windows·원격 CI 미검증. CUA 연결 실패로 테스트 렌더와 실제 실행 증거를 구분한다. #54, 사이트 구현, 원본 픽셀 추출·정확한 트레이싱은 이번 완료 범위가 아니다.
 
-[로컬 적용 화면과 검증 범위](../../../../디자인/happylulu/2026-10-21-design-update/local-app/README.md). 아래 기준 버전 표는 최초 조사 이력을 보존하며, 위 로컬 적용 상태가 승인 후 변경분이다.
+[로컬 적용 화면과 검증 범위](../../../../design/happylulu/2026-10-21-design-update/local-app/README.md). 아래 기준 버전 표는 최초 조사 이력을 보존하며, 위 로컬 적용 상태가 승인 후 변경분이다.
 
-작성 기준: 2026-10-21 (Asia/Seoul). [기능 명세](FEATURE-SPEC.md)의 전체 기능을 보존하면서 Mac 앱과 소개 사이트의 시각·상태·상호작용을 정리한다. 기존 [디자인 원본 안내](../../../../디자인/README.md)와 [올루루 디자인](../../../../디자인/올루루/README.md)을 재사용한다. 앱·사이트 제안서는 [2026-10-21 디자인 패키지](../../../../디자인/happylulu/2026-10-21-design-update/README.md)에서 별도로 관리한다. 최신 색감·원형·상태 표정 검토는 [2차 시안 패키지](../../../../디자인/happylulu/2026-10-21-design-update/revision-2/README.md)를 따른다. 1차 선택과 제안 기록은 삭제하지 않는다.
+작성 기준: 2026-10-21 (Asia/Seoul). [기능 명세](FEATURE-SPEC.md)의 전체 기능을 보존하면서 Mac 앱과 소개 사이트의 시각·상태·상호작용을 정리한다. 기존 [디자인 원본 안내](../../../../design/README.md)와 [올루루 디자인](../../../../design/archive/ollulu/README.md)을 재사용한다. 앱·사이트 제안서는 [2026-10-21 디자인 패키지](../../../../design/happylulu/2026-10-21-design-update/README.md)에서 별도로 관리한다. 최신 색감·원형·상태 표정 검토는 [2차 시안 패키지](../../../../design/happylulu/2026-10-21-design-update/revision-2/README.md)를 따른다. 1차 선택과 제안 기록은 삭제하지 않는다.
 
 이 문서는 **최초 조사 소스 / 선택 디자인 / 승인 후 로컬 변경 / 적용·검증 대기**를 구분한다. 최초 조사 이후 변경은 상단 결과 절과 명시된 로컬 자산 행을 따른다. 화면 수용 기준은 앞으로 실행할 검사의 조건이며 실행 결과가 아니다. 사용자의 개인 출근·일정·연결 정보는 시안에 쓰지 않는다.
 
@@ -104,22 +104,22 @@ Mac은 현재 시스템 글꼴을 유지하는 방향을 권한다. 웹에는 �
 
 | 자산 ID·용도 | 원본·규격 | 상태·사용 규칙 |
 | --- | --- | --- |
-| HL-ASSET-001 브랜드 원본 올루루+시계 | [happylulu.png](../../../../디자인/올루루/앱-브랜딩-제안/icons/happylulu.png), 1254×1254 RGBA, SHA256 `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084` | 2026-10-19 선택 원본. 민트 타일·크림 시계와 보라색 올루루의 합성 PNG이며 눈 형태 마스터로 쓰지 않는다. 후속 승인으로 작업 checkout의 `HappyLuluBrand.png`·`HappyLuluIcon.png`에 동일 바이트 적용. 34.3 기본 앱/Dock 설치 이력과 설정 24 pt 정적 브랜드에 사용. 최신 패널은 HL-ASSET-005의 상태별 컬러 얼굴로 전환 완료. 사이트는 별도 대기 |
-| HL-ASSET-002 기존 v3 메뉴바 심볼 이력 | [v3 eyes-owl.svg](../../../../디자인/올루루/happylulu-눈-심볼/v3/assets/eyes-owl.svg), viewBox 100×100, currentColor, stroke 5.5, 타원 동공 rx10/ry13·작은 부리 | 2026-10-19 [선택안 기록](../../../../디자인/올루루/happylulu-선택안/README.md)을 보존한다. 2026-10-21 2차 피드백으로 v3를 재검토하며 최종 그대로 적용할 방향으로 단정하지 않는다. 대칭 테두리·동일한 수직 동공·물방울 부리는 원형과 차이가 있다. AppKit 18 pt 1×/2× template 이식·실기 미검증 |
+| HL-ASSET-001 브랜드 원본 올루루+시계 | [happylulu.png](../../../../design/archive/ollulu/app-branding-proposal/icons/happylulu.png), 1254×1254 RGBA, SHA256 `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084` | 2026-10-19 선택 원본. 민트 타일·크림 시계와 보라색 올루루의 합성 PNG이며 눈 형태 마스터로 쓰지 않는다. 후속 승인으로 작업 checkout의 `HappyLuluBrand.png`·`HappyLuluIcon.png`에 동일 바이트 적용. 34.3 기본 앱/Dock 설치 이력과 설정 24 pt 정적 브랜드에 사용. 최신 패널은 HL-ASSET-005의 상태별 컬러 얼굴로 전환 완료. 사이트는 별도 대기 |
+| HL-ASSET-002 기존 v3 메뉴바 심볼 이력 | [v3 eyes-owl.svg](../../../../design/archive/ollulu/happylulu-eye-symbols/v3/assets/eyes-owl.svg), viewBox 100×100, currentColor, stroke 5.5, 타원 동공 rx10/ry13·작은 부리 | 2026-10-19 [선택안 기록](../../../../design/archive/ollulu/happylulu-selection/README.md)을 보존한다. 2026-10-21 2차 피드백으로 v3를 재검토하며 최종 그대로 적용할 방향으로 단정하지 않는다. 대칭 테두리·동일한 수직 동공·물방울 부리는 원형과 차이가 있다. AppKit 18 pt 1×/2× template 이식·실기 미검증 |
 | HL-ASSET-003 로컬 후속 앱 아이콘 | 작업 checkout의 [Resources/HappyLuluIcon.png](../../design-refresh-local/Resources/HappyLuluIcon.png), HL-ASSET-001과 동일 SHA256 | 34.3에 선택 전체 올루루+시계 PNG로 교체·로컬 설치. 최초 조사 baseline의 청록색 웃는 시계 PNG SHA256 `08b6f5d25fb75c1d3f44360ad6f5f579fe691975f0612b92dfa62a3831ea0b86`와 구분한다. 외관의 개인 아이콘 선택 경로는 유지하며 실행 중 아이콘·Finder 번들 원본·상태별 패널 얼굴을 혼동하지 않음 |
 | HL-ASSET-004 실제 사이트 아이콘 | [site/dist/assets/happylulu.png](../site/dist/assets/happylulu.png), SHA256 `08b6f5d25fb75c1d3f44360ad6f5f579fe691975f0612b92dfa62a3831ea0b86` | 최초 조사 소스의 청록색 웃는 시계 PNG를 유지. 로컬 앱의 새 HL-ASSET-003과 다르다. 선택 올루루 PNG의 사이트 교체·배포는 별도 결정 대기 |
-| HL-ASSET-005 로컬 상태별 메뉴바·패널 얼굴 | 작업 checkout [LuluBrand.swift](../../design-refresh-local/Sources/AfterSix/LuluBrand.swift)의 26×18 pt template 벡터 8종·1×/2×. [첨부 표·컬러 PNG 8종·제작 기록](../../../../디자인/happylulu/2026-10-21-design-update/state-assets/README.md), 1280×1280 투명 PNG를 패널 28×28 pt에 표시 | 34.5 로컬 구현·fixture 검증·설치 완료. 실제 메뉴 조작·VoiceOver는 미검증. 메뉴바와 패널은 같은 상태를 읽고 설정 사이드바·Dock는 전체 브랜드를 사용한다. 컬러 PNG는 built-in imagegen 참조 재구성이며 원본 픽셀 추출 결과가 아니다. 메뉴바도 코드 벡터 재구성이므로 정확한 원본 tracing 완료를 주장하지 않음 |
-| HL-ASSET-006 눈 원형의 정답 PNG 마스터·표정 참조 | [올루루-기본.png](../../../../디자인/올루루/assets/올루루-기본.png), [12개 표정](../../../../디자인/올루루/emotions/) | `올루루-기본.png` 하나를 눈 원형의 정답 마스터로 사용한다. 기쁨·집중은 표정 참조이며 각각 별도 기준 형태를 만들지 않는다. 라벤더 몸/크림 눈·배/짙은 동공/주황 부리·발/짧은 머리깃/배무늬 5개 유지. 기능 상태를 감정 그림만으로 전달하지 않음 |
-| HL-ASSET-007 홈페이지 방향 이미지 | [happylulu-home.png](../../../../디자인/올루루/앱-브랜딩-제안/mockups/happylulu-home.png), 1586×992; [참고 사본](../../../../디자인/레포별-참고자료/happylulu/2026-10-19/home-concept.png) | AI 생성 방향 시안. 최신 승인 UI·실앱 스크린샷 아님. 재택근무 등 가상 기능과 예전 대소문자는 구현 근거로 사용하지 않음 |
+| HL-ASSET-005 로컬 상태별 메뉴바·패널 얼굴 | 작업 checkout [LuluBrand.swift](../../design-refresh-local/Sources/AfterSix/LuluBrand.swift)의 26×18 pt template 벡터 8종·1×/2×. [첨부 표·컬러 PNG 8종·제작 기록](../../../../design/happylulu/2026-10-21-design-update/state-assets/README.md), 1280×1280 투명 PNG를 패널 28×28 pt에 표시 | 34.5 로컬 구현·fixture 검증·설치 완료. 실제 메뉴 조작·VoiceOver는 미검증. 메뉴바와 패널은 같은 상태를 읽고 설정 사이드바·Dock는 전체 브랜드를 사용한다. 컬러 PNG는 built-in imagegen 참조 재구성이며 원본 픽셀 추출 결과가 아니다. 메뉴바도 코드 벡터 재구성이므로 정확한 원본 tracing 완료를 주장하지 않음 |
+| HL-ASSET-006 눈 원형의 정답 PNG 마스터·표정 참조 | [올루루-기본.png](../../../../design/archive/ollulu/assets/올루루-기본.png), [12개 표정](../../../../design/archive/ollulu/emotions) | `올루루-기본.png` 하나를 눈 원형의 정답 마스터로 사용한다. 기쁨·집중은 표정 참조이며 각각 별도 기준 형태를 만들지 않는다. 라벤더 몸/크림 눈·배/짙은 동공/주황 부리·발/짧은 머리깃/배무늬 5개 유지. 기능 상태를 감정 그림만으로 전달하지 않음 |
+| HL-ASSET-007 홈페이지 방향 이미지 | [happylulu-home.png](../../../../design/archive/ollulu/app-branding-proposal/mockups/happylulu-home.png), 1586×992; [참고 사본](../../../../design/legacy-references/happylulu/2026-10-19/home-concept.png) | AI 생성 방향 시안. 최신 승인 UI·실앱 스크린샷 아님. 재택근무 등 가상 기능과 예전 대소문자는 구현 근거로 사용하지 않음 |
 | HL-ASSET-008 이전 웹 데모 이미지 | [preview-ko.jpg](assets/preview-ko.jpg), [preview-en.jpg](assets/preview-en.jpg), 각 1280×720 | 웹 제품 데모. 현재 실앱 화면이나 최신 홈 화면 증거로 쓰지 않음 |
 
-[앱-브랜딩 갤러리](../../../../디자인/올루루/앱-브랜딩-제안/proposal.html), [타이포 시연](../../../../디자인/올루루/앱-브랜딩-제안/typography.html), [눈 심볼 v3 미리보기](../../../../디자인/올루루/happylulu-눈-심볼/v3/preview.html)는 참고 HTML이다. v3의 `app-owl.svg`는 미채택 앱 아이콘이다. v1·v2와 v3 앱 아이콘을 최종 선택안으로 재분류하지 않는다.
+[앱-브랜딩 갤러리](../../../../design/archive/ollulu/app-branding-proposal/proposal.html), [타이포 시연](../../../../design/archive/ollulu/app-branding-proposal/typography.html), [눈 심볼 v3 미리보기](../../../../design/archive/ollulu/happylulu-eye-symbols/v3/preview.html)는 참고 HTML이다. v3의 `app-owl.svg`는 미채택 앱 아이콘이다. v1·v2와 v3 앱 아이콘을 최종 선택안으로 재분류하지 않는다.
 
-[과거 플러그인 설정 HTML](../../../../디자인/happylulu/happylulu-plugin-settings-preview.html)은 상호작용 탐색 자료다. 외관 메뉴가 없고 과거 개발자명이 잘못되어 현행 화면 정본으로 복사하지 않는다. 현재 다우오피스 개발자는 **손정열**, 자체 모듈은 **HappyLulu contributors**다. 실제 최신 앱 스크린샷은 조사 파일에서 확인하지 못했으므로 새 제안 화면은 `소스 기반 재구성 · 제안 · 가상 데이터`로 표시한다.
+[과거 플러그인 설정 HTML](../../../../design/happylulu/happylulu-plugin-settings-preview.html)은 상호작용 탐색 자료다. 외관 메뉴가 없고 과거 개발자명이 잘못되어 현행 화면 정본으로 복사하지 않는다. 현재 다우오피스 개발자는 **손정열**, 자체 모듈은 **HappyLulu contributors**다. 실제 최신 앱 스크린샷은 조사 파일에서 확인하지 못했으므로 새 제안 화면은 `소스 기반 재구성 · 제안 · 가상 데이터`로 표시한다.
 
 ### 1.4 아이콘 제작 기하
 
-[ICON-GEOMETRY.md](../../../../디자인/올루루/앱-브랜딩-제안/ICON-GEOMETRY.md)의 현행 측정과 향후 제작 규격을 구분한다. 선택 PNG 1254×1254의 불투명 타일 폭 1122/높이 1095, 좌/상/우/하 여백 65/81/67/78 px다. 불규칙 곡률이므로 현행 PNG에 정확한 단일 R 값을 붙이지 않는다.
+[ICON-GEOMETRY.md](../../../../design/archive/ollulu/app-branding-proposal/ICON-GEOMETRY.md)의 현행 측정과 향후 제작 규격을 구분한다. 선택 PNG 1254×1254의 불투명 타일 폭 1122/높이 1095, 좌/상/우/하 여백 65/81/67/78 px다. 불규칙 곡률이므로 현행 PNG에 정확한 단일 R 값을 붙이지 않는다.
 
 향후 공통 제작 템플릿은 1024 캔버스, 타일 x64/y64/896×896/R200, 캐릭터 x128/y128/768×768, 배지 x704/y704/224×224/R56, 외부 그림자 없음이다. 이는 **아직 적용되지 않은 제작 규격**이다. 기존 PNG를 리사이즈했다고 정규화 완료로 기록하지 않는다. 원본 레이어·같은 마스크·템플릿 재사용이 필요하며 실제 교체는 별도 결정이다.
 
@@ -183,7 +183,7 @@ UI ID는 위계와 검증용이며 기능 ID를 대체하지 않는다. 진행 �
 
 ### 2.4 원본 기반 눈과 상태 표정: 2차 피드백
 
-HL-ADD-002/003의 34.1/34.2 로컬 적용은 이력이다. 최신 첨부 8상태 표에 따른 **34.5 메뉴바·컬러 헤더 동기화는 로컬 구현·검증·설치 완료**이다. 이번 후속 범위는 색감, 눈 원형과 표정 정교화다. 첨부 표와 재구성 PNG의 출처는 HL-ASSET-005에 둔다. [원본 캐릭터 PNG](../../../../디자인/올루루/assets/올루루-기본.png)를 정답 마스터로 삼으며, 기준 마스터를 추출·정면 재구성하는 작업과 원본 중첩 비교가 필요하다. [기쁨](../../../../디자인/올루루/emotions/올루루-기쁨.png)·[집중](../../../../디자인/올루루/emotions/올루루-집중.png)은 표정 참조다. 형태 마스터는 하나로 유지하며 앱+시계 합성 PNG를 눈 형태 마스터로 쓰지 않는다. 문서·새 벡터 시안이 있다는 사실을 직접 추출·tracing 완료 증거로 쓰지 않는다.
+HL-ADD-002/003의 34.1/34.2 로컬 적용은 이력이다. 최신 첨부 8상태 표에 따른 **34.5 메뉴바·컬러 헤더 동기화는 로컬 구현·검증·설치 완료**이다. 이번 후속 범위는 색감, 눈 원형과 표정 정교화다. 첨부 표와 재구성 PNG의 출처는 HL-ASSET-005에 둔다. [원본 캐릭터 PNG](../../../../design/archive/ollulu/assets/올루루-기본.png)를 정답 마스터로 삼으며, 기준 마스터를 추출·정면 재구성하는 작업과 원본 중첩 비교가 필요하다. [기쁨](../../../../design/archive/ollulu/emotions/올루루-기쁨.png)·[집중](../../../../design/archive/ollulu/emotions/올루루-집중.png)은 표정 참조다. 형태 마스터는 하나로 유지하며 앱+시계 합성 PNG를 눈 형태 마스터로 쓰지 않는다. 문서·새 벡터 시안이 있다는 사실을 직접 추출·tracing 완료 증거로 쓰지 않는다.
 
 기존 v3의 대칭 테두리, 동일한 수직 동공과 물방울 부리는 원형과 차이가 있다. 원형의 핵심은 **깊은 V자 형태의 크림 연속면, 크고 기울어진 동공, 작은 주황 부리**다. 원본과 비교할 때 눈 주변 면이 분리된 테두리처럼 바뀌지 않는지, 동공의 크기·기울기·시선과 부리의 위치·비례가 유지되는지 확인한다. v3 원본은 이력으로 보존하며 그대로 최종 적용할 대상으로 확정하지 않는다.
 
@@ -223,7 +223,7 @@ HL-ADD-002/003의 34.1/34.2 로컬 적용은 이력이다. 최신 첨부 8상태
 
 ### 3.2 브랜드 참조와 권장 역할
 
-[브랜딩 갤러리](../../../../디자인/올루루/앱-브랜딩-제안/proposal.html)의 CSS는 ink `#352C49`, muted `#70667D`, purple `#7150A0`, line `#E5DDEB`, paper `#FFFDF9`, 배경 `#F7F3EC`를 사용한다. 카드 R26/목업 R22/모바일 목업 R14는 **갤러리 표현값**이며 앱 공식 토큰이 아니다.
+[브랜딩 갤러리](../../../../design/archive/ollulu/app-branding-proposal/proposal.html)의 CSS는 ink `#352C49`, muted `#70667D`, purple `#7150A0`, line `#E5DDEB`, paper `#FFFDF9`, 배경 `#F7F3EC`를 사용한다. 카드 R26/목업 R22/모바일 목업 R14는 **갤러리 표현값**이며 앱 공식 토큰이 아니다.
 
 1차 권장안은 현행 앱 소프트 민트 기본면과 라벤더 보조 강조였다. 이 이력은 보존하되 2026-10-21 2차 사용자 피드백으로 색감 제안을 다시 검토한다. 아래 두 후보 중 **A가 승인되어 Mac 로컬 적용됐다**. B는 비교 이력이다. HEX는 시안을 위한 후보이며 원본 PNG에서 추출한 색상값이 아니다. 기존 5개 테마와 개인화 기능은 그대로 보존한다.
 
@@ -232,7 +232,7 @@ HL-ADD-002/003의 34.1/34.2 로컬 적용은 이력이다. 최신 첨부 8상태
 | A 오프화이트·보라 — 추천 | 오프화이트 `#FAF9FC`, 흰색, ink `#2F2B3D`, purple `#7054B3`, lilac `#EEE8F8` | 사용자 승인 후 Mac 로컬 적용. 기존5테마와 개인화는 유지하며 사이트 적용은 대기 |
 | B 크림·보라·소량 앰버 | cream `#FFFBF5`, 흰색, ink `#352F3D`, purple `#7659A6`, amber `#E8AD47` 소량 | 따뜻한 면과 작은 앰버 강조의 비교 후보. 앰버를 광범위한 배경·상태 구분의 유일한 수단으로 사용하지 않음 |
 
-[후보 색상 대비 계산](../../../../디자인/happylulu/2026-10-21-design-update/revision-2/palette-contrast.json)은 sRGB 색상쌍의 정적 계산이다. A의 본문/오프화이트는 13.05:1, 흰 버튼 글자/보라는 5.82:1, 보라 선택 글자/라일락은 4.86:1이다. B의 본문/크림은 12.53:1, 흰 버튼 글자/보라는 5.60:1이다. 앰버/흰색은 2.00:1이므로 작은 글자에 쓰지 않고 장식으로 한정한다. 이 계산은 실제 UI·메뉴바 소형 표현·접근성 전체의 통과 증거가 아니다.
+[후보 색상 대비 계산](../../../../design/happylulu/2026-10-21-design-update/revision-2/palette-contrast.json)은 sRGB 색상쌍의 정적 계산이다. A의 본문/오프화이트는 13.05:1, 흰 버튼 글자/보라는 5.82:1, 보라 선택 글자/라일락은 4.86:1이다. B의 본문/크림은 12.53:1, 흰 버튼 글자/보라는 5.60:1이다. 앰버/흰색은 2.00:1이므로 작은 글자에 쓰지 않고 장식으로 한정한다. 이 계산은 실제 UI·메뉴바 소형 표현·접근성 전체의 통과 증거가 아니다.
 
 두 후보 모두 실제 화면에서 본문·포커스·오류 대비를 확인해야 한다. 브랜드 그림의 크림색·라벤더·주황을 버튼·오류·선택 상태에 무조건 적용하지 않는다. 후보 선택이 기존 테마 저장값이나 사용자 색상을 덮어쓸 근거가 되지 않는다.
 
@@ -242,9 +242,9 @@ HL-ADD-002/003의 34.1/34.2 로컬 적용은 이력이다. 최신 첨부 8상태
 | --- | --- | --- |
 | Mac 앱 | `.system`과 SwiftUI 역할형 글꼴. 패널 시각 31 rounded semibold/monospacedDigit·헤더 16 semibold·일정 13/12/11·유형 11 | 시스템 글꼴 유지 권장. 숫자 폭·시간 경계·한영 긴 문구·스크린리더 순서 확인. Pretendard 적용됐다고 표기하지 않음 |
 | 사이트 | [style.css](../site/dist/style.css): Inter→Apple 계열→Noto Sans KR, 본문 16 px/1.75. 최종 cascade H1 `clamp(2.45rem,4.15vw,4rem)`/1.23/-0.065 em, ≤767 px `clamp(2.1rem,7.6vw,3.1rem)` | 브랜드 문서 Pretendard Variable v1.3.9 적용 후보. 본문 400/-0.01 em/1.6·버튼 600/-0.01 em/1.6·제목 700/-0.03 em/1.2·브랜드 700/-0.025 em/1.2. 소개 H1 desktop 56/mobile 36 px는 제안이며 현행 CSS 값과 구분 |
-| 브랜드 문서 | [TYPOGRAPHY.md](../../../../디자인/올루루/앱-브랜딩-제안/TYPOGRAPHY.md), [typography.css](../../../../디자인/올루루/앱-브랜딩-제안/typography.css) | 정규 디자인 표기 `happylulu`, lulu 소문자. runtime `HappyLulu`/`AfterSix`/bundle ID/저장 경로는 유지. 로컬 WOFF2·`font-synthesis:none`·OFL 동봉·fallback·한영 줄바꿈 확인 |
+| 브랜드 문서 | [TYPOGRAPHY.md](../../../../design/archive/ollulu/app-branding-proposal/TYPOGRAPHY.md), [typography.css](../../../../design/archive/ollulu/app-branding-proposal/typography.css) | 정규 디자인 표기 `happylulu`, lulu 소문자. runtime `HappyLulu`/`AfterSix`/bundle ID/저장 경로는 유지. 로컬 WOFF2·`font-synthesis:none`·OFL 동봉·fallback·한영 줄바꿈 확인 |
 
-폰트 라이선스 원본은 [OFL-Pretendard.txt](../../../../디자인/올루루/앱-브랜딩-제안/fonts/OFL-Pretendard.txt)다. PNG 안 글자만 보고 글꼴을 확정하지 않는다. 기존 타이포·모바일 갤러리 촬영은 브랜드 표기 변경 전 기록이며 앱/사이트 적용 완료 증거가 아니다.
+폰트 라이선스 원본은 [OFL-Pretendard.txt](../../../../design/archive/ollulu/app-branding-proposal/fonts/OFL-Pretendard.txt)다. PNG 안 글자만 보고 글꼴을 확정하지 않는다. 기존 타이포·모바일 갤러리 촬영은 브랜드 표기 변경 전 기록이며 앱/사이트 적용 완료 증거가 아니다.
 
 ### 3.4 접근성 수용 기준
 

@@ -41,7 +41,7 @@
 
 - [승인된 8상태 컬러 얼굴](../state-assets/README.md). 기존 자산을 그대로 사용했으며 이 작업에서 새 이미지를 생성하지 않았다.
 - [새 Mac 패널 검사용 렌더](../state-assets/render/panel-korean-regular.png). 가상 데이터이며 공개 앱의 업데이트 완료 증거가 아니다.
-- [전체 앱 캐릭터 원본](../../../../../../../design/올루루/앱-브랜딩-제안/icons/happylulu.png)
+- [전체 앱 캐릭터 원본](../../../../../../../design/archive/ollulu/app-branding-proposal/icons/happylulu.png)
 - [사이트 소스 설명](../../../../../design-refresh-local/site/README.md)
 - [디자인 명세](../../../../../design-refresh-local/docs/DESIGN-SPEC.md)
 

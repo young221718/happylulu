@@ -5,8 +5,8 @@
 | 위치 | 선택한 자산 | 상태 |
 | --- | --- | --- |
 | 앱 아이콘 | [기존 보라색 올루루와 시계 PNG](../../references/ollulu-2026-10-19/app-icon.png) | 기존 디자인 유지 |
-| 메뉴바 눈 심볼 | [v3 눈·부리 SVG](../happylulu-눈-심볼/v3/assets/eyes-owl.svg) | 사용자 채택 |
-| v3의 보라색 눈 전용 앱 아이콘 | [app-owl.svg](../happylulu-눈-심볼/v3/assets/app-owl.svg) | 미채택, 비교 기록으로 보존 |
+| 메뉴바 눈 심볼 | [v3 눈·부리 SVG](../eye-symbols/v3/assets/eyes-owl.svg) | 사용자 채택 |
+| v3의 보라색 눈 전용 앱 아이콘 | [app-owl.svg](../eye-symbols/v3/assets/app-owl.svg) | 미채택, 비교 기록으로 보존 |
 
 앱 아이콘은 민트색 타일에 보라색 올루루와 시계가 들어간 기존 이미지입니다. 메뉴바에는 둥근 눈테, 큰 세로 타원 동공, 작은 반짝임과 부리가 있는 v3 단색 심볼을 사용합니다. v3 미리보기의 왼쪽 앱 아이콘은 이번 선택에 포함되지 않습니다.
 

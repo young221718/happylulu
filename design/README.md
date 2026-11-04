@@ -11,7 +11,7 @@
 | 사이트 상세 화면 | [사이트 문서 명세](../docs/site-detail-pages-spec.md), [사이트 개발](../site/README.md) |
 | 보존된 제안과 디자인 원본 위치 | [레포의 기존 위치 안내](../docs/design/ollulu/2026-10-19/README.md) |
 | 날짜별 시안·캡처·검증 이력 | [이력 목차](history/README.md) |
-| 올루루 앱 아이콘·메뉴바 선택 | [선택 기록](branding/happylulu-선택안/README.md), [심볼 v3](branding/happylulu-눈-심볼/v3/README.md) |
+| 올루루 앱 아이콘·메뉴바 선택 | [선택 기록](branding/selection/README.md), [심볼 v3](branding/eye-symbols/v3/README.md) |
 | 초기 제품별 브랜딩 참고 | [2026-10-19 원본과 가이드](references/ollulu-2026-10-19/README.md) |
 
 workspace-chanyoung의 [공용 원본과 기준](../../../../design/common/README.md)은 작업공간이 소유한다. 독립 clone에는 이 경로가 없을 수 있다. 제품별 HTML 미리보기에 필요한 공용 원본 복사본은 `references/shared/`에 두며, 공용 정본의 변경이 제품에 자동 반영되지는 않는다. 제품에 적용한 런타임 자산은 기존 소스 경로에서 관리한다.

@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-const root = '/Users/chanyoungchoi/workspace-chanyoung/디자인/올루루/happylulu-눈-심볼/v2';
+const root = '/Users/chanyoungchoi/workspace-chanyoung/design/archive/ollulu/happylulu-eye-symbols/v2';
 if (fs.existsSync(root)) throw new Error('Preserve existing draft; use a new version');
 fs.mkdirSync(path.join(root, 'assets'), {recursive:true});
 fs.mkdirSync(path.join(root, 'fonts'));
-const fontSource = '/Users/chanyoungchoi/workspace-chanyoung/디자인/올루루/앱-브랜딩-제안/fonts';
+const fontSource = '/Users/chanyoungchoi/workspace-chanyoung/design/archive/ollulu/app-branding-proposal/fonts';
 for (const file of ['PretendardVariable.woff2', 'OFL-Pretendard.txt']) fs.copyFileSync(path.join(fontSource,file),path.join(root,'fonts',file));
 // One closed contour: two round lobes with a curved, nonzero waist.
 const contour = 'M50 41 C43 41 40 25 26 25 C13 25 4 35 4 50 C4 65 13 75 26 75 C40 75 43 59 50 59 C57 59 60 75 74 75 C87 75 96 65 96 50 C96 35 87 25 74 25 C60 25 57 41 50 41 Z';

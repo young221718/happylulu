@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-const root='/Users/chanyoungchoi/workspace-chanyoung/디자인/올루루/happylulu-눈-심볼/v1';
+const root='/Users/chanyoungchoi/workspace-chanyoung/design/archive/ollulu/happylulu-eye-symbols/v1';
 if(fs.existsSync(root)) throw new Error('Preserve existing draft; choose a new version');
 fs.mkdirSync(path.join(root,'assets'),{recursive:true});
 fs.mkdirSync(path.join(root,'fonts'));
-const old='/Users/chanyoungchoi/workspace-chanyoung/디자인/올루루/앱-브랜딩-제안/fonts';
+const old='/Users/chanyoungchoi/workspace-chanyoung/design/archive/ollulu/app-branding-proposal/fonts';
 for(const file of ['PretendardVariable.woff2','OFL-Pretendard.txt'])fs.copyFileSync(path.join(old,file),path.join(root,'fonts',file));
 const variants=[
  {id:'bright',letter:'A',name:'초롱눈',tag:'기본 로고 추천',desc:'또렷하고 호기심 있는 표정'},

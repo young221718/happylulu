@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-const base='/Users/chanyoungchoi/workspace-chanyoung/디자인/올루루/happylulu-눈-심볼';
+const base='/Users/chanyoungchoi/workspace-chanyoung/design/archive/ollulu/happylulu-eye-symbols';
 const root=path.join(base,'v3');
 if(fs.existsSync(root))throw new Error('Preserve existing version');
 for(const dir of ['assets','fonts','reference'])fs.mkdirSync(path.join(root,dir),{recursive:true});

@@ -44,6 +44,6 @@ SHA-256: `3d9a2440d3af41a5ab18d3a1280f6ea80bccb08bdba2aef6cefd5ee05fa86134`
 
 디자인 선택은 완료했습니다. 로컬 브라우저에서 18×18 CSS px의 밝은·어두운 메뉴바 모형과 SVG 로드를 확인했습니다. 실제 AppKit 출력, 앱 구현, 빌드, CI, 배포는 아직 수행하지 않았습니다.
 
-워크스페이스 디자인 기록: `artifacts/design/올루루/happylulu-선택안/README.md`
+워크스페이스 디자인 기록: `artifacts/design/archive/ollulu/happylulu-selection/README.md`
 
-기존 앱 아이콘 참고 원본: `artifacts/design/올루루/앱-브랜딩-제안/icons/happylulu.png` (SHA-256: `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084`). 위 두 경로는 로컬 보관 위치이며 GitHub 첨부 링크가 아닙니다.
+기존 앱 아이콘 참고 원본: `artifacts/design/archive/ollulu/app-branding-proposal/icons/happylulu.png` (SHA-256: `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084`). 위 두 경로는 로컬 보관 위치이며 GitHub 첨부 링크가 아닙니다.
