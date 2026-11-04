@@ -1,0 +1,72 @@
+[
+  {
+    "height": 844,
+    "lang": "ko",
+    "mascot": {
+      "bottom": 252.83853912353516,
+      "loaded": true,
+      "top": 112.83853912353516,
+      "visible": true,
+      "width": 140
+    },
+    "overflow": false,
+    "panel": true,
+    "width": 390
+  },
+  {
+    "height": 800,
+    "lang": "ko",
+    "mascot": {
+      "bottom": 252.83853912353516,
+      "loaded": true,
+      "top": 112.83853912353516,
+      "visible": true,
+      "width": 140
+    },
+    "overflow": false,
+    "panel": true,
+    "width": 320
+  },
+  {
+    "height": 800,
+    "lang": "en",
+    "mascot": {
+      "bottom": 252.83853912353516,
+      "loaded": true,
+      "top": 112.83853912353516,
+      "visible": true,
+      "width": 140
+    },
+    "overflow": false,
+    "panel": true,
+    "width": 320
+  },
+  {
+    "height": 1079,
+    "lang": "en",
+    "mascot": {
+      "bottom": 330.8333282470703,
+      "loaded": true,
+      "top": 120.83332824707033,
+      "visible": true,
+      "width": 210
+    },
+    "overflow": false,
+    "panel": true,
+    "width": 1033
+  },
+  {
+    "height": 1079,
+    "lang": "ko",
+    "mascot": {
+      "bottom": 330.8333282470703,
+      "loaded": true,
+      "top": 120.83332824707033,
+      "visible": true,
+      "width": 210
+    },
+    "overflow": false,
+    "panel": true,
+    "width": 1033
+  }
+]

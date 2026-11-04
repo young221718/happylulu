@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>happylulu · Astra 러너 비교</title>
+<style>
+  :root{color-scheme:light;--bg:#f6f5f2;--card:#fff;--fg:#292631;--muted:#797582;--line:#e6e3e9;--accent:#7253b6}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+  body.dark{color-scheme:dark;--bg:#19181c;--card:#25232a;--fg:#f1edf6;--muted:#aaa3b5;--line:#423d49;--accent:#bea3ef}
+  main{max-width:1100px;margin:36px auto;padding:0 24px 40px}h1{font-size:27px;margin:0 0 10px}p{color:var(--muted);line-height:1.6;margin:0 0 22px;font-size:14px}
+  .controls{position:sticky;top:0;z-index:1;background:var(--bg);display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;padding:14px 0 18px;border-bottom:1px solid var(--line)}
+  button,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 14px;cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+  label{display:flex;align-items:center;gap:8px;font-size:13px}input{accent-color:var(--accent)}#frame{width:120px}output{font-variant-numeric:tabular-nums;min-width:35px}#theme{margin-left:auto}
+  .titles,.animal{display:grid;grid-template-columns:110px repeat(3,minmax(0,1fr));gap:16px}.titles{margin:24px 0 12px;font-size:14px;font-weight:650;text-align:center}.animal{align-items:center;margin:0 0 18px}.animal h2{font-size:18px;margin:0}.cell{background:var(--card);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;align-items:center;padding:14px 8px;min-width:0}.large{width:156px;height:108px;display:block;object-fit:contain}.native{width:26px;height:18px;display:block;margin:13px 0 7px}.hint{font-size:11px;color:var(--muted)}
+  .reference{background:#fff;color:#292631}.reference .hint{color:#797582}.dark .sprite{filter:brightness(0) invert(1)}.pixels .sprite.large{image-rendering:pixelated}
+  .note{margin-top:20px}details{margin-top:24px;border-top:1px solid var(--line);padding-top:20px}summary{cursor:pointer;font-weight:600}details img{width:100%;height:auto;margin-top:20px;border-radius:14px}#status{font-size:12px;color:var(--muted);margin-top:12px}
+  @media(max-width:720px){main{padding:0 12px;margin-top:22px}.titles,.animal{grid-template-columns:62px repeat(3,minmax(0,1fr));gap:6px}.animal h2{font-size:14px}.titles{font-size:12px}.large{width:100%;max-width:156px;height:90px}.cell{padding:8px 2px}.hint{font-size:9px}h1{font-size:22px}#theme{margin-left:0}}
+</style>
+<main>
+  <h1>원안과 실제 러너 프레임 비교</h1>
+  <p>위는 확대, 아래는 실제 메뉴바 크기입니다. 동작 비교를 위해 일정한 속도로 재생합니다.</p>
+  <div class="controls">
+    <button id="play" type="button">일시 정지</button>
+    <label>속도 <select id="speed"><option value="4">느리게 · 4프레임/초</option><option value="8" selected>보통 · 8프레임/초</option><option value="12">빠르게 · 12프레임/초</option></select></label>
+    <label>자세 <input id="frame" type="range" min="0" max="7" value="0" aria-label="프레임 선택"><output id="frameLabel">1 / 8</output></label>
+    <label><input id="pixels" type="checkbox">확대 픽셀 보기</label>
+    <button id="theme" type="button" aria-pressed="false">어두운 배경</button>
+  </div>
+  <div class="titles" aria-hidden="true"><span></span><span>원본 제안</span><span>이전 35.2</span><span>Astra 수정안</span></div>
+  <section id="animals" aria-label="동물별 프레임 비교"></section>
+  <div id="status" role="status">실제 프레임을 불러오는 중…</div>
+  <p class="note">원안은 원본 배경을 유지했습니다. 수정안은 검토용이며 현재 설치 앱에는 반영하지 않았습니다.</p>
+  <details><summary>전체 원안 보기</summary><img src="reference.png" alt="최초 제안한 통통 햄스터, 깡총 토끼, 아기 고양이의 컬러 및 단색 시안"></details>
+</main>
+<script>
+const animals=[{id:'hamster',name:'햄스터',crop:'170 575 205 155',x:3.2,y:1.7,w:19.885,h:15.035},{id:'rabbit',name:'토끼',crop:'668 552 208 182',x:4.1,y:1.15,w:18.304,h:16.016},{id:'cat',name:'고양이',crop:'1140 565 277 180',x:1.4,y:1.35,w:23.545,h:15.3}];
+const area=document.querySelector('#animals');
+for(const a of animals){
+  const row=document.createElement('article');row.className='animal';
+  row.innerHTML=`<h2>${a.name}</h2><div class="cell reference">${['large','native'].map(size=>`<svg class="${size}" viewBox="0 0 26 18" role="img" aria-label="${a.name} 원안"><svg x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" viewBox="${a.crop}"><image href="reference.png" width="1536" height="1024"/></svg></svg>`).join('')}<span class="hint">원본 시안</span></div>${['old','new'].map(kind=>`<div class="cell">${['large','native'].map(size=>`<img class="sprite ${size}" data-kind="${kind}" data-animal="${a.id}" src="${kind}/${a.id}-0-2x.png" alt="${a.name} ${kind==='old'?'이전':'수정'} 프레임">`).join('')}<span class="hint">26 × 18</span></div>`).join('')}`;
+  area.append(row);
+}
+let playing=true,current=0,last=0,ready=false;
+const play=document.querySelector('#play'),slider=document.querySelector('#frame'),label=document.querySelector('#frameLabel'),speed=document.querySelector('#speed');
+function setFrame(n){current=n;slider.value=String(n);label.value=`${n+1} / 8`;for(const img of document.querySelectorAll('.sprite'))img.src=`${img.dataset.kind}/${img.dataset.animal}-${n}-2x.png`;}
+function setPlaying(value){playing=value;play.textContent=value?'일시 정지':'재생';last=performance.now();}
+play.addEventListener('click',()=>setPlaying(!playing));
+slider.addEventListener('input',()=>{setPlaying(false);setFrame(Number(slider.value));});
+speed.addEventListener('change',()=>{last=performance.now();});
+document.querySelector('#pixels').addEventListener('change',e=>document.body.classList.toggle('pixels',e.target.checked));
+document.querySelector('#theme').addEventListener('click',e=>{const dark=document.body.classList.toggle('dark');e.target.textContent=dark?'밝은 배경':'어두운 배경';e.target.setAttribute('aria-pressed',String(dark));});
+const preload=[];
+for(const kind of ['old','new'])for(const a of animals)for(let n=0;n<8;n++)preload.push(new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>img.naturalWidth===52&&img.naturalHeight===36?resolve(img):reject(new Error('프레임 크기 불일치'));img.onerror=()=>reject(new Error('프레임 로딩 실패'));img.src=`${kind}/${a.id}-${n}-2x.png`;}));
+Promise.all(preload).then(images=>{window.loadedFrames=images;ready=true;document.querySelector('#status').textContent='세 동물의 8개 자세를 모두 불러왔습니다.';}).catch(error=>{setPlaying(false);document.querySelector('#status').textContent=error.message;});
+function tick(now){if(ready&&playing&&now-last>=1000/Number(speed.value)){setFrame((current+1)%8);last=now;}requestAnimationFrame(tick);}requestAnimationFrame(tick);
+</script>
+</html>

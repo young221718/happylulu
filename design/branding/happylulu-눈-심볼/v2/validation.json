@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "scope": "Local SVG and browser design-preview checks only; no AppKit or native menu acceptance",
+  "images_loaded": 5,
+  "svg_downloads": 2,
+  "menu_sizes": [
+    {
+      "width": 18,
+      "height": 18
+    },
+    {
+      "width": 18,
+      "height": 18
+    }
+  ],
+  "layouts": [
+    {
+      "width": 1200,
+      "scrollWidth": 1200
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390
+    }
+  ],
+  "font": "Local Pretendard Variable loaded",
+  "page_errors": [],
+  "assets": [
+    {
+      "file": "app-infinity.svg",
+      "contour": "M50 41 C43 41 40 25 26 25 C13 25 4 35 4 50 C4 65 13 75 26 75 C40 75 43 59 50 59 C57 59 60 75 74 75 C87 75 96 65 96 50 C96 35 87 25 74 25 C60 25 57 41 50 41 Z",
+      "pupils": [
+        {
+          "cx": "26",
+          "cy": "50",
+          "r": "9.5"
+        },
+        {
+          "cx": "74",
+          "cy": "50",
+          "r": "9.5"
+        }
+      ],
+      "tile": {
+        "x": "64",
+        "y": "64",
+        "width": "896",
+        "height": "896",
+        "rx": "200"
+      }
+    },
+    {
+      "file": "eyes-infinity.svg",
+      "contour": "M50 41 C43 41 40 25 26 25 C13 25 4 35 4 50 C4 65 13 75 26 75 C40 75 43 59 50 59 C57 59 60 75 74 75 C87 75 96 65 96 50 C96 35 87 25 74 25 C60 25 57 41 50 41 Z",
+      "pupils": [
+        {
+          "cx": "26",
+          "cy": "50",
+          "r": "9.5"
+        },
+        {
+          "cx": "74",
+          "cy": "50",
+          "r": "9.5"
+        }
+      ],
+      "tile": null
+    }
+  ]
+}

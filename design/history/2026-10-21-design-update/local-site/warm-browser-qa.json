@@ -1,0 +1,454 @@
+{
+  "representative": [
+    {
+      "route": "/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": {
+        "height": 353.3072814941406,
+        "loaded": true,
+        "width": 353.3072814941406,
+        "x": 564.2317504882812,
+        "y": 218.61978149414065
+      },
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/en/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": {
+        "height": 353.3072814941406,
+        "loaded": true,
+        "width": 353.3072814941406,
+        "x": 564.2317504882812,
+        "y": 218.61978149414065
+      },
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/features/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/en/features/countdown/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/guide/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/en/guide/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/releases/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/en/releases/macos-1.5.17/",
+      "requestedWidth": 1280,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 900,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 1267,
+      "width": 1280
+    },
+    {
+      "route": "/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/en/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/features/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/en/features/countdown/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/guide/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/en/guide/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/releases/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/en/releases/macos-1.5.17/",
+      "requestedWidth": 390,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 377,
+      "width": 390
+    },
+    {
+      "route": "/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/en/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/features/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/en/features/countdown/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/guide/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/en/guide/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/releases/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    },
+    {
+      "route": "/en/releases/macos-1.5.17/",
+      "requestedWidth": 320,
+      "bg": "rgb(255, 252, 247)",
+      "h1": 1,
+      "height": 844,
+      "mascot": null,
+      "overflow": false,
+      "scrollWidth": 307,
+      "width": 320
+    }
+  ],
+  "boundaryFinal": [
+    {
+      "path": "/",
+      "requestedWidth": 650,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 642,
+      "width": 650
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 650,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 642,
+      "width": 650
+    },
+    {
+      "path": "/",
+      "requestedWidth": 651,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 638,
+      "width": 651
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 651,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 638,
+      "width": 651
+    },
+    {
+      "path": "/",
+      "requestedWidth": 719,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 707,
+      "width": 719
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 719,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 707,
+      "width": 719
+    },
+    {
+      "path": "/",
+      "requestedWidth": 720,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 707,
+      "width": 720
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 720,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 707,
+      "width": 720
+    },
+    {
+      "path": "/",
+      "requestedWidth": 800,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 787,
+      "width": 800
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 800,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 787,
+      "width": 800
+    },
+    {
+      "path": "/",
+      "requestedWidth": 801,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 789,
+      "width": 801
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 801,
+      "images": true,
+      "overflow": false,
+      "scrollWidth": 789,
+      "width": 801
+    }
+  ],
+  "boundaryBeforeFix": [
+    {
+      "path": "/",
+      "requestedWidth": 650,
+      "heroColumns": "597.5px",
+      "images": true,
+      "overflow": false,
+      "width": 650
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 650,
+      "heroColumns": "597.5px",
+      "images": true,
+      "overflow": false,
+      "width": 650
+    },
+    {
+      "path": "/",
+      "requestedWidth": 651,
+      "heroColumns": "590.326px",
+      "images": true,
+      "overflow": true,
+      "width": 651
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 651,
+      "heroColumns": "590.326px",
+      "images": true,
+      "overflow": true,
+      "width": 651
+    },
+    {
+      "path": "/",
+      "requestedWidth": 800,
+      "heroColumns": "739.492px",
+      "images": true,
+      "overflow": false,
+      "width": 800
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 800,
+      "heroColumns": "739.492px",
+      "images": true,
+      "overflow": false,
+      "width": 800
+    },
+    {
+      "path": "/",
+      "requestedWidth": 801,
+      "heroColumns": "313.19px 379.141px",
+      "images": true,
+      "overflow": false,
+      "width": 801
+    },
+    {
+      "path": "/en/",
+      "requestedWidth": 801,
+      "heroColumns": "313.19px 379.141px",
+      "images": true,
+      "overflow": false,
+      "width": 801
+    }
+  ],
+  "interactions": {
+    "morningHalf": {
+      "arrival": "13:00",
+      "leave": "17:00"
+    }
+  },
+  "limits": [
+    "VoiceOver not tested",
+    "No public deployment or remote CI"
+  ]
+}

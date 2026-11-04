@@ -1,0 +1,13 @@
+Built-in image_gen.imagegen, 2026-10-21. Original PNG references, no production vector claim.
+
+Use case: logo-brand and expression study. Create a polished DESIGN EXPLORATION BOARD, landscape about 2048x1400, warm offwhite #FAF9FC background, titled "올루루 눈 표정 연구". Three input images are STRICT identity reference only: 1 original basic owl, 2 same owl joyful, 3 same owl focused. Preserve the original character, do not substitute a generic owl or previous symmetrical round-eyeglasses eyes. Faithfulness highest priority. Lock one common head master and placement across all states: broad lavender forehead descending into a DEEP SHARP V at center between eyes; two large creamy face lobes CONNECTED as a continuous face plane, original subtle asymmetric three-quarter head; dark very large oval pupils naturally TILTED, left pupil appears larger, right slightly smaller; small short plump ORANGE curved beak, not a dangling teardrop. Use close-up heads only. Original 3D soft material retained in COLOR HEAD in each state. All head ratios and face contour identical. Change only eyelids / pupils / smile eyes. No hats, clocks, letters on face, angry eyebrows, exhausted red eyes or new characters.
+Main board 4 columns x 2 rows, exactly EIGHT clearly separated labeled specimens. Each specimen has large color head close-up on top, below a carefully simplified single-ink #2F2B3D EYES+FACE symbol derived from SAME deep-V continuous cream face outline, tilted asymmetric pupils and short beak. Monochrome is flat one-color icon candidate, not vector production. Avoid two disconnected circular spectacle rings or vertical symmetric pupils. Aim simple readable silhouettes, sparse highlights. Caption labels exact:
+1 "출근대기" with gentle attentive open eyes
+2 "남은시간" calm focused open eyes
+3 "룰루데이" friendly mild smile eyes, working shortened day not holiday
+4 "오전반차" left eye gentle wink, opposite open eye; label essential
+5 "오후반차" right eye gentle wink, opposite open eye; label essential
+6 "예정퇴근시각경과" gently relaxed smile, not angry or tired, NO done checkmark
+7 "연차·공가" calm relieved soft smile eyes
+8 "오늘쉬는날" serene eyes softly closed
+One short footer exact "원본 기반 재구성 · 방향 시안 · 18pt 실기 검증 전". All states equally sized, not emoji. Crisp Korean typography. NO app UI, no extra state names, no claims of exact tracing. Include only these8states and preserve original eye identity.

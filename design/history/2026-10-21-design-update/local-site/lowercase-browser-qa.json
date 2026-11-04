@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-22",
+  "cases": [
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [],
+      "mixedCase": [],
+      "scrollWidth": 1267,
+      "url": "/",
+      "width": 1280
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [],
+      "mixedCase": [],
+      "scrollWidth": 307,
+      "url": "/",
+      "width": 320
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [],
+      "mixedCase": [],
+      "scrollWidth": 1267,
+      "url": "/en/",
+      "width": 1280
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [],
+      "mixedCase": [],
+      "scrollWidth": 307,
+      "url": "/en/",
+      "width": 320
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [
+        {
+          "text": "happylulu",
+          "transform": "none"
+        }
+      ],
+      "mixedCase": [],
+      "scrollWidth": 1267,
+      "url": "/features/",
+      "width": 1280
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [
+        {
+          "text": "happylulu",
+          "transform": "none"
+        }
+      ],
+      "mixedCase": [],
+      "scrollWidth": 307,
+      "url": "/features/",
+      "width": 320
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [
+        {
+          "text": "happylulu",
+          "transform": "none"
+        }
+      ],
+      "mixedCase": [],
+      "scrollWidth": 1267,
+      "url": "/en/features/",
+      "width": 1280
+    },
+    {
+      "brand": [
+        "happylulu",
+        "happylulu"
+      ],
+      "eyebrow": [
+        {
+          "text": "happylulu",
+          "transform": "none"
+        }
+      ],
+      "mixedCase": [],
+      "scrollWidth": 307,
+      "url": "/en/features/",
+      "width": 320
+    }
+  ],
+  "englishLuluSelection": {
+    "title": "lulu day",
+    "alt": "lulu day"
+  },
+  "scope": "Local preview only"
+}

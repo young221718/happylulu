@@ -1,0 +1,47 @@
+{
+  "scope": "Proposed sRGB color-pair calculation only; not runtime UI or small-icon verification",
+  "checks": [
+    {
+      "pair": "A body",
+      "foreground": "#2F2B3D",
+      "background": "#FAF9FC",
+      "ratio": 13.05,
+      "normal_text_4_5": true
+    },
+    {
+      "pair": "A button text",
+      "foreground": "#FFFFFF",
+      "background": "#7054B3",
+      "ratio": 5.82,
+      "normal_text_4_5": true
+    },
+    {
+      "pair": "A selected text",
+      "foreground": "#7054B3",
+      "background": "#EEE8F8",
+      "ratio": 4.86,
+      "normal_text_4_5": true
+    },
+    {
+      "pair": "B body",
+      "foreground": "#352F3D",
+      "background": "#FFFBF5",
+      "ratio": 12.53,
+      "normal_text_4_5": true
+    },
+    {
+      "pair": "B button text",
+      "foreground": "#FFFFFF",
+      "background": "#7659A6",
+      "ratio": 5.6,
+      "normal_text_4_5": true
+    },
+    {
+      "pair": "B amber decoration only",
+      "foreground": "#E8AD47",
+      "background": "#FFFFFF",
+      "ratio": 2.0,
+      "normal_text_4_5": false
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-19",
+  "status": "user-selected-design",
+  "user_decision": "앱 아이콘은 옛날게 더 좋고 눈 심볼만 저걸로 가자",
+  "app_implementation_changed": false,
+  "files": [
+    {
+      "role": "app-icon",
+      "status": "retain-existing-design",
+      "source": "../../references/ollulu-2026-10-19/app-icon.png",
+      "sha256": "82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084",
+      "bytes": 1696403
+    },
+    {
+      "role": "menu-bar-symbol",
+      "status": "selected",
+      "source": "../happylulu-눈-심볼/v3/assets/eyes-owl.svg",
+      "sha256": "3d9a2440d3af41a5ab18d3a1280f6ea80bccb08bdba2aef6cefd5ee05fa86134",
+      "bytes": 1065
+    }
+  ],
+  "not_selected": [
+    "../happylulu-눈-심볼/v3/assets/app-owl.svg"
+  ]
+}

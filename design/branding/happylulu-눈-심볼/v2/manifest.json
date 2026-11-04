@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "date": "2026-10-19",
+  "status": "design-proposal",
+  "files": [
+    {
+      "file": "assets/app-infinity.svg",
+      "sha256": "365c1cdc70363dd86a155864062f446d5e825c670270f73fd4e42352dd1f59ef"
+    },
+    {
+      "file": "assets/eyes-infinity.svg",
+      "sha256": "6bab4b7fe84b1bdb68d27e87e9833f3f41281f8a9d9053dfd2962a5e47046daf"
+    },
+    {
+      "file": "fonts/PretendardVariable.woff2",
+      "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4"
+    },
+    {
+      "file": "fonts/OFL-Pretendard.txt",
+      "sha256": "d31ddd9f2bed32fd7e302a205cf2380ba0de6529152d239ef99cfb6f261bfc04"
+    },
+    {
+      "file": "preview.html",
+      "sha256": "90483b3d8b9adbd313b75f83f71f2ae08edae956e2a3cf1cf21c1824419c4a4d"
+    },
+    {
+      "file": "README.md",
+      "sha256": "2a17b91857c084bf3d2addd4221f537aec6fa71fcc717ab0ab227849d01a5236"
+    },
+    {
+      "file": "build.mjs",
+      "sha256": "9a6856b421f992a6c29b8d88ba2b917930255eb8861f005b225cd298a4021655"
+    }
+  ]
+}

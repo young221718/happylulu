@@ -1,0 +1,3 @@
+PERF first orbit cycle: 48 frames, mean 1.871 ms, max 13.057 ms, first 1.997 ms
+PASS 20574 owl orbit checks: original alpha, fixed pupils/expressions/beak/holiday hat, moving light, clipping, 1x/2x, exact loop, palette cache/endpoint updates, unchanged trail strength, highlight contrast and host effect lifecycle
+Evidence: /Users/chanyoungchoi/workspace-chanyoung/디자인/happylulu/2026-10-22-owl-colors

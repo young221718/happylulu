@@ -1,0 +1,53 @@
+{
+  "name": "happylulu eyes v1",
+  "status": "design proposal; not applied to app",
+  "creation": "native SVG geometry and HTML typography",
+  "brand": "happylulu",
+  "reference": "../../assets/올루루-기본.png",
+  "canvas": [
+    1024,
+    1024
+  ],
+  "tile": {
+    "x": 64,
+    "y": 64,
+    "width": 896,
+    "height": 896,
+    "radius": 200
+  },
+  "variants": [
+    "bright",
+    "smile",
+    "relaxed"
+  ],
+  "files": [
+    {
+      "path": "assets/app-bright.svg",
+      "sha256": "5910d5c8871dd0105ee0c308ca1d0acfdf1863d9f534d0e8ef123dd6335c7f96"
+    },
+    {
+      "path": "assets/app-relaxed.svg",
+      "sha256": "782a19f3ceb09ca4d87807bf381c0533e23589c3d7d653fa33502fbb2e406e8c"
+    },
+    {
+      "path": "assets/app-smile.svg",
+      "sha256": "be02c0c856d6cb999cc0607883a9d22ac0b83737b1690d91c240eed0cef5131f"
+    },
+    {
+      "path": "assets/eyes-bright.svg",
+      "sha256": "83fc0d001cfc91b07296c30ce575dec031669c08c1f436e0ba73595dbafa191f"
+    },
+    {
+      "path": "assets/eyes-relaxed.svg",
+      "sha256": "bbdf28f38ba04ec7d9b0628ef6f9da79d003270f93a341b6fae6ba6711d8b4c1"
+    },
+    {
+      "path": "assets/eyes-smile.svg",
+      "sha256": "e278429bb17dcea6d0d8c7e54bf01aa16bb6c6e03021d21fcf0596a7e4319dca"
+    }
+  ],
+  "preview": "preview.html",
+  "comparison": "비교판.png",
+  "verification": "validation.json",
+  "interpretation": "Eyes-only native vector abstraction of the existing mascot"
+}

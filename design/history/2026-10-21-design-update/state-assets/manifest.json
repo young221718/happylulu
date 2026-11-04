@@ -1,0 +1,55 @@
+{
+  "tool": "built-in imagegen",
+  "reference": "user-reference.png",
+  "prompts": "prompts.json",
+  "assets": [
+    {
+      "state": "waiting",
+      "file": "waiting.png",
+      "sha256": "7c09818acd05df37e3846c59a79fc484cad4bf5c8f404645df979a04bdeab699",
+      "bytes": 1289731
+    },
+    {
+      "state": "regular",
+      "file": "regular.png",
+      "sha256": "5dd38f402abb08cc605e784d26570baa7fd84ceaccb527f4c0e87b752b445ba4",
+      "bytes": 1209603
+    },
+    {
+      "state": "luluDay",
+      "file": "luluDay.png",
+      "sha256": "206e8d554055434e6ba63fdbd927b019678cea31d541fb6f6853961ab4039013",
+      "bytes": 1396602
+    },
+    {
+      "state": "morningHalf",
+      "file": "morningHalf.png",
+      "sha256": "65a44dfa5453d140aad32d5a9c484965744797cfa497568c97c676c61ec3c42f",
+      "bytes": 1277237
+    },
+    {
+      "state": "afternoonHalf",
+      "file": "afternoonHalf.png",
+      "sha256": "109f6121030ea95b9b0bc29600f56cbe5e0ab1d6f4f09e4d2952b467a92a311b",
+      "bytes": 1234497
+    },
+    {
+      "state": "readyToLeave",
+      "file": "readyToLeave.png",
+      "sha256": "9054669f09e6f23f74b4454b72914b20a4d972173bbdd18bfde602d1ccb0b722",
+      "bytes": 1297225
+    },
+    {
+      "state": "annualLeave",
+      "file": "annualLeave.png",
+      "sha256": "3803dd26d92a84436145f3e8ff082e0cbf7ba7c47763fe1563e45b704fb3d5cd",
+      "bytes": 1217106
+    },
+    {
+      "state": "dayOff",
+      "file": "dayOff.png",
+      "sha256": "64f76618400e7add524a831d1f9ff2d33e5584dffb2b943947cb72e0de58ac6a",
+      "bytes": 1281329
+    }
+  ]
+}

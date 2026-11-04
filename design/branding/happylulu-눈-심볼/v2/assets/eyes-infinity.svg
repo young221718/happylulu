@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="happylulu 연결형 부엉이 눈 단색 심볼"><title>happylulu 연결형 부엉이 눈 단색 심볼</title><path data-part="connected-mask" d="M50 41 C43 41 40 25 26 25 C13 25 4 35 4 50 C4 65 13 75 26 75 C40 75 43 59 50 59 C57 59 60 75 74 75 C87 75 96 65 96 50 C96 35 87 25 74 25 C60 25 57 41 50 41 Z" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+<g data-part="pupils" fill="currentColor"><circle cx="26" cy="50" r="9.5"/><circle cx="74" cy="50" r="9.5"/></g>
+</svg>

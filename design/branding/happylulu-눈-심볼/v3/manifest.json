@@ -1,0 +1,40 @@
+{
+  "version": 3,
+  "date": "2026-10-19",
+  "status": "design-proposal",
+  "method": "Native SVG based on user visual reference",
+  "files": [
+    {
+      "file": "assets/app-owl.svg",
+      "sha256": "71315da69f2073e6fa8e44573f09e05bb9ae26553dff350de66b2e12d9e36924"
+    },
+    {
+      "file": "assets/eyes-owl.svg",
+      "sha256": "3d9a2440d3af41a5ab18d3a1280f6ea80bccb08bdba2aef6cefd5ee05fa86134"
+    },
+    {
+      "file": "fonts/PretendardVariable.woff2",
+      "sha256": "9599f12fd42fc0bce1cd50b47a0c022e108d7aa64dd0d1bb0ed44f3282d900b4"
+    },
+    {
+      "file": "fonts/OFL-Pretendard.txt",
+      "sha256": "d31ddd9f2bed32fd7e302a205cf2380ba0de6529152d239ef99cfb6f261bfc04"
+    },
+    {
+      "file": "reference/사용자-부엉이-참고.png",
+      "sha256": "aba0eeaa48b170be25440de19fc82284ed966789ac9dced5252b7ec80fe49c3c"
+    },
+    {
+      "file": "preview.html",
+      "sha256": "dac6aec99869985e72c6b9a372be933457969de5fe6b0187b8c599558ec94ced"
+    },
+    {
+      "file": "README.md",
+      "sha256": "0736c4a2f408a55c6b9e3443578639696b1342e2236d89a55974416bbed6e52b"
+    },
+    {
+      "file": "build.mjs",
+      "sha256": "e877b2972a5af3bac160c8095b0cc74364e59111f77398256fbc771442ce9bd8"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-21",
+  "status": "proposal-unpublished",
+  "slides": 6,
+  "outputs": [
+    {
+      "file": "output/desktop-home-concept.png",
+      "bytes": 65335,
+      "sha256": "19e51e89befe6a4e948aa0e57a91967c82104c76e4c39a1340080ca6ac5658ce"
+    },
+    {
+      "file": "output/download-concept.png",
+      "bytes": 25768,
+      "sha256": "0da2aa3bd49a69e9b40e2241ee9894bd3782474c7c6936e70dabc78f4296e7e4"
+    },
+    {
+      "file": "output/happylulu-site-improvement-proposal.pptx",
+      "bytes": 14065727,
+      "sha256": "5767ffb500a99d050ac423c7291a6c706281a4f802630b94cebef683ea698b65"
+    },
+    {
+      "file": "output/mobile-home-concept.png",
+      "bytes": 36290,
+      "sha256": "76f7235ac2f5731be83acc8ee1d8a477c29bf2ae0c76b74c9b0ef30a385cd9bf"
+    },
+    {
+      "file": "output/preview.png",
+      "bytes": 126782,
+      "sha256": "7f48d56313af788d8f726592aeb3bbe435216b993b039e3ffce3352c81177206"
+    },
+    {
+      "file": "output/slide-1.png",
+      "bytes": 198519,
+      "sha256": "6efc4f228bb7567b5adfd8336fa2700df7d16204386200bf531e4c5b46686d28"
+    },
+    {
+      "file": "output/slide-2.png",
+      "bytes": 114556,
+      "sha256": "5c72a3e4849e44fe25f6acc38e2e8b9433aef3fe05f120f43ce0200438d753f5"
+    },
+    {
+      "file": "output/slide-3.png",
+      "bytes": 108583,
+      "sha256": "69bd6fe4a455957d48df84d81a09c76c2c2f9cfb33cec8b96b401bf4fa7e28fb"
+    },
+    {
+      "file": "output/slide-4.png",
+      "bytes": 138926,
+      "sha256": "5fa98f9f603341af94b99a059d1a7e8305445960c8af0aa2d4abe862f5fa3a82"
+    },
+    {
+      "file": "output/slide-5.png",
+      "bytes": 233437,
+      "sha256": "c2b50452ef1bceebd265893c7034fb17dd786aaeda3679ab6b81e2a236c37873"
+    },
+    {
+      "file": "output/slide-6.png",
+      "bytes": 108512,
+      "sha256": "85c193d836adf80425eca75ac3612124ca46e96447ef82d180f1b22e4ce5cb5f"
+    }
+  ]
+}

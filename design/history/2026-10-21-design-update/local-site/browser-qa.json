@@ -1,0 +1,708 @@
+{
+  "checkedAt": "2026-10-21T09:15:41.113Z",
+  "origin": "http://127.0.0.1:8765",
+  "layoutResults": [
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/",
+      "scroll": 375,
+      "title": "HappyLulu — 출근 기록과 퇴근 예정, 한눈에.",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/",
+      "scroll": 375,
+      "title": "HappyLulu — Arrival and departure, at a glance.",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/features/",
+      "scroll": 375,
+      "title": "기능 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/features/",
+      "scroll": 375,
+      "title": "Features · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/features/countdown/",
+      "scroll": 375,
+      "title": "퇴근 예정과 남은 시간 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/features/countdown/",
+      "scroll": 375,
+      "title": "Expected departure and countdown · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/guide/",
+      "scroll": 375,
+      "title": "HappyLulu 사용 방법 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/guide/",
+      "scroll": 375,
+      "title": "How to use HappyLulu · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/releases/",
+      "scroll": 375,
+      "title": "릴리즈 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/releases/",
+      "scroll": 375,
+      "title": "Releases · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/releases/macos-1.5.17/",
+      "scroll": 375,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/en/releases/macos-1.5.17/",
+      "scroll": 375,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 375,
+      "headings": 1,
+      "route": "/download/",
+      "scroll": 375,
+      "title": "다운로드 · HappyLulu",
+      "width": 390
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/",
+      "scroll": 305,
+      "title": "HappyLulu — 출근 기록과 퇴근 예정, 한눈에.",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/",
+      "scroll": 305,
+      "title": "HappyLulu — Arrival and departure, at a glance.",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/features/",
+      "scroll": 305,
+      "title": "기능 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/features/",
+      "scroll": 305,
+      "title": "Features · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/features/countdown/",
+      "scroll": 305,
+      "title": "퇴근 예정과 남은 시간 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/features/countdown/",
+      "scroll": 305,
+      "title": "Expected departure and countdown · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/guide/",
+      "scroll": 305,
+      "title": "HappyLulu 사용 방법 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/guide/",
+      "scroll": 305,
+      "title": "How to use HappyLulu · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/releases/",
+      "scroll": 305,
+      "title": "릴리즈 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/releases/",
+      "scroll": 305,
+      "title": "Releases · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/releases/macos-1.5.17/",
+      "scroll": 305,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/en/releases/macos-1.5.17/",
+      "scroll": 305,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 305,
+      "headings": 1,
+      "route": "/download/",
+      "scroll": 305,
+      "title": "다운로드 · HappyLulu",
+      "width": 320
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/",
+      "scroll": 1265,
+      "title": "HappyLulu — 출근 기록과 퇴근 예정, 한눈에.",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/",
+      "scroll": 1265,
+      "title": "HappyLulu — Arrival and departure, at a glance.",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/features/",
+      "scroll": 1265,
+      "title": "기능 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/features/",
+      "scroll": 1265,
+      "title": "Features · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/features/countdown/",
+      "scroll": 1265,
+      "title": "퇴근 예정과 남은 시간 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/features/countdown/",
+      "scroll": 1265,
+      "title": "Expected departure and countdown · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/guide/",
+      "scroll": 1265,
+      "title": "HappyLulu 사용 방법 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/guide/",
+      "scroll": 1265,
+      "title": "How to use HappyLulu · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/releases/",
+      "scroll": 1265,
+      "title": "릴리즈 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/releases/",
+      "scroll": 1265,
+      "title": "Releases · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/releases/macos-1.5.17/",
+      "scroll": 1265,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/en/releases/macos-1.5.17/",
+      "scroll": 1265,
+      "title": "Mac 1.5.17 · build 33 · HappyLulu",
+      "width": 1280
+    },
+    {
+      "client": 1265,
+      "headings": 1,
+      "route": "/download/",
+      "scroll": 1265,
+      "title": "다운로드 · HappyLulu",
+      "width": 1280
+    }
+  ],
+  "breakpointResults": [
+    {
+      "client": 634,
+      "route": "/",
+      "scroll": 634,
+      "width": 649
+    },
+    {
+      "client": 634,
+      "route": "/guide/",
+      "scroll": 634,
+      "width": 649
+    },
+    {
+      "client": 634,
+      "route": "/features/",
+      "scroll": 634,
+      "width": 649
+    },
+    {
+      "client": 635,
+      "route": "/",
+      "scroll": 635,
+      "width": 650
+    },
+    {
+      "client": 635,
+      "route": "/guide/",
+      "scroll": 635,
+      "width": 650
+    },
+    {
+      "client": 635,
+      "route": "/features/",
+      "scroll": 635,
+      "width": 650
+    },
+    {
+      "client": 636,
+      "route": "/",
+      "scroll": 636,
+      "width": 651
+    },
+    {
+      "client": 636,
+      "route": "/guide/",
+      "scroll": 636,
+      "width": 651
+    },
+    {
+      "client": 636,
+      "route": "/features/",
+      "scroll": 636,
+      "width": 651
+    },
+    {
+      "client": 704,
+      "route": "/",
+      "scroll": 704,
+      "width": 719
+    },
+    {
+      "client": 704,
+      "route": "/guide/",
+      "scroll": 704,
+      "width": 719
+    },
+    {
+      "client": 704,
+      "route": "/features/",
+      "scroll": 704,
+      "width": 719
+    },
+    {
+      "client": 705,
+      "route": "/",
+      "scroll": 705,
+      "width": 720
+    },
+    {
+      "client": 705,
+      "route": "/guide/",
+      "scroll": 705,
+      "width": 720
+    },
+    {
+      "client": 705,
+      "route": "/features/",
+      "scroll": 705,
+      "width": 720
+    },
+    {
+      "client": 706,
+      "route": "/",
+      "scroll": 706,
+      "width": 721
+    },
+    {
+      "client": 706,
+      "route": "/guide/",
+      "scroll": 706,
+      "width": 721
+    },
+    {
+      "client": 706,
+      "route": "/features/",
+      "scroll": 706,
+      "width": 721
+    },
+    {
+      "client": 784,
+      "route": "/",
+      "scroll": 784,
+      "width": 799
+    },
+    {
+      "client": 784,
+      "route": "/guide/",
+      "scroll": 784,
+      "width": 799
+    },
+    {
+      "client": 784,
+      "route": "/features/",
+      "scroll": 784,
+      "width": 799
+    },
+    {
+      "client": 785,
+      "route": "/",
+      "scroll": 785,
+      "width": 800
+    },
+    {
+      "client": 785,
+      "route": "/guide/",
+      "scroll": 785,
+      "width": 800
+    },
+    {
+      "client": 785,
+      "route": "/features/",
+      "scroll": 785,
+      "width": 800
+    },
+    {
+      "client": 786,
+      "route": "/",
+      "scroll": 786,
+      "width": 801
+    },
+    {
+      "client": 786,
+      "route": "/guide/",
+      "scroll": 786,
+      "width": 801
+    },
+    {
+      "client": 786,
+      "route": "/features/",
+      "scroll": 786,
+      "width": 801
+    },
+    {
+      "client": 884,
+      "route": "/",
+      "scroll": 884,
+      "width": 899
+    },
+    {
+      "client": 884,
+      "route": "/guide/",
+      "scroll": 884,
+      "width": 899
+    },
+    {
+      "client": 884,
+      "route": "/features/",
+      "scroll": 884,
+      "width": 899
+    },
+    {
+      "client": 885,
+      "route": "/",
+      "scroll": 885,
+      "width": 900
+    },
+    {
+      "client": 885,
+      "route": "/guide/",
+      "scroll": 885,
+      "width": 900
+    },
+    {
+      "client": 885,
+      "route": "/features/",
+      "scroll": 885,
+      "width": 900
+    },
+    {
+      "client": 886,
+      "route": "/",
+      "scroll": 886,
+      "width": 901
+    },
+    {
+      "client": 886,
+      "route": "/guide/",
+      "scroll": 886,
+      "width": 901
+    },
+    {
+      "client": 886,
+      "route": "/features/",
+      "scroll": 886,
+      "width": 901
+    }
+  ],
+  "koreanStates": [
+    {
+      "alt": "출근 대기",
+      "image": "/assets/owl-waiting.png",
+      "selected": "waiting",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "출근 대기"
+    },
+    {
+      "alt": "일반근무",
+      "image": "/assets/owl-regular.png",
+      "selected": "regular",
+      "times": [
+        "09:00",
+        "18:00"
+      ],
+      "title": "일반근무"
+    },
+    {
+      "alt": "룰루데이",
+      "image": "/assets/owl-luluDay.png",
+      "selected": "luluDay",
+      "times": [
+        "09:00",
+        "16:00"
+      ],
+      "title": "룰루데이"
+    },
+    {
+      "alt": "오전반차",
+      "image": "/assets/owl-morningHalf.png",
+      "selected": "morningHalf",
+      "times": [
+        "13:00",
+        "17:00"
+      ],
+      "title": "오전반차"
+    },
+    {
+      "alt": "오후반차",
+      "image": "/assets/owl-afternoonHalf.png",
+      "selected": "afternoonHalf",
+      "times": [
+        "09:00",
+        "13:00"
+      ],
+      "title": "오후반차"
+    },
+    {
+      "alt": "예정 시각 경과",
+      "image": "/assets/owl-readyToLeave.png",
+      "selected": "readyToLeave",
+      "times": [
+        "09:00",
+        "18:00"
+      ],
+      "title": "예정 시각 경과"
+    },
+    {
+      "alt": "연차·공가",
+      "image": "/assets/owl-annualLeave.png",
+      "selected": "annualLeave",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "연차·공가"
+    },
+    {
+      "alt": "오늘 쉬는 날",
+      "image": "/assets/owl-dayOff.png",
+      "selected": "dayOff",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "오늘 쉬는 날"
+    }
+  ],
+  "englishStates": [
+    {
+      "alt": "Waiting",
+      "selected": "waiting",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "Waiting"
+    },
+    {
+      "alt": "Regular",
+      "selected": "regular",
+      "times": [
+        "09:00",
+        "18:00"
+      ],
+      "title": "Regular"
+    },
+    {
+      "alt": "Lulu day",
+      "selected": "luluDay",
+      "times": [
+        "09:00",
+        "16:00"
+      ],
+      "title": "Lulu day"
+    },
+    {
+      "alt": "Morning off",
+      "selected": "morningHalf",
+      "times": [
+        "13:00",
+        "17:00"
+      ],
+      "title": "Morning off"
+    },
+    {
+      "alt": "Afternoon off",
+      "selected": "afternoonHalf",
+      "times": [
+        "09:00",
+        "13:00"
+      ],
+      "title": "Afternoon off"
+    },
+    {
+      "alt": "Past planned time",
+      "selected": "readyToLeave",
+      "times": [
+        "09:00",
+        "18:00"
+      ],
+      "title": "Past planned time"
+    },
+    {
+      "alt": "Annual leave",
+      "selected": "annualLeave",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "Annual leave"
+    },
+    {
+      "alt": "Day off",
+      "selected": "dayOff",
+      "times": [
+        "—",
+        "—"
+      ],
+      "title": "Day off"
+    }
+  ],
+  "observedInteractions": [
+    "mobile header toggle/Escape returns focus",
+    "guide Enter opens11links",
+    "guide link closes and focuses section",
+    "English guide destination visible below sticky header",
+    "guide Escape returns focus to summary",
+    "feature menu13links including overview and12details/current state/groups",
+    "feature menu Escape returns focus",
+    "native radio ArrowRight changes regular to luluDay",
+    "legacyFriday leave15:47/progress89"
+  ],
+  "limits": [
+    "VoiceOver announcements not exercised",
+    "JavaScript-disabled browser not exercised; fallback inspected in source",
+    "remote CI/deployment/public download HTTP/app install not executed"
+  ]
+}

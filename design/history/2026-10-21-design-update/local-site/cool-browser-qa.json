@@ -1,0 +1,278 @@
+{
+  "date": "2026-10-22",
+  "cases": [
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "download-card mac-download"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "download-card"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(247, 250, 252)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(242, 247, 250)",
+          "class": "section owl-section"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "owl-result"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "download-card mac-download"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "download-card"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(247, 250, 252)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(242, 247, 250)",
+          "class": "section owl-section"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "owl-result"
+        }
+      ],
+      "width": 320
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "download-card mac-download"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "download-card"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(247, 250, 252)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(242, 247, 250)",
+          "class": "section owl-section"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "owl-result"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "download-card mac-download"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "download-card"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(247, 250, 252)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(244, 247, 250)",
+          "class": "feature-purpose"
+        },
+        {
+          "background": "rgb(242, 247, 250)",
+          "class": "section owl-section"
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "owl-result"
+        }
+      ],
+      "width": 320
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/features/",
+      "surfaces": [],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/features/",
+      "surfaces": [],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/features/",
+      "surfaces": [],
+      "width": 320
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/guide/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "guide-toc"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/guide/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "guide-toc"
+        }
+      ],
+      "width": 320
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/guide/",
+      "surfaces": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "class": "guide-toc"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/features/",
+      "width": 320
+    },
+    {
+      "body": "rgb(255, 255, 255)",
+      "brands": [
+        "happylulu",
+        "happylulu"
+      ],
+      "header": "rgba(255, 255, 255, 0.93)",
+      "overflow": false,
+      "route": "/en/guide/",
+      "width": 320
+    }
+  ]
+}
