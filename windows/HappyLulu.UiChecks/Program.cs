@@ -9,17 +9,24 @@ internal static class Program
     private static int checks;
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         Application.SetHighDpiMode(HighDpiMode.SystemAware);
         Application.EnableVisualStyles();
         Words.Preference = UiLanguage.English;
         try
         {
+            if (args.SequenceEqual(new[] { "--interactive" }))
+            {
+                InteractiveQa.Run();
+                return 0;
+            }
+            if (args.Length != 0) throw new ArgumentException("Use no arguments for checks, or --interactive for isolated GUI QA.");
             ClockEditing();
             DayTypeSelection();
             MonthHistory();
             StorageFailures();
+            InteractiveSafety();
             Console.WriteLine($"PASS Windows form behavior: {checks} assertions (isolated storage, no desktop input)");
             return 0;
         }
@@ -149,6 +156,16 @@ internal static class Program
             Equal<int?>(0, fixture.Controller.State.Arrivals["2026-11-05"].EarlyLeaveOverrideMinutes, "Failed save preserves the original reduction");
         }
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Failed save preserves the previous file");
+    }
+
+    private static void InteractiveSafety()
+    {
+        using var fixture = new Fixture();
+        using SettingsForm form = InteractiveQa.CreateSettings(fixture.Controller);
+        Equal(false, Find<CheckBox>(form, "Start when signing in to Windows").Enabled,
+            "Interactive QA cannot change Windows startup registration");
+        Equal(fixture.Store.Path, Find<TextBox>(form, "Local attendance file path").Text,
+            "Interactive Settings keeps the supplied isolated state path");
     }
 
     private static T Field<T>(object target, string name) where T : class =>

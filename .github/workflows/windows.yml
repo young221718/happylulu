@@ -37,6 +37,8 @@ jobs:
       - name: Check isolated Windows form behavior
         timeout-minutes: 5
         run: dotnet run --project windows/HappyLulu.UiChecks/HappyLulu.UiChecks.csproj --configuration Release
+      - name: Publish isolated interactive Windows QA
+        run: dotnet publish windows/HappyLulu.UiChecks/HappyLulu.UiChecks.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false --output dist/windows/interactive-qa-publish
       - name: Publish portable Windows app with bundled runtime
         run: dotnet publish windows/HappyLulu.Tray/HappyLulu.Tray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false --output dist/windows/self-contained
       - name: Publish small portable Windows app requiring Desktop Runtime
@@ -58,9 +60,24 @@ jobs:
           }
           Compress-Archive -Path dist/windows/self-contained/* -DestinationPath dist/windows/HappyLulu-1.5.13-windows-x64.zip
           Compress-Archive -Path dist/windows/runtime-required/* -DestinationPath dist/windows/HappyLulu-1.5.13-windows-x64-runtime-required.zip
+          $qaDir = 'dist/windows/interactive-qa'
+          New-Item -ItemType Directory -Force $qaDir | Out-Null
+          # Package only the isolated entrypoint, never a referenced production app executable.
+          Copy-Item dist/windows/interactive-qa-publish/HappyLulu.UiChecks.exe $qaDir
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md, windows/HappyLulu.UiChecks/README.md, windows/HappyLulu.UiChecks/Run-Interactive-QA.cmd $qaDir
+          Copy-Item -Recurse dist/windows/self-contained/licenses "$qaDir/licenses"
+          Compress-Archive -Path "$qaDir/*" -DestinationPath dist/windows/HappyLulu-Windows-Interactive-QA.zip
           Get-FileHash dist/windows/*.zip -Algorithm SHA256 | ForEach-Object {
             '{0}  {1}' -f $_.Hash.ToLowerInvariant(), (Split-Path $_.Path -Leaf)
           } | Set-Content -Encoding ascii dist/windows/SHA256SUMS.txt
+      - name: Check packaged isolated QA executable
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $qaSmokeDir = Join-Path $env:RUNNER_TEMP 'happylulu-packaged-qa'
+          Expand-Archive -Path dist/windows/HappyLulu-Windows-Interactive-QA.zip -DestinationPath $qaSmokeDir
+          & "$qaSmokeDir/HappyLulu.UiChecks.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Packaged QA checks failed: $LASTEXITCODE" }
       - uses: actions/upload-artifact@v4
         with:
           name: HappyLulu-1.5.13-windows-x64
@@ -73,3 +90,7 @@ jobs:
         with:
           name: HappyLulu-1.5.13-windows-checksums
           path: dist/windows/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HappyLulu-Windows-Interactive-QA
+          path: dist/windows/HappyLulu-Windows-Interactive-QA.zip
