@@ -140,10 +140,13 @@ internal static class Program
         File.Delete(fixture.Store.Path);
         fixture.SaveArrival("09:00");
         byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        AttendanceState originalState = fixture.Controller.State;
         using (var locked = new FileStream(fixture.Store.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
             Equal(false, fixture.Controller.SetDayType(ManualDayType.LuluDay), "Failed atomic replacement is reported as failure");
-            Equal(false, fixture.Controller.State.ManualDayTypes.ContainsKey("2026-11-05"), "Failed save does not publish the candidate state");
+            Equal(true, ReferenceEquals(originalState, fixture.Controller.State), "Failed save does not publish the candidate state");
+            Equal(ManualDayType.Regular, fixture.Controller.State.ManualDayTypes["2026-11-05"], "Failed save preserves the explicitly chosen regular type");
+            Equal<int?>(0, fixture.Controller.State.Arrivals["2026-11-05"].EarlyLeaveOverrideMinutes, "Failed save preserves the original reduction");
         }
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Failed save preserves the previous file");
     }
