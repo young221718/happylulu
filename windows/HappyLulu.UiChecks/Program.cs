@@ -25,6 +25,7 @@ internal static class Program
             ClockEditing();
             DayTypeSelection();
             MonthHistory();
+            SettingsLayout();
             StorageFailures();
             InteractiveSafety();
             Console.WriteLine($"PASS Windows form behavior: {checks} assertions (isolated storage, no desktop input)");
@@ -134,6 +135,53 @@ internal static class Program
         ComboBox remaining = Find<ComboBox>(form, "Remaining time display");
         remaining.SelectedIndex = (int)RemainingTimeUnit.Seconds;
         Equal(RemainingTimeUnit.Seconds, fixture.Store.Load().RemainingTimeUnit, "Countdown unit persists through the settings event");
+    }
+
+    private static void SettingsLayout()
+    {
+        foreach (UiLanguage language in new[] { UiLanguage.English, UiLanguage.Korean })
+        {
+            Words.Preference = language;
+            using var fixture = new Fixture();
+            using var form = new SettingsForm(fixture.Controller, SystemIcons.Application)
+            {
+                ShowInTaskbar = false, StartPosition = FormStartPosition.Manual,
+                Location = new Point(-10000, -10000)
+            };
+            // Native layout must run; constructor-only checks miss first-display sizing.
+            form.Show();
+            Application.DoEvents();
+            CheckSettingRows(form, "language", "remainingUnit", "startup");
+            Click(Find<Button>(form, Words.T("근무", "Work")));
+            Application.DoEvents();
+            CheckSettingRows(form, "work", "rest");
+            Click(Find<Button>(form, Words.T("일반", "General")));
+            Application.DoEvents();
+            CheckSettingRows(form, "language", "remainingUnit", "startup");
+
+            form.Size = form.MinimumSize;
+            Application.DoEvents();
+            CheckSettingRows(form, "language", "remainingUnit", "startup");
+            Click(Find<Button>(form, Words.T("근무", "Work")));
+            Application.DoEvents();
+            CheckSettingRows(form, "work", "rest");
+        }
+        Words.Preference = UiLanguage.English;
+    }
+
+    private static void CheckSettingRows(SettingsForm form, params string[] controlNames)
+    {
+        foreach (string name in controlNames)
+        {
+            Control input = Field<Control>(form, name);
+            var row = (TableLayoutPanel)input.Parent!;
+            Control stack = row.Parent!;
+            int available = stack.ClientSize.Width - stack.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth;
+            Equal(true, row.Width >= available - row.Margin.Horizontal,
+                $"{Words.Preference} {name} row uses the available settings width on first display, revisit, and resize");
+            Equal(true, row.GetControlFromPosition(1, 0)!.Width >= 140,
+                $"{Words.Preference} {name} description remains readable at the minimum window size");
+        }
     }
 
     private static void StorageFailures()
