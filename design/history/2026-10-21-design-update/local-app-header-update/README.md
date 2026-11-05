@@ -3,7 +3,7 @@
 사용자 후속 승인에 따라 패널·설정 좌상단에 선택 HappyLulu 캐릭터 PNG를 적용하고, 근무유형 옆 부엉이 장식은 제거했다. 기능과 상태 문구, 메뉴바의 8상태 눈은 유지한다.
 
 - 로컬 설치: `/Users/chanyoungchoi/Applications/HappyLulu.app`, 1.5.18 / build 34.2 / `2026-10-21-header`.
-- 원본: [선택 PNG](../../../../../../../design/archive/ollulu/app-branding-proposal/icons/happylulu.png). 원본과 앱 내 `HappyLuluBrand.png`의 SHA256은 `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084`로 같다.
+- 원본: [선택 PNG](../../../../../../../design/history/ollulu/app-branding-proposal/icons/happylulu.png). 원본과 앱 내 `HappyLuluBrand.png`의 SHA256은 `82a8ba2d30478b3a68a25a9b74071c4d01706263734494e2e8a40a26a55fa084`로 같다.
 - 패널 헤더 28×28 pt, 설정 사이드바 헤더 24×24 pt. 기본 앱/Dock 아이콘과 사용자 아이콘 미리보기는 기존 설정을 따른다.
 - [기능 명세](../../../../../design-refresh-local/docs/FEATURE-SPEC.md) · [디자인 명세](../../../../../design-refresh-local/docs/DESIGN-SPEC.md) · [이전 34.1 화면](../local-app/README.md).
 
