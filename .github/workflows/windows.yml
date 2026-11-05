@@ -34,6 +34,9 @@ jobs:
         run: dotnet run --project windows/HappyLulu.Checks/HappyLulu.Checks.csproj --configuration Release
       - name: Check shared Mac and Windows workday expectations
         run: dotnet run --project windows/HappyLulu.ParityChecks/HappyLulu.ParityChecks.csproj --configuration Release -- Tests/Shared/attendance.json
+      - name: Check isolated Windows form behavior
+        timeout-minutes: 5
+        run: dotnet run --project windows/HappyLulu.UiChecks/HappyLulu.UiChecks.csproj --configuration Release
       - name: Publish portable Windows app with bundled runtime
         run: dotnet publish windows/HappyLulu.Tray/HappyLulu.Tray.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false --output dist/windows/self-contained
       - name: Publish small portable Windows app requiring Desktop Runtime

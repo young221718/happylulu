@@ -1,5 +1,7 @@
 # Mac·Windows 기능 현황과 개발 기준
 
+> 2026-11-05 Windows 작업 브랜치에서 컴팩트 오늘 창, 5개 수동 근무 유형과 월별 기록을 개발 중입니다. 이 후보는 아래 2026-10-15 기준표나 공개 버전 상태를 변경하지 않습니다. Windows 빌드·자동 검사·실기기 검증은 아직 필요합니다. 상세는 [Windows 안내](../windows/README.md)를 확인하세요.
+
 HappyLulu는 **공통 `main` 하나**를 개발 기준으로 사용합니다. Mac과 Windows에 같은 기능과 근무 계산 규칙을 제공하는 것을 목표로 하며, 플랫폼별 상태와 차이를 아래 한 표에서 관리합니다.
 
 확인일: 2026-10-15. [구현이 반영된 main 기준](https://github.com/young221718/happylulu-app/tree/ddedf83b0bfd14f0d47c0cdd7d93b2c3b33112f3). 공개 버전은 Mac 1.5.14 build30·Windows 1.5.13이며 Mac 1.5.15 build31은 배포 준비·미게시 후보입니다. 공개 버전은 [README](../README.md#다운로드), 자동 검사와 미완료 검증은 [플랫폼 검증 기록](PLATFORM-VALIDATION.md)에서 확인합니다.

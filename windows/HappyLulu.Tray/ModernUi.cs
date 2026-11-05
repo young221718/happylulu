@@ -6,14 +6,14 @@ namespace HappyLulu.Tray;
 
 internal static class UiPalette
 {
-    public static readonly Color Page = Color.FromArgb(247, 250, 249);
+    public static readonly Color Page = Color.FromArgb(250, 249, 252);
     public static readonly Color Card = Color.White;
-    public static readonly Color MintWash = Color.FromArgb(232, 246, 240);
-    public static readonly Color Mint = Color.FromArgb(32, 112, 99);
-    public static readonly Color MintDeep = Color.FromArgb(24, 88, 79);
-    public static readonly Color Ink = Color.FromArgb(28, 49, 45);
-    public static readonly Color Muted = Color.FromArgb(77, 99, 93);
-    public static readonly Color Border = Color.FromArgb(220, 233, 227);
+    public static readonly Color MintWash = Color.FromArgb(238, 232, 248);
+    public static readonly Color Mint = Color.FromArgb(112, 84, 179);
+    public static readonly Color MintDeep = Color.FromArgb(85, 62, 143);
+    public static readonly Color Ink = Color.FromArgb(47, 43, 61);
+    public static readonly Color Muted = Color.FromArgb(101, 95, 116);
+    public static readonly Color Border = Color.FromArgb(226, 221, 235);
     public static readonly Color Warning = Color.FromArgb(143, 78, 25);
 }
 

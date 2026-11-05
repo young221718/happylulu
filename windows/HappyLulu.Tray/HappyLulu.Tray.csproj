@@ -12,6 +12,7 @@
     <FileVersion>1.5.13.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="HappyLulu.UiChecks" />
     <ProjectReference Include="../HappyLulu.Core/HappyLulu.Core.csproj" />
     <EmbeddedResource Include="Resources/HappyLuluIcon.png" LogicalName="HappyLulu.Icon.png" />
   </ItemGroup>

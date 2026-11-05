@@ -84,6 +84,75 @@ Check(rejected, "future manual arrival rejected");
 Check(Attendance.IsLastFriday(At(2026, 10, 30, 9, 0)), "last Friday identified");
 Check(!Attendance.IsLastFriday(At(2026, 10, 23, 9, 0)), "ordinary Friday identified");
 
+var dayTypeState = new AttendanceState();
+var dayTypeNow = At(2026, 10, 30, 14, 0);
+Attendance.SetDayType(dayTypeState, ManualDayType.Regular, dayTypeNow);
+Check(dayTypeState.Arrivals.Count == 0, "day type selection does not fabricate an arrival");
+Check(Attendance.RecordUnlock(dayTypeState, At(2026, 10, 30, 9, 0)), "selected regular accepts normal unlock");
+Check(Attendance.Departure(dayTypeState.Arrivals["2026-10-30"], dayTypeState.Settings) == At(2026, 10, 30, 18, 0),
+      "explicit regular overrides last Friday shortening");
+Attendance.SetDayType(dayTypeState, ManualDayType.LuluDay, dayTypeNow);
+Check(Attendance.Departure(dayTypeState.Arrivals["2026-10-30"], dayTypeState.Settings) == At(2026, 10, 30, 16, 0),
+      "Lulu day shortens normal work by exactly two hours");
+Attendance.SetManual(dayTypeState, At(2026, 10, 30, 9, 15), dayTypeNow, null);
+Check(dayTypeState.Arrivals["2026-10-30"].EarlyLeaveOverrideMinutes == 120 &&
+      dayTypeState.ManualDayTypes["2026-10-30"] == ManualDayType.LuluDay,
+      "clock-only edit preserves Lulu selection and override");
+var beforeInvalidType = dayTypeState.Arrivals["2026-10-30"];
+rejected = false;
+try { Attendance.SetDayType(dayTypeState, ManualDayType.MorningHalf, dayTypeNow); }
+catch (ArgumentException) { rejected = true; }
+Check(rejected && dayTypeState.Arrivals["2026-10-30"] == beforeInvalidType &&
+      dayTypeState.ManualDayTypes["2026-10-30"] == ManualDayType.LuluDay,
+      "incompatible day type is rejected without changing the arrival or selection");
+Attendance.SetDayType(dayTypeState, ManualDayType.AnnualLeave, dayTypeNow);
+Check(dayTypeState.Arrivals["2026-10-30"] == beforeInvalidType && Attendance.Today(dayTypeState, dayTypeNow) is null,
+      "annual leave preserves original arrival while hiding today's work");
+Check(!Attendance.RecordUnlock(dayTypeState, At(2026, 10, 30, 9, 30)) &&
+      Attendance.Overtime(dayTypeState, At(2026, 10, 30, 20, 0)) is null,
+      "annual leave blocks automatic arrivals and overtime guide");
+Attendance.SetDayType(dayTypeState, ManualDayType.AfternoonHalf, dayTypeNow);
+Check(!dayTypeState.SuppressedDays.Contains("2026-10-30") &&
+      Attendance.Today(dayTypeState, dayTypeNow)?.Mode == WorkdayMode.AfternoonHalf &&
+      Attendance.Departure(dayTypeState.Arrivals["2026-10-30"], dayTypeState.Settings) == At(2026, 10, 30, 13, 15),
+      "leaving annual leave restores arrival and half day never double-shortens");
+Attendance.SkipToday(dayTypeState, dayTypeNow);
+Check(dayTypeState.Arrivals.Count == 0 && dayTypeState.ManualDayTypes.Count == 0 &&
+      !Attendance.RecordUnlock(dayTypeState, At(2026, 10, 30, 9, 45)),
+      "day off deletes arrival and selected type then blocks automatic record");
+Attendance.SetDayType(dayTypeState, ManualDayType.MorningHalf, dayTypeNow);
+Check(!Attendance.RecordUnlock(dayTypeState, At(2026, 10, 30, 7, 0)) &&
+      Attendance.RecordUnlock(dayTypeState, At(2026, 10, 30, 13, 0)) &&
+      Attendance.Today(dayTypeState, dayTypeNow)?.Mode == WorkdayMode.MorningHalf,
+      "pending morning half day restricts automatic unlock window");
+Check(Attendance.EffectiveDayType(dayTypeState, dayTypeNow) == ManualDayType.MorningHalf &&
+      Attendance.EffectiveDayType(dayTypeState, At(2026, 10, 31, 14, 0)) is null,
+      "day type is limited to its selected date");
+var legacyManualHalf = new AttendanceState();
+legacyManualHalf.Arrivals["2026-10-30"] = new Arrival
+{
+    Day = "2026-10-30", Time = At(2026, 10, 30, 9, 0), Source = ArrivalSource.Manual, Mode = WorkdayMode.AfternoonHalf
+};
+Attendance.SetManual(legacyManualHalf, At(2026, 10, 30, 9, 15), dayTypeNow, null);
+Check(legacyManualHalf.Arrivals["2026-10-30"].Mode == WorkdayMode.AfternoonHalf,
+      "clock-only edit preserves a legacy manually selected half day");
+var leaveWithoutArrival = new AttendanceState();
+Attendance.SetDayType(leaveWithoutArrival, ManualDayType.AnnualLeave, dayTypeNow);
+Check(!Attendance.RecordUnlock(leaveWithoutArrival, At(2026, 10, 30, 9, 0)) && leaveWithoutArrival.Arrivals.Count == 0,
+      "annual leave also blocks first automatic arrival");
+Attendance.SetManual(leaveWithoutArrival, At(2026, 10, 30, 9, 0), dayTypeNow, null);
+Check(!leaveWithoutArrival.ManualDayTypes.ContainsKey("2026-10-30") &&
+      !leaveWithoutArrival.SuppressedDays.Contains("2026-10-30") && Attendance.Today(leaveWithoutArrival, dayTypeNow) is not null,
+      "manual arrival resumes after annual leave");
+var luluOrdinary = new AttendanceState();
+Attendance.SetDayType(luluOrdinary, ManualDayType.LuluDay, At(2026, 10, 29, 14, 0));
+Attendance.SetManual(luluOrdinary, At(2026, 10, 29, 9, 0), At(2026, 10, 29, 14, 0), null);
+Check(Attendance.Departure(luluOrdinary.Arrivals["2026-10-29"], luluOrdinary.Settings) == At(2026, 10, 29, 16, 0),
+      "Lulu day also shortens an ordinary weekday");
+Check(luluOrdinary.Copy().ManualDayTypes["2026-10-29"] == ManualDayType.LuluDay &&
+      luluOrdinary.Copy().Arrivals["2026-10-29"].EarlyLeaveOverrideMinutes == 120,
+      "copy preserves manual types and overrides");
+
 var overtimeState = new AttendanceState();
 Check(Attendance.Overtime(overtimeState, At(2026, 10, 6, 18, 31)) is null,
       "no overtime guide without an arrival");
@@ -171,11 +240,24 @@ try
           loaded.Arrivals["2026-10-24"].Time == At(2026, 10, 24, 8, 0), "restart keeps first normalized arrival");
     Check(loaded.RemainingTimeUnit == RemainingTimeUnit.Hours && loaded.Copy().RemainingTimeUnit == RemainingTimeUnit.Hours,
           "remaining unit persists and survives copy");
+    Attendance.SetDayType(loaded, ManualDayType.LuluDay, At(2026, 10, 24, 14, 0));
+    store.Save(loaded);
+    loaded = store.Load();
+    Check(loaded.ManualDayTypes["2026-10-24"] == ManualDayType.LuluDay &&
+          loaded.Arrivals["2026-10-24"].EarlyLeaveOverrideMinutes == 120,
+          "manual types and overrides survive restart");
     string original = File.ReadAllText(store.Path);
     var legacy = System.Text.Json.Nodes.JsonNode.Parse(original)!;
     legacy.AsObject().Remove("RemainingTimeUnit");
+    legacy.AsObject().Remove("ManualDayTypes");
+    foreach (var arrivalNode in legacy["Arrivals"]!.AsObject())
+        arrivalNode.Value!.AsObject().Remove("EarlyLeaveOverrideMinutes");
     File.WriteAllText(store.Path, legacy.ToJsonString());
-    Check(store.Load().RemainingTimeUnit == RemainingTimeUnit.HoursMinutes, "legacy state defaults without migration");
+    var legacyLoaded = store.Load();
+    Check(legacyLoaded.RemainingTimeUnit == RemainingTimeUnit.HoursMinutes &&
+          legacyLoaded.ManualDayTypes.Count == 0 &&
+          legacyLoaded.Arrivals.Values.All(arrival => arrival.EarlyLeaveOverrideMinutes is null),
+          "legacy state defaults without migration");
     File.WriteAllText(store.Path, original);
     var invalidUnit = loaded.Copy();
     invalidUnit.RemainingTimeUnit = (RemainingTimeUnit)999;
@@ -183,6 +265,18 @@ try
     try { store.Save(invalidUnit); }
     catch (InvalidDataException) { rejected = true; }
     Check(rejected && File.ReadAllText(store.Path) == original, "invalid display preference preserves saved file");
+    var invalidType = loaded.Copy();
+    invalidType.ManualDayTypes["2026-10-24"] = (ManualDayType)999;
+    rejected = false;
+    try { store.Save(invalidType); }
+    catch (InvalidDataException) { rejected = true; }
+    Check(rejected && File.ReadAllText(store.Path) == original, "invalid day type preserves saved file");
+    var invalidOverride = loaded.Copy();
+    invalidOverride.Arrivals["2026-10-24"].EarlyLeaveOverrideMinutes = 60;
+    rejected = false;
+    try { store.Save(invalidOverride); }
+    catch (InvalidDataException) { rejected = true; }
+    Check(rejected && File.ReadAllText(store.Path) == original, "invalid early leave override preserves saved file");
     var invalid = loaded.Copy();
     invalid.Settings.WorkMinutes = 0;
     rejected = false;

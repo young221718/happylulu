@@ -1,0 +1,221 @@
+using System.Drawing;
+using System.Globalization;
+using System.Reflection;
+using HappyLulu.Core;
+using HappyLulu.Tray;
+
+internal static class Program
+{
+    private static int checks;
+
+    [STAThread]
+    private static int Main()
+    {
+        Application.SetHighDpiMode(HighDpiMode.SystemAware);
+        Application.EnableVisualStyles();
+        Words.Preference = UiLanguage.English;
+        try
+        {
+            ClockEditing();
+            DayTypeSelection();
+            MonthHistory();
+            StorageFailures();
+            Console.WriteLine($"PASS Windows form behavior: {checks} assertions (isolated storage, no desktop input)");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("FAIL Windows form behavior: " + ex);
+            return 1;
+        }
+    }
+
+    private static void ClockEditing()
+    {
+        using var fixture = new Fixture();
+        using var form = fixture.Today();
+        TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+        Button edit = Find<Button>(form, "Edit arrival time");
+        Click(edit);
+        input.Text = "09:15";
+        Key(input, Keys.Enter);
+        Equal("09:15", fixture.StoredClock(), "Enter persists the edited clock");
+
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        Click(edit);
+        input.Text = "09:45";
+        Key(input, Keys.Escape);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Escape preserves stored bytes");
+
+        Click(edit);
+        input.Text = "25:61";
+        Key(input, Keys.Enter);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Invalid clock preserves stored bytes");
+        Equal("25:61", input.Text, "Invalid input remains available to correct");
+        input.Text = "09:30";
+        Raise(typeof(Control), input, "OnLeave", EventArgs.Empty);
+        Equal("09:30", fixture.StoredClock(), "Leaving the editor persists a valid clock");
+
+        Click(edit);
+        input.Text = "09:45";
+        var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
+        Raise(typeof(Form), form, "OnFormClosing", closing);
+        Equal("09:45", fixture.StoredClock(), "Closing commits a valid clock");
+        Equal(true, closing.Cancel, "User close keeps the resident window reusable");
+
+        Click(edit);
+        input.Text = "09:50";
+        before = File.ReadAllBytes(fixture.Store.Path);
+        fixture.Now = fixture.Now.AddDays(1);
+        Key(input, Keys.Enter);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Midnight rollover cannot move the old edit to another day");
+        Equal(false, fixture.Store.Load().Arrivals.ContainsKey("2026-11-06"), "Rollover does not fabricate today's arrival");
+    }
+
+    private static void DayTypeSelection()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        using var form = fixture.Today();
+        TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+        ComboBox type = Find<ComboBox>(form, "Today's work type");
+        Click(Find<Button>(form, "Edit arrival time"));
+        input.Text = "09:30";
+        Choose(type, (int)ManualDayType.LuluDay);
+        AttendanceState stored = fixture.Store.Load();
+        Equal("09:30", fixture.StoredClock(), "Changing type commits an active valid clock edit");
+        Equal(ManualDayType.LuluDay, stored.ManualDayTypes["2026-11-05"], "Refresh during clock save does not replace the requested type");
+        Equal(120, stored.Arrivals["2026-11-05"].EarlyLeaveOverrideMinutes, "Lulu day saves its two-hour reduction");
+
+        Choose(type, (int)ManualDayType.AnnualLeave);
+        Equal("09:30", fixture.StoredClock(), "Annual leave preserves the arrival file record");
+        Equal(null, Attendance.Today(fixture.Controller.State, fixture.Now), "Annual leave pauses the active workday");
+        Equal("—", Field<Label>(form, "departureTime").Text, "Annual leave removes the planned departure display");
+
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        Choose(type, (int)ManualDayType.MorningHalf);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Incompatible half-day selection preserves the previous state");
+        Equal((int)ManualDayType.AnnualLeave, type.SelectedIndex, "Rejected type restores the displayed selection");
+    }
+
+    private static void MonthHistory()
+    {
+        using var fixture = new Fixture();
+        DateOnly oldDay = DateOnly.FromDateTime(DateTime.Today).AddMonths(-18);
+        string key = oldDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        DateTimeOffset oldArrival = new(oldDay.Year, oldDay.Month, oldDay.Day, 9, 17, 0, TimeSpan.FromHours(9));
+        fixture.Controller.Apply(state =>
+        {
+            state.Arrivals[key] = new Arrival { Day = key, Time = oldArrival, Source = ArrivalSource.Manual, Mode = WorkdayMode.Normal };
+            state.ManualDayTypes[key] = ManualDayType.AnnualLeave;
+        });
+        using var form = new SettingsForm(fixture.Controller, SystemIcons.Application);
+        Click(Find<Button>(form, "Attendance"));
+        Button previous = Find<Button>(form, "Previous month");
+        for (int i = 0; i < 18; i++) Click(previous);
+        Button day = Descendants(form).OfType<Button>().Single(button => button.AccessibleName?.StartsWith(key + " ", StringComparison.Ordinal) == true);
+        Click(day);
+        Label detail = Find<Label>(form, "Attendance for the selected day");
+        Equal(true, detail.Text.Contains("09:17", StringComparison.Ordinal), "Old month displays the recorded clock without host timezone conversion");
+        Equal(true, detail.Text.Contains("UTC+09:00", StringComparison.Ordinal), "History retains the recorded UTC offset");
+        Equal(true, detail.Text.Contains("preserved", StringComparison.Ordinal), "Annual leave detail exposes the preserved arrival");
+        Equal(true, detail.Text.Contains("Manual entry", StringComparison.Ordinal), "History retains the original input source");
+
+        ComboBox language = Find<ComboBox>(form, "Display language");
+        language.SelectedIndex = (int)UiLanguage.Korean;
+        Equal(UiLanguage.Korean, fixture.Store.Load().Language, "Language selection persists through the settings event");
+        ComboBox remaining = Find<ComboBox>(form, "Remaining time display");
+        remaining.SelectedIndex = (int)RemainingTimeUnit.Seconds;
+        Equal(RemainingTimeUnit.Seconds, fixture.Store.Load().RemainingTimeUnit, "Countdown unit persists through the settings event");
+    }
+
+    private static void StorageFailures()
+    {
+        using var fixture = new Fixture();
+        File.WriteAllText(fixture.Store.Path, "broken attendance file");
+        var blocked = new AppController(fixture.Store, () => fixture.Now);
+        Equal(false, blocked.SetDayType(ManualDayType.LuluDay), "Load failure disables all later saving");
+        Equal("broken attendance file", File.ReadAllText(fixture.Store.Path), "Load failure preserves the original file bytes");
+
+        File.Delete(fixture.Store.Path);
+        fixture.SaveArrival("09:00");
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        using (var locked = new FileStream(fixture.Store.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Equal(false, fixture.Controller.SetDayType(ManualDayType.LuluDay), "Failed atomic replacement is reported as failure");
+            Equal(false, fixture.Controller.State.ManualDayTypes.ContainsKey("2026-11-05"), "Failed save does not publish the candidate state");
+        }
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Failed save preserves the previous file");
+    }
+
+    private static T Field<T>(object target, string name) where T : class =>
+        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(target) as T
+        ?? throw new InvalidOperationException("Missing field: " + name);
+
+    private static IEnumerable<Control> Descendants(Control root)
+    {
+        foreach (Control child in root.Controls)
+        {
+            yield return child;
+            foreach (Control nested in Descendants(child)) yield return nested;
+        }
+    }
+
+    private static T Find<T>(Control root, string accessibleName) where T : Control =>
+        Descendants(root).OfType<T>().Single(control => control.AccessibleName == accessibleName);
+
+    // Raise native control events without desktop input, app startup registration, or a real user profile.
+    private static void Click(Button button) => Raise(typeof(Control), button, "OnClick", EventArgs.Empty);
+    private static void Key(Control control, Keys key) => Raise(typeof(Control), control, "OnKeyDown", new KeyEventArgs(key));
+    private static void Choose(ComboBox choice, int index)
+    {
+        choice.SelectedIndex = index;
+        Raise(typeof(ComboBox), choice, "OnSelectionChangeCommitted", EventArgs.Empty);
+    }
+
+    private static void Raise(Type type, object target, string method, object argument) =>
+        (type.GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)
+         ?? throw new InvalidOperationException("Missing event raiser: " + method)).Invoke(target, new[] { argument });
+
+    private static void Equal<T>(T expected, T actual, string description)
+    {
+        checks++;
+        if (!EqualityComparer<T>.Default.Equals(expected, actual))
+            throw new InvalidOperationException($"{description}: expected {expected}, got {actual}");
+    }
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "happylulu-ui-checks-" + Guid.NewGuid().ToString("N"));
+        public DateTimeOffset Now { get; set; }
+        public StateStore Store { get; }
+        public AppController Controller { get; }
+
+        public Fixture()
+        {
+            Directory.CreateDirectory(directory);
+            DateTime local = new(2026, 11, 5, 17, 0, 0, DateTimeKind.Unspecified);
+            Now = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+            Store = new StateStore(Path.Combine(directory, "state.json"));
+            Controller = new AppController(Store, () => Now);
+            Equal(Store.Path, Controller.DataPath, "Controller uses only the isolated fixture path");
+        }
+
+        public TodayForm Today()
+        {
+            var form = new TodayForm(Controller, () => { }, SystemIcons.Application);
+            Controller.Changed += () => form.RefreshView();
+            return form;
+        }
+
+        public void SaveArrival(string clock)
+        {
+            TimeOnly time = TimeOnly.ParseExact(clock, "HH:mm", CultureInfo.InvariantCulture);
+            DateTime local = Now.LocalDateTime.Date.Add(time.ToTimeSpan());
+            Equal(true, Controller.ManualArrival(new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)), WorkdayMode.Normal), "Fixture arrival can be saved");
+        }
+
+        public string StoredClock() => Store.Load().Arrivals["2026-11-05"].Time.ToString("HH:mm", CultureInfo.InvariantCulture);
+        public void Dispose() => Directory.Delete(directory, true);
+    }
+}

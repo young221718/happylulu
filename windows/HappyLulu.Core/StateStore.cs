@@ -52,16 +52,21 @@ public sealed class StateStore(string path)
     {
         if (state.Version != 1 || state.Settings is null || !state.Settings.IsValid ||
             !Enum.IsDefined(state.Language) || !Enum.IsDefined(state.RemainingTimeUnit) ||
-            state.Arrivals is null || state.SuppressedDays is null)
+            state.Arrivals is null || state.SuppressedDays is null || state.ManualDayTypes is null)
             throw new InvalidDataException("Attendance file has invalid settings or version.");
         foreach (var (key, arrival) in state.Arrivals)
         {
             if (arrival is null || !DateOnly.TryParseExact(key, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out _) || arrival.Day != key ||
                 Attendance.DayKey(arrival.Time) != key ||
-                !Enum.IsDefined(arrival.Source) || !Enum.IsDefined(arrival.Mode))
+                !Enum.IsDefined(arrival.Source) || !Enum.IsDefined(arrival.Mode) ||
+                arrival.EarlyLeaveOverrideMinutes is not (null or 0 or 120))
                 throw new InvalidDataException("Attendance file has an invalid arrival.");
         }
+        foreach (var (day, type) in state.ManualDayTypes)
+            if (!DateOnly.TryParseExact(day, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out _) || !Enum.IsDefined(type))
+                throw new InvalidDataException("Attendance file has an invalid manual day type.");
         foreach (string day in state.SuppressedDays)
             if (!DateOnly.TryParseExact(day, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out _))

@@ -6,18 +6,23 @@ namespace HappyLulu.Tray;
 internal sealed class AppController
 {
     private readonly StateStore? store;
+    private readonly Func<DateTimeOffset> clock;
     private AttendanceState state = new();
     private bool writable;
     public string? Error { get; private set; }
     public AttendanceState State => state;
     public string DataPath => store?.Path ?? "";
+    public DateTimeOffset Now => clock();
     public event Action? Changed;
 
-    public AppController()
+    public AppController() : this(null, () => DateTimeOffset.Now) { }
+
+    internal AppController(StateStore? storage, Func<DateTimeOffset> clock)
     {
+        this.clock = clock;
         try
         {
-            store = StateStore.Standard();
+            store = storage ?? StateStore.Standard();
             state = store.Load();
             writable = true;
         }
@@ -55,8 +60,9 @@ internal sealed class AppController
 
     public void ObservedUnlock(DateTimeOffset at) => Apply(candidate => Attendance.RecordUnlock(candidate, at));
     public bool ManualArrival(DateTimeOffset at, WorkdayMode? mode) =>
-        Apply(candidate => Attendance.SetManual(candidate, at, DateTimeOffset.Now, mode));
-    public bool SkipToday() => Apply(candidate => Attendance.SkipToday(candidate, DateTimeOffset.Now));
+        Apply(candidate => Attendance.SetManual(candidate, at, Now, mode));
+    public bool SetDayType(ManualDayType type) => Apply(candidate => Attendance.SetDayType(candidate, type, Now));
+    public bool SkipToday() => Apply(candidate => Attendance.SkipToday(candidate, Now));
     public bool SetWork(int work, int rest) => Apply(candidate =>
     {
         candidate.Settings.WorkMinutes = work;
