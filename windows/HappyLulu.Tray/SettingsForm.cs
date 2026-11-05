@@ -404,6 +404,12 @@ internal sealed class SettingsForm : Form
             int width = Math.Max(200, stack.ClientSize.Width - stack.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
             foreach (Control child in stack.Controls)
             {
+                if (child is TableLayoutPanel row)
+                {
+                    // Flow layout otherwise replaces Width with the auto-sized preferred width.
+                    row.MinimumSize = new Size(width, 0);
+                    row.MaximumSize = new Size(width, 0);
+                }
                 if (child is TableLayoutPanel || child is TextBox) child.Width = width;
                 if (child is Label label) label.MaximumSize = new Size(width, 0);
             }
