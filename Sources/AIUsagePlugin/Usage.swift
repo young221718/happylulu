@@ -59,11 +59,12 @@ public struct UsageSnapshot: Sendable {
 }
 
 public enum UsageError: LocalizedError {
-    case cliNotFound, notLoggedIn, unsupportedAccount, noWeeklyQuota, noCodexQuota
+    case cliNotFound, notLoggedIn, unsupportedAccount, noWeeklyQuota, noCodexQuota, unsupportedProvider
     case timeout, disconnected, invalidResponse, loginFailed, loginTimeout, server(String)
 
     public var errorDescription: String? {
         switch self {
+        case .unsupportedProvider: return "이 연결은 현재 빌드에서 지원하지 않습니다. Codex 또는 Antigravity 연결을 선택해 주세요."
         case .cliNotFound: return "Codex CLI를 찾을 수 없습니다. 연결 설정에서 실행 파일을 선택하세요."
         case .notLoggedIn: return "ChatGPT에 로그인하면 주간 잔여량을 확인할 수 있습니다."
         case .unsupportedAccount: return "ChatGPT 로그인이 필요합니다. API 키 계정에서는 주간 한도를 조회할 수 없습니다."
@@ -89,19 +90,116 @@ public enum LabelFormat: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public enum UsageProviderKind: String, Codable, CaseIterable, Sendable {
+    case codex, antigravity
+    // Preserve saved development profiles without enabling the retired integration.
+    case claude
+    public static let allCases: [UsageProviderKind] = [.codex, .antigravity]
+    public var isSupported: Bool { self != .claude }
+
+    public var name: String {
+        switch self {
+        case .codex: return "Codex"
+        case .claude: return "지원하지 않는 연결"
+        case .antigravity: return "Antigravity"
+        }
+    }
+}
+
+public struct UsageProfile: Codable, Equatable, Identifiable, Sendable {
+    public static let defaultCodexID = "default-codex"
+    public var id: String
+    public var name: String
+    public var provider: UsageProviderKind
+    public var cliPath: String
+    public var configDirectory: String
+    public var allowAntigravityCLI: Bool
+
+    public init(id: String = UUID().uuidString, name: String, provider: UsageProviderKind,
+                cliPath: String = "", configDirectory: String = "", allowAntigravityCLI: Bool = false) {
+        self.id = id; self.name = name; self.provider = provider
+        self.cliPath = cliPath; self.configDirectory = configDirectory
+        self.allowAntigravityCLI = allowAntigravityCLI
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, provider, cliPath, configDirectory, allowAntigravityCLI
+    }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        provider = try values.decode(UsageProviderKind.self, forKey: .provider)
+        cliPath = try values.decode(String.self, forKey: .cliPath)
+        configDirectory = try values.decode(String.self, forKey: .configDirectory)
+        allowAntigravityCLI = try values.decodeIfPresent(Bool.self, forKey: .allowAntigravityCLI) ?? false
+    }
+}
+
 public struct Preferences: Codable, Equatable, Sendable {
     public var refreshMinutes = 5
     public var labelFormat: LabelFormat = .named
     public var notificationsEnabled = false
     public var notificationThreshold = 20
-    public var cliPath = ""
+    public var profiles: [UsageProfile] = [UsageProfile(id: UsageProfile.defaultCodexID, name: "Codex", provider: .codex)]
+    public var selectedProfileID = UsageProfile.defaultCodexID
 
     public init() {}
-
+    public var selectedProfile: UsageProfile {
+        profiles.first { $0.id == selectedProfileID } ?? profiles.first ?? UsageProfile(id: UsageProfile.defaultCodexID, name: "Codex", provider: .codex)
+    }
+    public var cliPath: String {
+        get { selectedProfile.cliPath }
+        set { updateSelectedProfile { $0.cliPath = newValue } }
+    }
+    public mutating func updateSelectedProfile(_ change: (inout UsageProfile) -> Void) {
+        guard let index = profiles.firstIndex(where: { $0.id == selectedProfileID }) else { return }
+        change(&profiles[index])
+    }
     public mutating func normalize() {
         if ![1, 5, 10, 15, 30].contains(refreshMinutes) { refreshMinutes = 5 }
         if ![10, 20, 30].contains(notificationThreshold) { notificationThreshold = 20 }
-        cliPath = cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        var ids = Set<String>()
+        for index in profiles.indices {
+            if profiles[index].id.isEmpty || !ids.insert(profiles[index].id).inserted {
+                profiles[index].id = UUID().uuidString
+                ids.insert(profiles[index].id)
+            }
+            profiles[index].name = profiles[index].name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if profiles[index].name.isEmpty { profiles[index].name = profiles[index].provider.name }
+            profiles[index].cliPath = profiles[index].cliPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            profiles[index].configDirectory = profiles[index].configDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if profiles.isEmpty { profiles = Preferences().profiles }
+        if !profiles.contains(where: { $0.id == selectedProfileID }) { selectedProfileID = profiles[0].id }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case refreshMinutes, labelFormat, notificationsEnabled, notificationThreshold, cliPath, profiles, selectedProfileID
+    }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        refreshMinutes = try values.decodeIfPresent(Int.self, forKey: .refreshMinutes) ?? 5
+        labelFormat = try values.decodeIfPresent(LabelFormat.self, forKey: .labelFormat) ?? .named
+        notificationsEnabled = try values.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? false
+        notificationThreshold = try values.decodeIfPresent(Int.self, forKey: .notificationThreshold) ?? 20
+        if let saved = try values.decodeIfPresent([UsageProfile].self, forKey: .profiles) {
+            profiles = saved
+            selectedProfileID = try values.decodeIfPresent(String.self, forKey: .selectedProfileID) ?? UsageProfile.defaultCodexID
+        } else {
+            profiles[0].cliPath = try values.decodeIfPresent(String.self, forKey: .cliPath) ?? ""
+        }
+        normalize()
+    }
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(refreshMinutes, forKey: .refreshMinutes)
+        try values.encode(labelFormat, forKey: .labelFormat)
+        try values.encode(notificationsEnabled, forKey: .notificationsEnabled)
+        try values.encode(notificationThreshold, forKey: .notificationThreshold)
+        try values.encode(profiles, forKey: .profiles)
+        try values.encode(selectedProfileID, forKey: .selectedProfileID)
+        try values.encode(cliPath, forKey: .cliPath)
     }
 }
 

@@ -21,6 +21,17 @@ private struct PreviewUsageProvider: UsageProvider {
     func makeLoginAttempt() -> (any UsageLoginAttempt)? { nil }
 }
 
+private struct PreviewRecentSessionMonitor: CodexRecentSessionMonitoring {
+    let scopeKey = "codex-recent:00000000-0000-0000-0000-000000000075"
+
+    func poll(now: Date) async throws -> CodexRecentSessionObservation {
+        let sample = TokenSpeedSample(outputTokens: 750, durationMilliseconds: 10_000,
+            recordedAt: now.addingTimeInterval(-1), accountKey: scopeKey, requestKey: "turn:" + String(repeating: "0", count: 64))!
+        return CodexRecentSessionObservation(latestSample: sample, discoveredSessionCount: 1,
+            unsupportedSessionCount: 0, isCatchingUp: false)
+    }
+}
+
 @MainActor
 private enum PreviewUsageModule: PluginModule {
     static let id = AIUsageModule.id
@@ -28,7 +39,8 @@ private enum PreviewUsageModule: PluginModule {
     static var model: AIUsageModel!
     static let iconSource = "official-monochrome-glyph"
     static func register(in context: PluginHostContext) throws {
-        let model = AIUsageModel(defaults: ProbePreferences.shared, localize: context.localize,
+        let model = AIUsageModel(defaults: ProbePreferences.shared,
+            recentSessionMonitorFactory: { _ in PreviewRecentSessionMonitor() }, localize: context.localize,
             providerFactory: { _ in PreviewUsageProvider() })
         model.updatePreferences { $0.labelFormat = .icon }
         precondition(model.menuBarPreview.iconPNG != nil && model.menuBarPreview.iconIsTemplate,
@@ -225,9 +237,13 @@ struct AIUsageUIProbe {
                 directory: output, scheme: scheme)
             plugins.setShowUsage(true)
             let deadline = Date().addingTimeInterval(3)
-            while PreviewUsageModule.model.snapshot == nil && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+            while (PreviewUsageModule.model.snapshot == nil || PreviewUsageModule.model.currentTokenSpeedSample == nil)
+                && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+            precondition(PreviewUsageModule.model.tokenMeasurementSource == .codexRecentSessions
+                && PreviewUsageModule.model.currentTokenSpeedSample?.tokensPerSecond == 75,
+                "The synthetic recent-session monitor must supply a nonzero speed sample")
             PreviewUsageModule.model.updatePreferences { $0.labelFormat = .named }
-            precondition(plugins.menuBarItems.first?.title == "Codex 72%")
+            precondition(plugins.menuBarItems.first?.title == "Codex 72% · 75.0 tok/s")
             try await render(settings, size: NSSize(width: 820, height: 620), name: "general-on-minimum-" + suffix,
                 directory: output, scheme: scheme)
             navigation.pluginID = AIUsageModule.id; navigation.selection = .plugin
@@ -236,7 +252,7 @@ struct AIUsageUIProbe {
             try await render(settings, size: NSSize(width: 820, height: 980), name: "usage-connection-expanded-" + suffix,
                 directory: output, scheme: scheme)
             PreviewUsageModule.model.updatePreferences { $0.labelFormat = .icon }
-            precondition(plugins.menuBarItems.first?.title == "72%" && plugins.menuBarItems.first?.iconPNG != nil
+            precondition(plugins.menuBarItems.first?.title == "72% · 75.0 tok/s" && plugins.menuBarItems.first?.iconPNG != nil
                 && plugins.menuBarItems.first?.iconIsTemplate == true)
             try await render(settings, size: NSSize(width: 820, height: 700), name: "usage-settings-icon-" + suffix,
                 directory: output, scheme: scheme)
@@ -282,8 +298,8 @@ struct AIUsageUIProbe {
             && PreviewRunnerModule.model.metrics == .empty)
         let after = try Data(contentsOf: store.url)
         precondition(before == after && !sync.runtimeAllowed)
-        print("PASS usage UI: actual settings/full attendance panel, isolated synthetic 72%/CPU35%/memory/storage/network/battery, expanded Codex connection, owl orbit and cat, light/dark, minimum settings size, packaged runner assets, display-off, stop and unchanged attendance")
-        print("PASS native status button: owl orbit without extra animal, preserved owl/cat group, inline Codex icon/72%, aqua/darkAqua, native highlight flags, \(PreviewUsageModule.iconSource)")
+        print("PASS usage UI: actual settings/full attendance panel, isolated synthetic 72%/75.0 tok/s/CPU35%/memory/storage/network/battery, expanded Codex connection, owl orbit and cat, light/dark, minimum settings size, packaged runner assets, display-off, stop and unchanged attendance")
+        print("PASS native status button: owl orbit without extra animal, preserved owl/cat group, inline Codex icon/72%/75.0 tok/s, aqua/darkAqua, native highlight flags, \(PreviewUsageModule.iconSource)")
         print("PASS overtime presentation: injected clock advances 90 to 91 minutes, shared elapsed text in panel/menu, light/dark, unchanged attendance")
         print("PASS usage panel: existing/native light/dark, 574pt metrics panel, usage-row routing and Settings/Quit menu")
         print("LIMIT native status button: cached button views do not capture the window-managed selection background")
@@ -316,7 +332,8 @@ struct AIUsageUIProbe {
         button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         button.attributedTitle = PluginMenuBarTitle.attributed(base: model.menuTitle,
             items: plugins.menuBarItems, font: button.font!, appearance: appearance)
-        precondition(button.attributedTitle.string.contains("72%") && !button.attributedTitle.string.contains("Codex"))
+        precondition(button.attributedTitle.string.contains("72%")
+            && button.attributedTitle.string.contains("75.0 tok/s") && !button.attributedTitle.string.contains("Codex"))
         var attachments = 0
         button.attributedTitle.enumerateAttribute(.attachment,
             in: NSRange(location: 0, length: button.attributedTitle.length)) { value, _, _ in
@@ -531,7 +548,7 @@ private final class InteractiveUsageSession: NSObject {
         }
         openSettings()
         updateStatus()
-        reportUsageProbe("READY SYNTHETIC QA: Codex remaining72%, CPU35%, fake resources; system integrations/notifications unavailable")
+        reportUsageProbe("READY SYNTHETIC QA: Codex remaining72%, token speed75.0 tok/s, CPU35%, fake resources; system integrations/notifications unavailable")
     }
 
     private var materialMode: LuluMaterialMode {
@@ -545,7 +562,7 @@ private final class InteractiveUsageSession: NSObject {
     }
 
     private var banner: some View {
-        Text("SYNTHETIC QA · 가상 출근 기록 / Codex 72% / CPU 35% · 외부 연동 없음")
+        Text("SYNTHETIC QA · 가상 출근 기록 / Codex 72% / 75.0 tok/s / CPU 35% · 외부 연동 없음")
             .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
             .padding(8).frame(maxWidth: .infinity).frame(height: Self.bannerHeight).background(Color.indigo)
     }

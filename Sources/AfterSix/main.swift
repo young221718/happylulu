@@ -7,6 +7,21 @@ import ServiceManagement
 import AfterSixCore
 import MacLaunchSupport
 import AppPluginCore
+#if HAPPY_LULU_AI_USAGE_ENABLED
+import AIUsagePlugin
+#endif
+
+if CommandLine.arguments.contains("--token-speed-bridge") {
+    guard CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--token-speed-bridge" else { exit(64) }
+    #if HAPPY_LULU_AI_USAGE_ENABLED
+    let provider = CommandLine.arguments[2]
+    Task.detached { exit(await TokenSpeedBridge.run(provider: provider)) }
+    dispatchMain()
+    #else
+    FileHandle.standardError.write(Data("HappyLulu: AI usage support is not included in this build.\n".utf8))
+    exit(64)
+    #endif
+}
 
 let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdentifier,
     applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
@@ -23,7 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             routingStore: FeatureRoutingStore(url: runtimeProfile.routingURL),
             catalogStore: PluginCatalogStore(url: runtimeProfile.catalogURL))
         manager.configureCatalog(sync: calendarSync, presentations: pluginPresentations,
-            allowsExternalIntegrations: runtimeProfile.allowsExternalIntegrations)
+            allowsExternalIntegrations: runtimeProfile.allowsExternalIntegrations,
+            isolatedPluginIDs: Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
+                ? ["ai-usage"] : [])
         return manager
     }()
     private lazy var model = AppModel(store: StateStore(url: runtimeProfile.stateURL), featureRouter: plugins.router,
@@ -151,8 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             self.model.observeFeatures(self.plugins)
             if runtimeProfile.allowsAutomaticActivity {
                 self.model.start(loginObservedAt: self.loginObservedAt)
-                self.plugins.start()
             }
+            self.plugins.start()
         }
         updater.canInstallNow = { [weak self] in
             guard let self else { return false }
@@ -175,14 +192,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         let items = plugins.menuBarItems
         menuBarImages.setProviders(plugins.registrations.compactMap { entry in
-            guard plugins.allowsExternalIntegrations, plugins.isEnabled(entry.id), entry.controller.enabled else { return nil }
+            guard plugins.allowsExecution(entry.id), plugins.isEnabled(entry.id), entry.controller.enabled else { return nil }
             return entry.controller as? any PluginMenuBarImageProviding
         })
         displayedMenuTitle = model.menuTitle
         displayedPluginItems = items
         updateMenuBarTitle()
         let pluginPanelHeight = plugins.registrations.reduce(CGFloat.zero) { height, entry in
-            guard plugins.allowsExternalIntegrations, plugins.isEnabled(entry.id), entry.controller.enabled,
+            guard plugins.allowsExecution(entry.id), plugins.isEnabled(entry.id), entry.controller.enabled,
                   let provider = entry.controller as? any PluginPanelProviding else { return height }
             return height + provider.panelHeight
         }

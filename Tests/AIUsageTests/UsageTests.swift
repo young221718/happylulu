@@ -115,4 +115,55 @@ final class UsageTests: XCTestCase {
         XCTAssertEqual(preferences.notificationThreshold, 20)
         XCTAssertEqual(preferences.cliPath, "/tmp/codex")
     }
+    func testLegacyPreferencesMigrateToDefaultCodexProfile() throws {
+        let saved = Data(#"{"refreshMinutes":10,"labelFormat":"named","notificationsEnabled":true,"notificationThreshold":30,"cliPath":"/fixture/old-codex"}"#.utf8)
+        let preferences = try JSONDecoder().decode(Preferences.self, from: saved)
+        XCTAssertEqual(preferences.selectedProfile.id, UsageProfile.defaultCodexID)
+        XCTAssertEqual(preferences.selectedProfile.provider, .codex)
+        XCTAssertEqual(preferences.selectedProfile.cliPath, "/fixture/old-codex")
+        XCTAssertEqual(preferences.profiles.count, 1)
+    }
+
+    func testProfilesRoundTripAndSelectedCLIPathIsIndependent() throws {
+        var preferences = Preferences()
+        let other = UsageProfile(name: "Work", provider: .antigravity, cliPath: "/fixture/agy", configDirectory: "/fixture/work")
+        preferences.profiles.append(other)
+        preferences.selectedProfileID = other.id
+        preferences.cliPath = "/fixture/other-agy"
+        preferences.normalize()
+        XCTAssertEqual(preferences.selectedProfile.configDirectory, "/fixture/work")
+        XCTAssertEqual(preferences.profiles[0].cliPath, "")
+        XCTAssertEqual(preferences.selectedProfile.cliPath, "/fixture/other-agy")
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences)), preferences)
+    }
+
+    func testExistingProfilesDoNotEnableAntigravityCLIWithoutConsent() throws {
+        let saved = Data(#"{"profiles":[{"id":"existing-agy","name":"Antigravity","provider":"antigravity","cliPath":"/fixture/agy","configDirectory":"/fixture/report.json"}],"selectedProfileID":"existing-agy"}"#.utf8)
+        let preferences = try JSONDecoder().decode(Preferences.self, from: saved)
+        XCTAssertFalse(preferences.selectedProfile.allowAntigravityCLI)
+        XCTAssertEqual(preferences.selectedProfile.cliPath, "/fixture/agy")
+        XCTAssertEqual(preferences.selectedProfile.configDirectory, "/fixture/report.json")
+        XCTAssertFalse(UsageProfile(name: "New", provider: .antigravity).allowAntigravityCLI)
+    }
+
+    func testAntigravityCLIConsentSurvivesProfileRoundTrip() throws {
+        var profile = UsageProfile(name: "Antigravity", provider: .antigravity)
+        profile.allowAntigravityCLI = true
+        let restored = try JSONDecoder().decode(UsageProfile.self, from: JSONEncoder().encode(profile))
+        XCTAssertTrue(restored.allowAntigravityCLI)
+        XCTAssertEqual(restored, profile)
+    }
+
+    func testSelectableProvidersExcludeLegacyUnsupportedConnectionWithoutLosingSavedProfiles() throws {
+        XCTAssertEqual(UsageProviderKind.allCases, [.codex, .antigravity])
+        let saved = Data(#"{"refreshMinutes":15,"profiles":[{"id":"saved-codex","name":"Work","provider":"codex","cliPath":"/fixture/codex","configDirectory":"/fixture/work"},{"id":"saved-legacy","name":"Legacy","provider":"claude","cliPath":"/fixture/legacy","configDirectory":"/fixture/legacy-home"},{"id":"saved-agy","name":"Antigravity","provider":"antigravity","cliPath":"/fixture/agy","configDirectory":"/fixture/report.json"}],"selectedProfileID":"saved-legacy"}"#.utf8)
+        let preferences = try JSONDecoder().decode(Preferences.self, from: saved)
+        XCTAssertEqual(preferences.refreshMinutes, 15)
+        XCTAssertEqual(preferences.selectedProfileID, "saved-legacy")
+        XCTAssertEqual(preferences.profiles.map(\.id), ["saved-codex", "saved-legacy", "saved-agy"])
+        XCTAssertEqual(preferences.profiles[0].configDirectory, "/fixture/work")
+        XCTAssertEqual(preferences.profiles[1].configDirectory, "/fixture/legacy-home")
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences)), preferences)
+    }
+
 }
