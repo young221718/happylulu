@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using HappyLulu.Core;
 
@@ -6,15 +7,21 @@ namespace HappyLulu.Tray;
 
 internal sealed class SettingsForm : Form
 {
+    private static readonly Color SidebarSurface = Color.FromArgb(244, 244, 246);
+    private static readonly Color GroupSurface = Color.FromArgb(245, 245, 247);
+    private static readonly Color SelectionSurface = Color.FromArgb(225, 226, 230);
     private readonly AppController controller;
     private readonly ComboBox language = Choice();
     private readonly ComboBox remainingUnit = Choice();
-    private readonly CheckBox startup = new() { AutoSize = true };
+    private readonly CheckBox startup = new SettingsSwitch();
     private readonly Label startupHint = Help("");
+    private readonly Label countdownPreview = Preview("");
+    private readonly Label workPreview = Preview("");
+    private readonly Label restPreview = Preview("");
     private readonly TextBox dataPath = new() { ReadOnly = true, Dock = DockStyle.Fill };
     private readonly NumericUpDown work = new() { Minimum = 60, Maximum = 960, Increment = 30, Width = 120 };
     private readonly NumericUpDown rest = new() { Minimum = 0, Maximum = 240, Increment = 15, Width = 120 };
-    private readonly Panel content = new() { Dock = DockStyle.Fill };
+    private readonly Panel content = new() { Dock = DockStyle.Fill, Margin = Padding.Empty };
     private readonly List<(Button Button, Control Page)> pages = new();
     private readonly TableLayoutPanel calendar = new() { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 6 };
     private readonly Label monthLabel = new() { AutoSize = true, Anchor = AnchorStyles.Left };
@@ -37,30 +44,47 @@ internal sealed class SettingsForm : Form
         BackColor = UiPalette.Page;
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(920, 680);
+        ClientSize = new Size(960, 700);
         MinimumSize = new Size(820, 620);
 
         var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 176));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 205));
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var sidebar = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            BackColor = UiPalette.MintWash, Padding = new Padding(14, 22, 14, 14)
+            BackColor = SidebarSurface, Padding = new Padding(10, 20, 10, 14), AutoScroll = true,
+            Margin = Padding.Empty
         };
-        sidebar.Controls.Add(new Label
+        var brand = new FlowLayoutPanel
         {
-            Text = "happylulu", Font = new Font(Font.FontFamily, 17, FontStyle.Bold),
-            AutoSize = true, Margin = new Padding(6, 0, 0, 28)
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = new Padding(6, 0, 0, 22)
+        };
+        brand.Controls.Add(new PictureBox
+        {
+            Image = appIcon.ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(24, 24), Margin = new Padding(0, 1, 8, 0), AccessibleName = "happylulu"
         });
-        AddPage(sidebar, Words.T("일반", "General"), GeneralPage());
-        AddPage(sidebar, Words.T("근무", "Work"), WorkPage());
-        AddPage(sidebar, Words.T("출근 기록", "Attendance"), HistoryPage());
+        brand.Controls.Add(new Label
+        {
+            Text = "happylulu", Font = new Font(Font.FontFamily, 14, FontStyle.Bold),
+            AutoSize = true, Margin = Padding.Empty
+        });
+        sidebar.Controls.Add(brand);
         sidebar.Controls.Add(new Label
         {
-            Text = $"Windows {Application.ProductVersion}", AutoSize = true,
+            Text = Words.T("기본 설정", "Core settings"), AutoSize = true,
+            ForeColor = UiPalette.Muted, Font = new Font(Font.FontFamily, 9), Margin = new Padding(8, 0, 0, 8)
+        });
+        AddPage(sidebar, Words.T("일반", "General"), "\uE713", GeneralPage());
+        AddPage(sidebar, Words.T("근무", "Work"), "\uE917", WorkPage());
+        AddPage(sidebar, Words.T("출근 기록", "Attendance"), "\uE787", HistoryPage());
+        sidebar.Controls.Add(new Label
+        {
+            Text = $"Windows · {Application.ProductVersion.Split('+')[0]}", AutoSize = true,
             ForeColor = UiPalette.Muted, Font = new Font(Font.FontFamily, 8),
-            Margin = new Padding(6, 28, 0, 0)
+            Margin = new Padding(8, 24, 0, 0)
         });
         shell.Controls.Add(sidebar, 0, 0);
         shell.Controls.Add(content, 1, 0);
@@ -80,11 +104,11 @@ internal sealed class SettingsForm : Form
         RefreshView();
     }
 
-    private void AddPage(FlowLayoutPanel sidebar, string title, Control page)
+    private void AddPage(FlowLayoutPanel sidebar, string title, string symbol, Control page)
     {
-        var button = new Button
+        var button = new SettingsNavigationButton(symbol)
         {
-            Text = title, AccessibleName = title, Width = 142, Height = 42,
+            Text = title, AccessibleName = title, Width = 181, Height = 38,
             TextAlign = ContentAlignment.MiddleLeft, FlatStyle = FlatStyle.Flat,
             Padding = new Padding(12, 0, 0, 0), Margin = new Padding(0, 0, 0, 5),
             UseVisualStyleBackColor = false
@@ -103,8 +127,8 @@ internal sealed class SettingsForm : Form
         {
             bool active = page == selected;
             page.Visible = active;
-            button.BackColor = active ? UiPalette.Card : UiPalette.MintWash;
-            button.ForeColor = active ? UiPalette.Mint : UiPalette.Ink;
+            button.BackColor = active ? SelectionSurface : SidebarSurface;
+            button.ForeColor = UiPalette.Ink;
             button.AccessibleDescription = active ? Words.T("선택됨", "Selected") : "";
         }
         selected.BringToFront();
@@ -113,8 +137,9 @@ internal sealed class SettingsForm : Form
     private Control GeneralPage()
     {
         FlowLayoutPanel stack = PageStack(Words.T("일반", "General"),
-            Words.T("언어와 시간 표시, Windows 시작 동작을 관리해요.",
-                    "Choose your language, time display, and Windows startup behavior."));
+            Words.T("언어와 앱 실행 방식을 관리합니다.", "Manage language and app launch behavior."));
+        SettingsGroup group = Group(Words.T("일반", "General"));
+        group.Controls.Add(PreviewHeader());
         language.Items.AddRange(new object[]
         {
             Words.T("시스템 언어", "System language"), "한국어", "English"
@@ -130,8 +155,8 @@ internal sealed class SettingsForm : Form
                 refreshing = false;
             }
         };
-        stack.Controls.Add(SettingRow(Words.T("표시 언어", "Display language"),
-            Words.T("화면의 언어를 바꿔요.", "Change the language used in the app."), language));
+        group.Controls.Add(SettingRow(Words.T("언어", "Language"),
+            Preview(Words.T("안녕하세요, happylulu예요", "Hello from happylulu")), language));
         remainingUnit.Items.AddRange(new object[]
         {
             Words.T("시간/분 (기본)", "Hours/minutes (default)"),
@@ -141,17 +166,19 @@ internal sealed class SettingsForm : Form
         remainingUnit.AccessibleName = Words.T("남은 시간 표시", "Remaining time display");
         remainingUnit.SelectedIndexChanged += (_, _) =>
         {
+            RefreshPreviews();
             if (refreshing || remainingUnit.SelectedIndex < 0) return;
             if (!controller.SetRemainingTimeUnit((RemainingTimeUnit)remainingUnit.SelectedIndex))
             {
                 refreshing = true;
                 remainingUnit.SelectedIndex = (int)controller.State.RemainingTimeUnit;
                 refreshing = false;
+                RefreshPreviews();
             }
         };
-        stack.Controls.Add(SettingRow(Words.T("남은 시간", "Remaining time"),
-            Words.T("트레이와 오늘 창에 표시할 단위예요.", "The unit used in the tray and Today window."), remainingUnit));
-        startup.Text = Words.T("자동 실행", "Start at sign-in");
+        group.Controls.Add(SettingRow(Words.T("퇴근까지 남은 시간 표시", "Countdown display"),
+            countdownPreview, remainingUnit));
+        startup.Text = "";
         startup.AccessibleName = Words.T("Windows 로그인 시 자동 실행", "Start when signing in to Windows");
         startup.CheckedChanged += (_, _) =>
         {
@@ -167,51 +194,55 @@ internal sealed class SettingsForm : Form
                 SyncStartup();
             }
         };
-        stack.Controls.Add(SettingRow(Words.T("Windows 로그인", "Windows sign-in"),
-            Words.T("로그인할 때 이 앱을 열어요.", "Open the app when you sign in."), startup));
+        group.Controls.Add(SettingRow(Words.T("로그인 시 자동 실행", "Launch at login"),
+            Help(Words.T("Windows 로그인 시 이 앱을 실행합니다.", "Opens the app when you sign in to Windows.")), startup));
+        stack.Controls.Add(group);
         startupHint.Text = Words.T("이 앱 파일을 옮기면 자동 실행을 다시 설정해야 합니다.",
                                    "Set startup again if you move this portable app.");
         stack.Controls.Add(startupHint);
-        stack.Controls.Add(Heading(Words.T("로컬 기록 파일", "Local attendance file"), 11));
+        SettingsGroup records = Group(Words.T("로컬 기록 파일", "Local attendance file"));
         dataPath.Text = controller.DataPath;
         dataPath.AccessibleName = Words.T("로컬 기록 파일 경로", "Local attendance file path");
-        stack.Controls.Add(dataPath);
-        stack.Controls.Add(Help(Words.T("기록은 이 PC에만 저장됩니다. 창을 열어도 자동 실행 설정은 바뀌지 않습니다.",
+        records.Controls.Add(dataPath);
+        records.Controls.Add(Help(Words.T("기록은 이 PC에만 저장됩니다. 창을 열어도 자동 실행 설정은 바뀌지 않습니다.",
                            "Records stay on this PC. Opening Settings does not change startup.")));
+        stack.Controls.Add(records);
         return stack;
     }
 
     private Control WorkPage()
     {
         FlowLayoutPanel stack = PageStack(Words.T("근무", "Work"),
-            Words.T("퇴근 예정 시각을 계산할 기준을 정해요.", "Set the basis for your planned departure."));
+            Words.T("근무 시간과 휴게 시간을 설정합니다.", "Set your work and break hours."));
+        SettingsGroup group = Group(Words.T("근무", "Work"));
         work.AccessibleName = Words.T("근무 시간 (분)", "Work minutes");
         rest.AccessibleName = Words.T("휴게 시간 (분)", "Break minutes");
-        stack.Controls.Add(SettingRow(Words.T("근무 시간", "Work time"),
-            Words.T("일반 근무의 분 단위 시간", "Minutes for a full workday"), work));
-        stack.Controls.Add(SettingRow(Words.T("휴게 시간", "Break time"),
-            Words.T("일반 근무에 더할 휴게 시간", "Break minutes added to a full workday"), rest));
+        work.ValueChanged += (_, _) => RefreshPreviews();
+        rest.ValueChanged += (_, _) => RefreshPreviews();
+        group.Controls.Add(SettingRow(Words.T("근무 시간", "Work time"), workPreview, work));
+        group.Controls.Add(SettingRow(Words.T("휴게 시간", "Break time"), restPreview, rest));
         var apply = new Button
         {
             Text = Words.T("근무 시간 저장", "Save work hours"), AutoSize = true,
-            BackColor = UiPalette.Mint, ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
+            BackColor = SystemColors.Highlight, ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
             Padding = new Padding(12, 6, 12, 6), Margin = new Padding(0, 12, 0, 18)
         };
         apply.FlatAppearance.BorderSize = 0;
-        apply.FlatAppearance.MouseOverBackColor = UiPalette.MintDeep;
+        apply.FlatAppearance.MouseOverBackColor = SystemColors.HotTrack;
         apply.Click += (_, _) =>
         {
             if (!controller.SetWork((int)work.Value, (int)rest.Value))
                 MessageBox.Show(this, controller.Error ?? Words.T("저장할 수 없어요.", "Could not save."),
                     "happylulu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         };
-        stack.Controls.Add(apply);
-        stack.Controls.Add(Help(Words.T(
+        group.Controls.Add(apply);
+        group.Controls.Add(Help(Words.T(
             "일반 근무는 근무·휴게 시간을 더합니다. 자동 일반 근무는 마지막 금요일에 2시간 단축됩니다. 오늘 유형을 일반 근무로 직접 고르면 단축하지 않고, 룰루데이는 2시간 단축합니다. 반차는 휴게 없이 4시간입니다.",
             "Full days include work and break. Automatic full days end 2 hours earlier on the last Friday. Choosing Full day explicitly removes the reduction; Lulu day reduces it by 2 hours. Half days last 4 hours without a break.")));
-        stack.Controls.Add(Help(Words.T(
+        group.Controls.Add(Help(Words.T(
             "오늘의 근무 유형과 출근 시각은 트레이의 오늘 창에서 바꿀 수 있어요.",
             "Change today's work type and arrival time in the Today window from the tray.")));
+        stack.Controls.Add(group);
         return stack;
     }
 
@@ -222,21 +253,25 @@ internal sealed class SettingsForm : Form
         {
             Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 1, RowCount = 6,
-            BackColor = UiPalette.Page, Padding = new Padding(24, 20, 24, 16)
+            BackColor = UiPalette.Page, Padding = new Padding(28, 24, 28, 16)
         };
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
         // Keep six weeks readable at the minimum window size; the page scrolls instead of shrinking cells.
-        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 324));
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 564));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 156));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        page.Controls.Add(Heading(Words.T("출근 기록", "Attendance"), 20), 0, 0);
-        var navigation = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
+        var heading = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        heading.Controls.Add(Heading(Words.T("출근 기록", "Attendance"), 26));
+        heading.Controls.Add(Help(Words.T("저장된 출근 기록을 월별로 확인합니다.", "Browse saved arrivals by month.")));
+        page.Controls.Add(heading, 0, 0);
+        var navigation = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
+        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
+        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
         navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
-        navigation.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
         ConfigureMonthButton(previousMonth, "‹", Words.T("이전 달", "Previous month"));
         ConfigureMonthButton(nextMonth, "›", Words.T("다음 달", "Next month"));
         previousMonth.Click += (_, _) => ChangeMonth(-1);
@@ -249,11 +284,11 @@ internal sealed class SettingsForm : Form
             month = new DateOnly(selectedDay.Year, selectedDay.Month, 1);
             RefreshHistory();
         };
-        monthLabel.Font = new Font(Font, FontStyle.Bold);
+        monthLabel.Font = new Font(Font.FontFamily, 14, FontStyle.Bold);
         navigation.Controls.Add(previousMonth, 0, 0);
         navigation.Controls.Add(monthLabel, 1, 0);
-        navigation.Controls.Add(today, 2, 0);
-        navigation.Controls.Add(nextMonth, 3, 0);
+        navigation.Controls.Add(nextMonth, 2, 0);
+        navigation.Controls.Add(today, 4, 0);
         page.Controls.Add(navigation, 0, 1);
         var weekdays = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1 };
         string[] names = Words.Korean ? ["일", "월", "화", "수", "목", "금", "토"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -270,8 +305,8 @@ internal sealed class SettingsForm : Form
         for (int row = 0; row < 6; row++) calendar.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / 6));
         page.Controls.Add(weekdays, 0, 2);
         page.Controls.Add(calendar, 0, 3);
-        dayDetail.BackColor = UiPalette.Card;
-        dayDetail.Font = new Font(Font.FontFamily, 9);
+        dayDetail.BackColor = UiPalette.Page;
+        dayDetail.Font = new Font(Font.FontFamily, 10);
         dayDetail.Margin = new Padding(0, 12, 0, 0);
         dayDetail.AccessibleName = Words.T("선택한 날짜의 출근 기록", "Attendance for the selected day");
         page.Controls.Add(dayDetail, 0, 4);
@@ -322,16 +357,16 @@ internal sealed class SettingsForm : Form
                 string note = hasType && type == ManualDayType.AnnualLeave ? Words.T("연차/공가", "Leave")
                     : arrival is not null ? arrival.Time.ToString("HH:mm", CultureInfo.InvariantCulture)
                     : hasType ? DayTypeLabel(type) : skipped ? Words.T("쉬는 날", "Day off") : "";
-                var day = new Button
+                var day = new SettingsCalendarDay
                 {
                     Dock = DockStyle.Fill, Margin = new Padding(2), FlatStyle = FlatStyle.Flat,
                     Text = number + (note.Length == 0 ? "" : "\n" + note),
                     AccessibleName = key + (note.Length == 0 ? Words.T(" 기록 없음", " No record") : " " + note),
-                    BackColor = date == selectedDay ? UiPalette.MintWash : UiPalette.Card,
-                    ForeColor = date == DateOnly.FromDateTime(DateTime.Today) ? UiPalette.Mint : UiPalette.Ink,
-                    Font = new Font(Font.FontFamily, 9), UseVisualStyleBackColor = false, Tag = date
+                    BackColor = date == selectedDay ? Color.FromArgb(214, 233, 229) : GroupSurface,
+                    ForeColor = date == DateOnly.FromDateTime(DateTime.Today) ? Color.FromArgb(41, 122, 107) : UiPalette.Ink,
+                    Font = new Font(Font.FontFamily, 10), UseVisualStyleBackColor = false, Tag = date
                 };
-                day.FlatAppearance.BorderColor = date == selectedDay ? UiPalette.Mint : UiPalette.Border;
+                day.FlatAppearance.BorderColor = date == selectedDay ? Color.FromArgb(41, 122, 107) : GroupSurface;
                 day.Click += (_, _) => SelectHistoryDay(date);
                 calendar.Controls.Add(day, slot % 7, slot / 7);
             }
@@ -346,8 +381,8 @@ internal sealed class SettingsForm : Form
         foreach (Button day in calendar.Controls.OfType<Button>())
         {
             bool selected = day.Tag is DateOnly value && value == selectedDay;
-            day.BackColor = selected ? UiPalette.MintWash : UiPalette.Card;
-            day.FlatAppearance.BorderColor = selected ? UiPalette.Mint : UiPalette.Border;
+            day.BackColor = selected ? Color.FromArgb(214, 233, 229) : GroupSurface;
+            day.FlatAppearance.BorderColor = selected ? Color.FromArgb(41, 122, 107) : GroupSurface;
         }
         RefreshDayDetail(CultureInfo.GetCultureInfo(Words.Korean ? "ko-KR" : "en-US"));
     }
@@ -393,51 +428,82 @@ internal sealed class SettingsForm : Form
         var stack = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            AutoScroll = true, Padding = new Padding(24, 22, 24, 20), BackColor = UiPalette.Page
+            AutoScroll = true, Padding = new Padding(28, 24, 28, 20), BackColor = UiPalette.Page
         };
-        stack.Controls.Add(Heading(title, 20));
+        stack.Controls.Add(Heading(title, 26));
         Label intro = Help(description);
         intro.Margin = new Padding(0, 6, 0, 22);
         stack.Controls.Add(intro);
-        stack.SizeChanged += (_, _) =>
-        {
-            int width = Math.Max(200, stack.ClientSize.Width - stack.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth);
-            foreach (Control child in stack.Controls)
-            {
-                if (child is TableLayoutPanel row)
-                {
-                    // Flow layout otherwise replaces Width with the auto-sized preferred width.
-                    row.MinimumSize = new Size(width, 0);
-                    row.MaximumSize = new Size(width, 0);
-                }
-                if (child is TableLayoutPanel || child is TextBox) child.Width = width;
-                if (child is Label label) label.MaximumSize = new Size(width, 0);
-            }
-        };
+        stack.SizeChanged += (_, _) => FitStack(stack);
         return stack;
     }
 
-    private static TableLayoutPanel SettingRow(string title, string description, Control control)
+    private static void FitStack(FlowLayoutPanel stack)
+    {
+        int width = Math.Max(200, stack.ClientSize.Width - stack.Padding.Horizontal -
+            (stack.AutoScroll ? SystemInformation.VerticalScrollBarWidth : 0));
+        foreach (Control child in stack.Controls)
+        {
+            if (child is TableLayoutPanel || child is SettingsGroup)
+            {
+                // Flow layout otherwise replaces Width with the auto-sized preferred width.
+                child.MinimumSize = new Size(width, 0);
+                child.MaximumSize = new Size(width, 0);
+                child.Width = width;
+            }
+            if (child is TextBox) child.Width = width;
+            if (child is Label label) label.MaximumSize = new Size(width, 0);
+        }
+    }
+
+    private static SettingsGroup Group(string title)
+    {
+        var group = new SettingsGroup();
+        group.Controls.Add(Heading(title, 12));
+        group.SizeChanged += (_, _) => FitStack(group);
+        return group;
+    }
+
+    private static TableLayoutPanel PreviewHeader()
     {
         var row = new TableLayoutPanel
         {
             AutoSize = true, ColumnCount = 3, RowCount = 1, Width = 660,
-            BackColor = UiPalette.Card, Padding = new Padding(12, 14, 12, 14), Margin = new Padding(0, 0, 0, 10)
+            BackColor = Color.Transparent, Margin = new Padding(0, 4, 0, 10)
         };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
-        row.Controls.Add(new Label { Text = title, AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        Label help = Help(description);
-        help.Dock = DockStyle.Fill;
-        row.Controls.Add(help, 1, 0);
-        control.Anchor = AnchorStyles.Right;
-        row.Controls.Add(control, 2, 0);
-        row.SizeChanged += (_, _) => help.MaximumSize = new Size(Math.Max(60, row.ClientSize.Width - row.Padding.Horizontal - 350), 0);
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        row.Controls.Add(Help(Words.T("미리보기", "Preview")), 1, 0);
         return row;
     }
 
-    private static ComboBox Choice() => new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private static TableLayoutPanel SettingRow(string title, Label example, Control control)
+    {
+        var row = new TableLayoutPanel
+        {
+            AutoSize = true, ColumnCount = 3, RowCount = 1, Width = 660,
+            BackColor = Color.Transparent, Padding = Padding.Empty, Margin = new Padding(0, 0, 0, 20)
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+        row.Controls.Add(new Label
+        {
+            Text = title, AutoSize = true, Anchor = AnchorStyles.Left,
+            MaximumSize = new Size(115, 0), Margin = new Padding(0, 0, 10, 0)
+        }, 0, 0);
+        example.Dock = DockStyle.Fill;
+        example.Margin = new Padding(0, 0, 12, 0);
+        row.Controls.Add(example, 1, 0);
+        control.Anchor = AnchorStyles.Right;
+        row.Controls.Add(control, 2, 0);
+        row.SizeChanged += (_, _) => example.MaximumSize = new Size(
+            Math.Max(60, row.ClientSize.Width - (int)Math.Round(327f * row.DeviceDpi / 96)), 0);
+        return row;
+    }
+
+    private static ComboBox Choice() => new() { Width = 184, DropDownStyle = ComboBoxStyle.DropDownList };
     private static Label Heading(string text, int size) => new()
     {
         Text = text, AutoSize = true, Font = new Font("Segoe UI", size, FontStyle.Bold),
@@ -448,6 +514,24 @@ internal sealed class SettingsForm : Form
         Text = text, AutoSize = true, ForeColor = UiPalette.Muted,
         MaximumSize = new Size(610, 0), Margin = new Padding(0, 4, 0, 12)
     };
+
+    private static Label Preview(string text) => new()
+    {
+        Text = text, AutoSize = true, BackColor = Color.Transparent,
+        AccessibleName = Words.T("표시 예시", "Display example")
+    };
+
+    private void RefreshPreviews()
+    {
+        // Match the Mac's fictional example without reading attendance or a clock.
+        var now = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        RemainingTimeUnit unit = remainingUnit.SelectedIndex >= 0
+            ? (RemainingTimeUnit)remainingUnit.SelectedIndex : controller.State.RemainingTimeUnit;
+        string remaining = RemainingTimeDisplay.Format(now.AddSeconds(5320), now, unit, Words.Korean);
+        countdownPreview.Text = remaining + Words.T(" 남음", " left");
+        workPreview.Text = Words.Duration((int)work.Value);
+        restPreview.Text = Words.Duration((int)rest.Value);
+    }
 
     public void RefreshView()
     {
@@ -462,6 +546,7 @@ internal sealed class SettingsForm : Form
             refreshing = false;
             settingsLoaded = true;
         }
+        RefreshPreviews();
         RefreshHistory();
         error.Text = controller.Error ?? "";
         error.Visible = error.Text.Length > 0;
@@ -473,5 +558,96 @@ internal sealed class SettingsForm : Form
         try { startup.Checked = StartupRegistration.Enabled(); }
         catch (Exception ex) { startupHint.Text = ex.Message; }
         finally { refreshing = false; }
+    }
+
+    private sealed class SettingsGroup : FlowLayoutPanel
+    {
+        public SettingsGroup()
+        {
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            FlowDirection = FlowDirection.TopDown;
+            WrapContents = false;
+            Width = 660;
+            Padding = new Padding(14);
+            Margin = new Padding(0, 0, 0, 20);
+            BackColor = GroupSurface;
+            DoubleBuffered = true;
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent?.BackColor ?? UiPalette.Page);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using GraphicsPath path = RoundedCard.RoundedPath(new RectangleF(0, 0, Width - 1, Height - 1), 10f * DeviceDpi / 96);
+            using var brush = new SolidBrush(GroupSurface);
+            e.Graphics.FillPath(brush, path);
+        }
+    }
+
+    private sealed class SettingsNavigationButton(string symbol) : Button
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(SidebarSurface);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int Scale(int value) => (int)Math.Round(value * DeviceDpi / 96f);
+            bool hovered = ClientRectangle.Contains(PointToClient(MousePosition));
+            using GraphicsPath path = RoundedCard.RoundedPath(new RectangleF(0, 0, Width - 1, Height - 1), Scale(6));
+            using var brush = new SolidBrush(hovered && BackColor == SidebarSurface ? Color.FromArgb(234, 234, 238) : BackColor);
+            e.Graphics.FillPath(brush, path);
+            using var iconFont = new Font("Segoe Fluent Icons", 12);
+            TextRenderer.DrawText(e.Graphics, symbol, iconFont, new Rectangle(Scale(10), 0, Scale(24), Height), ForeColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(Scale(42), 0, Width - Scale(48), Height), ForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -3, -3), ForeColor, BackColor);
+        }
+    }
+
+    private sealed class SettingsSwitch : CheckBox
+    {
+        public SettingsSwitch()
+        {
+            AutoSize = false;
+            Size = new Size(42, 26);
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer, true);
+            CheckedChanged += (_, _) => Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(GroupSurface);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            float scale = Height / 26f;
+            using GraphicsPath track = RoundedCard.RoundedPath(new RectangleF(2 * scale, 3 * scale, 38 * scale, 20 * scale), 10 * scale);
+            using var trackBrush = new SolidBrush(Checked && Enabled ? SystemColors.Highlight : Color.FromArgb(196, 198, 204));
+            using var knob = new SolidBrush(Enabled ? Color.White : Color.FromArgb(235, 235, 238));
+            e.Graphics.FillPath(trackBrush, track);
+            e.Graphics.FillEllipse(knob, (Checked ? 23 : 5) * scale, 6 * scale, 14 * scale, 14 * scale);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, UiPalette.Ink, GroupSurface);
+        }
+    }
+
+    private sealed class SettingsCalendarDay : Button
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(UiPalette.Page);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int inset = (int)Math.Round(8f * DeviceDpi / 96);
+            using GraphicsPath path = RoundedCard.RoundedPath(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), 6f * DeviceDpi / 96);
+            using var brush = new SolidBrush(BackColor);
+            using var border = new Pen(FlatAppearance.BorderColor);
+            e.Graphics.FillPath(brush, path);
+            e.Graphics.DrawPath(border, path);
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(inset, inset, Width - inset * 2, Height - inset * 2), ForeColor,
+                TextFormatFlags.Top | TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -4, -4), ForeColor, BackColor);
+        }
     }
 }

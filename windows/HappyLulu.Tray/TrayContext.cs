@@ -18,6 +18,7 @@ internal sealed class TrayContext : ApplicationContext
     private TodayForm? today;
     private SettingsForm? settings;
     private UiLanguage displayedLanguage;
+    private Point? trayAnchor;
 
     public TrayContext()
     {
@@ -26,7 +27,10 @@ internal sealed class TrayContext : ApplicationContext
         var menu = new ContextMenuStrip();
         todayMenu.Click += (_, _) => ShowToday();
         settingsMenu.Click += (_, _) => ShowSettings();
-        exitMenu.Click += (_, _) => ExitThread();
+        exitMenu.Click += (_, _) =>
+        {
+            if (today is not { IsDisposed: false } || today.Dismiss()) ExitThread();
+        };
         menu.Items.Add(todayMenu);
         menu.Items.Add(settingsMenu);
         menu.Items.Add(new ToolStripSeparator());
@@ -39,9 +43,10 @@ internal sealed class TrayContext : ApplicationContext
             ContextMenuStrip = menu,
             Visible = true
         };
+        tray.MouseDown += (_, _) => trayAnchor = Cursor.Position;
         tray.MouseClick += (_, args) =>
         {
-            if (args.Button == MouseButtons.Left) ShowToday();
+            if (args.Button == MouseButtons.Left) ShowToday(toggle: true);
         };
         controller.Changed += () =>
         {
@@ -66,17 +71,20 @@ internal sealed class TrayContext : ApplicationContext
             unlockEvents.Enqueue(DateTimeOffset.Now);
     }
 
-    private void ShowToday()
+    private void ShowToday(bool toggle = false)
     {
         today ??= new TodayForm(controller, ShowSettings, appIcon);
-        today.Show();
-        today.WindowState = FormWindowState.Normal;
-        today.Activate();
-        today.RefreshView();
+        if (toggle && today.Visible)
+        {
+            today.Dismiss();
+            return;
+        }
+        today.ShowPopover(trayAnchor ?? Cursor.Position);
     }
 
     private void ShowSettings()
     {
+        if (today is { IsDisposed: false, Visible: true } && !today.Dismiss()) return;
         settings ??= new SettingsForm(controller, appIcon);
         settings.Show();
         settings.WindowState = FormWindowState.Normal;

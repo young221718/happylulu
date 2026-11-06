@@ -25,6 +25,8 @@ internal static class Program
             ClockEditing();
             DayTypeSelection();
             InvalidClockTypeSelection();
+            PopoverPlacement();
+            OwlAssets();
             MonthHistory();
             SettingsLayout();
             StorageFailures();
@@ -123,6 +125,7 @@ internal static class Program
         Raise(typeof(Form), form, "OnDeactivate", EventArgs.Empty);
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Deactivation with invalid input preserves the saved file");
         Equal("25:61", input.Text, "Deactivation keeps invalid input available to correct");
+        Equal(false, form.Dismiss(), "Invalid input prevents popover dismissal");
         var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
         Raise(typeof(Form), form, "OnFormClosing", closing);
         Equal(true, closing.Cancel, "Closing with invalid input keeps the window reusable");
@@ -131,6 +134,40 @@ internal static class Program
         Key(input, Keys.Escape);
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Escape after a rejected type change preserves saved bytes");
         Equal("09:00", Find<Button>(form, "Edit arrival time").Text, "Escape restores the persisted arrival display");
+    }
+
+    private static void PopoverPlacement()
+    {
+        foreach (var sample in new[]
+        {
+            (Anchor: new Point(1900, 1060), Work: new Rectangle(0, 0, 1920, 1040), Size: new Size(364, 350)),
+            (Anchor: new Point(20, 16), Work: new Rectangle(0, 40, 1920, 1040), Size: new Size(364, 350)),
+            (Anchor: new Point(24, 700), Work: new Rectangle(48, 0, 1872, 1080), Size: new Size(364, 350)),
+            (Anchor: new Point(-1900, 1050), Work: new Rectangle(-1920, 0, 1920, 1040), Size: new Size(364, 350)),
+            (Anchor: new Point(-400, -1050), Work: new Rectangle(-960, -1080, 1920, 1080), Size: new Size(364, 350)),
+            (Anchor: new Point(80, 120), Work: new Rectangle(0, 0, 160, 120), Size: new Size(800, 700))
+        })
+        {
+            Rectangle popup = TodayForm.PopupBounds(sample.Anchor, sample.Work, sample.Size);
+            Equal(true, sample.Work.Contains(popup), "Popover remains inside the working area for edge trays, negative monitors, and small screens");
+            Equal(true, popup.Width > 0 && popup.Height > 0, "Popover retains a usable positive size");
+            Equal(true, popup.Width <= sample.Size.Width && popup.Height <= sample.Size.Height, "Working-area fitting does not enlarge the requested popover");
+        }
+    }
+
+    private static void OwlAssets()
+    {
+        using var icons = new OwlStateIcons(SystemIcons.Application);
+        Image fallback = icons.Get((OwlState)(-1));
+        using var canvas = new Bitmap(28, 28);
+        using Graphics graphics = Graphics.FromImage(canvas);
+        graphics.DrawImage(fallback, new Rectangle(0, 0, 28, 28));
+        foreach (OwlState state in Enum.GetValues<OwlState>())
+        {
+            Image image = icons.Get(state);
+            Equal(false, ReferenceEquals(fallback, image), $"{state} loads its packaged owl asset instead of falling back");
+            graphics.DrawImage(image, new Rectangle(0, 0, 28, 28));
+        }
     }
 
     private static void MonthHistory()

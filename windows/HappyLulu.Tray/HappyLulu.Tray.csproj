@@ -15,5 +15,6 @@
     <InternalsVisibleTo Include="HappyLulu.UiChecks" />
     <ProjectReference Include="../HappyLulu.Core/HappyLulu.Core.csproj" />
     <EmbeddedResource Include="Resources/HappyLuluIcon.png" LogicalName="HappyLulu.Icon.png" />
+    <EmbeddedResource Include="../../Resources/OwlStates/*.png" LogicalName="HappyLulu.OwlStates.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
