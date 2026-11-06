@@ -510,7 +510,7 @@ internal sealed class SettingsForm : Form
         int Scale(int value) => (int)Math.Round(value * row.DeviceDpi / 96f);
         int controlWidth = Scale(190);
         // Give long labels room at the default size while preserving the preview at the minimum size.
-        int labelWidth = Math.Min(Scale(190), Math.Max(Scale(140), row.ClientSize.Width - controlWidth - Scale(152)));
+        int labelWidth = Math.Min(Scale(190), Math.Max(Scale(120), row.ClientSize.Width - controlWidth - Scale(152)));
         if (row.ColumnStyles[0].Width != labelWidth) row.ColumnStyles[0].Width = labelWidth;
         if (row.ColumnStyles[2].Width != controlWidth) row.ColumnStyles[2].Width = controlWidth;
         if (row.GetControlFromPosition(0, 0) is Label label)
@@ -520,7 +520,10 @@ internal sealed class SettingsForm : Form
         }
         if (row.GetControlFromPosition(1, 0) is Label example)
         {
-            var limit = new Size(Math.Max(60, row.ClientSize.Width - labelWidth - controlWidth - example.Margin.Horizontal), 0);
+            // AutoSize can otherwise shrink a short translated example below its readable column width.
+            var minimum = new Size(Scale(140), 0);
+            if (example.MinimumSize != minimum) example.MinimumSize = minimum;
+            var limit = new Size(Math.Max(minimum.Width, row.ClientSize.Width - labelWidth - controlWidth - example.Margin.Horizontal), 0);
             if (example.MaximumSize != limit) example.MaximumSize = limit;
         }
     }

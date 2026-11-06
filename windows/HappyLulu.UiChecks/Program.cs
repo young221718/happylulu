@@ -301,16 +301,17 @@ internal static class Program
             var row = (TableLayoutPanel)input.Parent!;
             Control stack = row.Parent!;
             int available = stack.ClientSize.Width - stack.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth;
-            Equal(true, row.Width >= available - row.Margin.Horizontal,
-                $"{Words.Preference} {name} row uses the available settings width on first display, revisit, and resize");
-            Equal(true, row.GetControlFromPosition(1, 0)!.Width >= 140,
-                $"{Words.Preference} {name} description remains readable at the minimum window size");
             Control label = row.GetControlFromPosition(0, 0)!;
             Control example = row.GetControlFromPosition(1, 0)!;
+            string geometry = $"example.Width={example.Width}, row.Width={row.Width}, columns=[{string.Join(",", row.GetColumnWidths())}], form.Size={form.Size}, form.ClientSize={form.ClientSize}, DPI={form.DeviceDpi}";
+            Equal(true, row.Width >= available - row.Margin.Horizontal,
+                $"{Words.Preference} {name} row uses the available settings width on first display, revisit, and resize ({geometry})");
+            Equal(true, example.Width >= 140,
+                $"{Words.Preference} {name} description remains readable at the minimum window size ({geometry})");
             Equal(true, row.ClientRectangle.Contains(label.Bounds) && row.ClientRectangle.Contains(example.Bounds) && row.ClientRectangle.Contains(input.Bounds),
-                $"{Words.Preference} {name} label, preview, and input stay inside the row at default and minimum sizes");
+                $"{Words.Preference} {name} label, preview, and input stay inside the row at default and minimum sizes ({geometry}; label={label.Bounds}, example={example.Bounds}, input={input.Bounds})");
             Equal(true, label.Right <= example.Left && example.Right <= input.Left,
-                $"{Words.Preference} {name} label, preview, and input do not overlap at default and minimum sizes");
+                $"{Words.Preference} {name} label, preview, and input do not overlap at default and minimum sizes ({geometry}; label={label.Bounds}, example={example.Bounds}, input={input.Bounds})");
         }
     }
 
