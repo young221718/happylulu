@@ -54,6 +54,7 @@ internal sealed class TodayForm : Form
     private Point? popupAnchor;
     private ManualDayType? displayedType;
     private bool displayedExpanded;
+    private int displayedTypeWidth = -1;
     private bool modalOpen;
 
     public TodayForm(AppController controller, Action showSettings, Icon appIcon)
@@ -168,7 +169,6 @@ internal sealed class TodayForm : Form
                 Margin = new Padding(0, 0, 4, 0), Font = new Font("Segoe UI", 8.25f),
                 BackColor = UiPalette.Card
             };
-            button.Width = TextRenderer.MeasureText(button.Text, button.Font).Width + 10;
             button.Click += (_, _) => SelectType(type);
             hints.SetToolTip(button, TypeName(type));
             typeButtons.Add(type, button);
@@ -264,17 +264,34 @@ internal sealed class TodayForm : Form
     private void LayoutTypeButtons()
     {
         ManualDayType selected = Attendance.EffectiveDayType(controller.State, controller.Now) ?? ManualDayType.Regular;
-        if (displayedType == selected && displayedExpanded == typesExpanded) return;
+        if (displayedType == selected && displayedExpanded == typesExpanded && displayedTypeWidth == dayTypes.ClientSize.Width) return;
         displayedType = selected;
         displayedExpanded = typesExpanded;
+        displayedTypeWidth = dayTypes.ClientSize.Width;
+        ManualDayType[] ordered = new[] { selected }.Concat(Enum.GetValues<ManualDayType>().Where(type => type != selected)).ToArray();
+        int visibleCount = typesExpanded ? ordered.Length : 1;
+        int gap = Scale(4);
+        int available = Math.Max(1, dayTypes.ClientSize.Width - gap * (visibleCount - 1));
+        int[] textWidths = ordered.Take(visibleCount).Select(type => TextRenderer.MeasureText(
+            typeButtons[type].Text, typeButtons[type].Font, Size.Empty,
+            TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width).ToArray();
+        int textTotal = textWidths.Sum();
+        int padding = Math.Min(Scale(14), Math.Max(0, available - textTotal) / visibleCount);
         dayTypes.SuspendLayout();
         dayTypes.Controls.Clear();
-        foreach (ManualDayType type in new[] { selected }.Concat(Enum.GetValues<ManualDayType>().Where(type => type != selected)))
+        for (int index = 0; index < ordered.Length; index++)
         {
+            ManualDayType type = ordered[index];
             DayTypeButton button = typeButtons[type];
             button.Selected = type == selected;
             button.AccessibleDescription = button.Selected ? Words.T("선택됨", "Selected") : "";
             button.Visible = typesExpanded || button.Selected;
+            if (index < visibleCount)
+            {
+                button.Width = textTotal <= available ? textWidths[index] + padding
+                    : Math.Max(1, available * textWidths[index] / textTotal);
+                button.Margin = new Padding(0, 0, index == visibleCount - 1 ? 0 : gap, 0);
+            }
             dayTypes.Controls.Add(button);
         }
         dayTypes.ResumeLayout();
@@ -563,8 +580,13 @@ internal sealed class TodayForm : Form
             using var path = RoundedCard.RoundedPath(new RectangleF(0.5f, 0.5f, Width - 1, Height - 1), (Height - 1) / 2f);
             using var brush = new SolidBrush(Selected ? UiPalette.Mint : UiPalette.MintWash);
             e.Graphics.FillPath(brush, path);
-            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Selected ? Color.White : UiPalette.Ink,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            const TextFormatFlags textFlags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding;
+            int textWidth = TextRenderer.MeasureText(Text, Font, Size.Empty, textFlags).Width;
+            using Font? fittedFont = textWidth > ClientSize.Width
+                ? new Font(Font.FontFamily, Font.Size * ClientSize.Width / textWidth, Font.Style) : null;
+            TextRenderer.DrawText(e.Graphics, Text, fittedFont ?? Font, ClientRectangle,
+                Selected ? Color.White : UiPalette.Ink, textFlags);
             if (Focused && ShowFocusCues)
             {
                 using var focus = new Pen(UiPalette.MintDeep, 1);

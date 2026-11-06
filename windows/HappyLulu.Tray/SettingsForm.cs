@@ -466,41 +466,63 @@ internal sealed class SettingsForm : Form
 
     private static TableLayoutPanel PreviewHeader()
     {
-        var row = new TableLayoutPanel
+        var row = new SettingsRow
         {
             AutoSize = true, ColumnCount = 3, RowCount = 1, Width = 660,
             BackColor = Color.Transparent, Margin = new Padding(0, 4, 0, 10)
         };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         row.Controls.Add(Help(Words.T("미리보기", "Preview")), 1, 0);
+        row.SizeChanged += (_, _) => FitSettingColumns(row);
         return row;
     }
 
     private static TableLayoutPanel SettingRow(string title, Label example, Control control)
     {
-        var row = new TableLayoutPanel
+        var row = new SettingsRow
         {
             AutoSize = true, ColumnCount = 3, RowCount = 1, Width = 660,
             BackColor = Color.Transparent, Padding = Padding.Empty, Margin = new Padding(0, 0, 0, 20)
         };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 125));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-        row.Controls.Add(new Label
+        var label = new Label
         {
             Text = title, AutoSize = true, Anchor = AnchorStyles.Left,
-            MaximumSize = new Size(115, 0), Margin = new Padding(0, 0, 10, 0)
-        }, 0, 0);
+            MaximumSize = new Size(180, 0), Margin = new Padding(0, 0, 10, 0)
+        };
+        row.Controls.Add(label, 0, 0);
         example.Dock = DockStyle.Fill;
         example.Margin = new Padding(0, 0, 12, 0);
         row.Controls.Add(example, 1, 0);
         control.Anchor = AnchorStyles.Right;
         row.Controls.Add(control, 2, 0);
-        row.SizeChanged += (_, _) => example.MaximumSize = new Size(
-            Math.Max(60, row.ClientSize.Width - (int)Math.Round(327f * row.DeviceDpi / 96)), 0);
+        row.SizeChanged += (_, _) => FitSettingColumns(row);
         return row;
+    }
+
+    private static void FitSettingColumns(TableLayoutPanel row)
+    {
+        if (row.ColumnStyles.Count < 3) return;
+        int Scale(int value) => (int)Math.Round(value * row.DeviceDpi / 96f);
+        int controlWidth = Scale(190);
+        // Give long labels room at the default size while preserving the preview at the minimum size.
+        int labelWidth = Math.Min(Scale(190), Math.Max(Scale(140), row.ClientSize.Width - controlWidth - Scale(152)));
+        if (row.ColumnStyles[0].Width != labelWidth) row.ColumnStyles[0].Width = labelWidth;
+        if (row.ColumnStyles[2].Width != controlWidth) row.ColumnStyles[2].Width = controlWidth;
+        if (row.GetControlFromPosition(0, 0) is Label label)
+        {
+            var limit = new Size(Math.Max(1, labelWidth - label.Margin.Horizontal), 0);
+            if (label.MaximumSize != limit) label.MaximumSize = limit;
+        }
+        if (row.GetControlFromPosition(1, 0) is Label example)
+        {
+            var limit = new Size(Math.Max(60, row.ClientSize.Width - labelWidth - controlWidth - example.Margin.Horizontal), 0);
+            if (example.MaximumSize != limit) example.MaximumSize = limit;
+        }
     }
 
     private static ComboBox Choice() => new() { Width = 184, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -558,6 +580,22 @@ internal sealed class SettingsForm : Form
         try { startup.Checked = StartupRegistration.Enabled(); }
         catch (Exception ex) { startupHint.Text = ex.Message; }
         finally { refreshing = false; }
+    }
+
+    private sealed class SettingsRow : TableLayoutPanel
+    {
+        protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
+        {
+            base.ScaleControl(factor, specified);
+            // TableLayoutPanel scales absolute column styles after the bounds change.
+            FitSettingColumns(this);
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            FitSettingColumns(this);
+            base.OnLayout(e);
+        }
     }
 
     private sealed class SettingsGroup : FlowLayoutPanel
