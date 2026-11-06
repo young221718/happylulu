@@ -28,6 +28,7 @@ internal static class Program
             EscapeFromOtherControl();
             PopoverPlacement();
             OwlAssets();
+            DayTypeLayout();
             MonthHistory();
             SettingsLayout();
             StorageFailures();
@@ -193,6 +194,40 @@ internal static class Program
         }
     }
 
+    private static void DayTypeLayout()
+    {
+        foreach (UiLanguage language in new[] { UiLanguage.English, UiLanguage.Korean })
+        {
+            foreach (ManualDayType selectedType in Enum.GetValues<ManualDayType>())
+            {
+                using var fixture = new Fixture();
+                Equal(true, fixture.Controller.SetDayType(selectedType), "Layout fixture can select each work type without an arrival");
+                Words.Preference = language;
+                using var form = fixture.Today();
+                form.StartPosition = FormStartPosition.Manual;
+                form.Location = new Point(-10000, -10000);
+                form.Show();
+                Application.DoEvents();
+                Control choices = Find<FlowLayoutPanel>(form, Words.T("오늘 근무 유형", "Today's work type"));
+                Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription == Words.T("선택됨", "Selected"));
+                Click(selected);
+                Application.DoEvents();
+                Button[] buttons = choices.Controls.OfType<Button>().ToArray();
+                Equal(5, buttons.Length, "Expanding a work type makes all five choices available");
+                foreach (Button button in buttons)
+                {
+                    Equal(true, choices.ClientRectangle.Contains(button.Bounds),
+                        $"{language} {selectedType} expanded {button.Text} remains fully inside its container");
+                    Size text = TextRenderer.MeasureText(button.Text, button.Font, Size.Empty,
+                        TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+                    Equal(true, text.Width <= button.ClientSize.Width && text.Height <= button.ClientSize.Height,
+                        $"{language} {selectedType} expanded {button.Text} fits its button without clipping");
+                }
+            }
+        }
+        Words.Preference = UiLanguage.English;
+    }
+
     private static void MonthHistory()
     {
         using var fixture = new Fixture();
@@ -239,12 +274,14 @@ internal static class Program
             form.Show();
             Application.DoEvents();
             CheckSettingRows(form, "language", "remainingUnit", "startup");
+            CheckDefaultSettingLabels(form, "language", "remainingUnit", "startup");
             Click(Find<Button>(form, Words.T("근무", "Work")));
             Application.DoEvents();
             CheckSettingRows(form, "work", "rest");
             Click(Find<Button>(form, Words.T("일반", "General")));
             Application.DoEvents();
             CheckSettingRows(form, "language", "remainingUnit", "startup");
+            CheckDefaultSettingLabels(form, "language", "remainingUnit", "startup");
 
             form.Size = form.MinimumSize;
             Application.DoEvents();
@@ -268,6 +305,26 @@ internal static class Program
                 $"{Words.Preference} {name} row uses the available settings width on first display, revisit, and resize");
             Equal(true, row.GetControlFromPosition(1, 0)!.Width >= 140,
                 $"{Words.Preference} {name} description remains readable at the minimum window size");
+            Control label = row.GetControlFromPosition(0, 0)!;
+            Control example = row.GetControlFromPosition(1, 0)!;
+            Equal(true, row.ClientRectangle.Contains(label.Bounds) && row.ClientRectangle.Contains(example.Bounds) && row.ClientRectangle.Contains(input.Bounds),
+                $"{Words.Preference} {name} label, preview, and input stay inside the row at default and minimum sizes");
+            Equal(true, label.Right <= example.Left && example.Right <= input.Left,
+                $"{Words.Preference} {name} label, preview, and input do not overlap at default and minimum sizes");
+        }
+    }
+
+    private static void CheckDefaultSettingLabels(SettingsForm form, params string[] controlNames)
+    {
+        foreach (string name in controlNames)
+        {
+            Control input = Field<Control>(form, name);
+            var row = (TableLayoutPanel)input.Parent!;
+            var label = (Label)row.GetControlFromPosition(0, 0)!;
+            Size singleLine = TextRenderer.MeasureText(label.Text, label.Font, Size.Empty,
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            Equal(true, singleLine.Width <= label.ClientSize.Width,
+                $"{Words.Preference} {name} label fits one line at the default settings size");
         }
     }
 
