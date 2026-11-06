@@ -36,12 +36,12 @@ public struct CodexClient: Sendable {
     private let timeout: TimeInterval
     public init(timeout: TimeInterval = 25) { self.timeout = timeout }
 
-    public func fetch(customPath: String = "") async throws -> UsageSnapshot {
+    public func fetch(customPath: String = "", configDirectory: String = "") async throws -> UsageSnapshot {
         let request = CancellableUsageRequest()
         return try await withTaskCancellationHandler {
             let value = try await withCheckedThrowingContinuation { continuation in
                 DispatchQueue.global(qos: .utility).async {
-                    do { continuation.resume(returning: try self.fetchBlocking(customPath: customPath, request: request)) }
+                    do { continuation.resume(returning: try self.fetchBlocking(customPath: customPath, configDirectory: configDirectory, request: request)) }
                     catch { continuation.resume(throwing: error) }
                 }
             }
@@ -50,12 +50,12 @@ public struct CodexClient: Sendable {
         } onCancel: { request.cancel() }
     }
 
-    public func fetchBlocking(customPath: String = "") throws -> UsageSnapshot {
-        try fetchBlocking(customPath: customPath, request: CancellableUsageRequest())
+    public func fetchBlocking(customPath: String = "", configDirectory: String = "") throws -> UsageSnapshot {
+        try fetchBlocking(customPath: customPath, configDirectory: configDirectory, request: CancellableUsageRequest())
     }
 
-    private func fetchBlocking(customPath: String, request: CancellableUsageRequest) throws -> UsageSnapshot {
-        let session = try RPCSession(executable: CodexExecutable.resolve(customPath: customPath), timeout: timeout)
+    private func fetchBlocking(customPath: String, configDirectory: String, request: CancellableUsageRequest) throws -> UsageSnapshot {
+        let session = try RPCSession(executable: CodexExecutable.resolve(customPath: customPath), timeout: timeout, configDirectory: configDirectory)
         defer { session.close() }
         try request.attach(session)
         _ = try session.request(id: 1, method: "initialize", params: [
@@ -111,7 +111,7 @@ private final class RPCSession: @unchecked Sendable {
     private var timedOut = false
     private var watchdog: DispatchWorkItem?
 
-    init(executable: URL, timeout: TimeInterval) throws {
+    init(executable: URL, timeout: TimeInterval, configDirectory: String = "") throws {
         process.executableURL = executable
         process.arguments = ["app-server", "--listen", "stdio://"]
         process.standardInput = input
@@ -120,6 +120,7 @@ private final class RPCSession: @unchecked Sendable {
         var environment = ProcessInfo.processInfo.environment
         let paths = [executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
         environment["PATH"] = (paths + [environment["PATH"] ?? ""]).joined(separator: ":")
+        if !configDirectory.isEmpty { environment["CODEX_HOME"] = (configDirectory as NSString).expandingTildeInPath }
         process.environment = environment
         // A disconnected or cancelled server must not raise SIGPIPE in the host app.
         guard fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1) != -1 else {
@@ -246,19 +247,19 @@ public final class CodexLoginAttempt: @unchecked Sendable {
         active?.abort()
     }
 
-    public func login(customPath: String = "", openBrowser: @escaping @Sendable (URL) -> Void) async throws {
+    public func login(customPath: String = "", configDirectory: String = "", openBrowser: @escaping @Sendable (URL) -> Void) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    try self.loginBlocking(customPath: customPath, openBrowser: openBrowser)
+                    try self.loginBlocking(customPath: customPath, configDirectory: configDirectory, openBrowser: openBrowser)
                     continuation.resume()
                 } catch { continuation.resume(throwing: error) }
             }
         }
     }
 
-    private func loginBlocking(customPath: String, openBrowser: @escaping @Sendable (URL) -> Void) throws {
-        let active = try RPCSession(executable: CodexExecutable.resolve(customPath: customPath), timeout: timeout)
+    private func loginBlocking(customPath: String, configDirectory: String, openBrowser: @escaping @Sendable (URL) -> Void) throws {
+        let active = try RPCSession(executable: CodexExecutable.resolve(customPath: customPath), timeout: timeout, configDirectory: configDirectory)
         lock.lock()
         if cancelled { lock.unlock(); active.close(); throw CancellationError() }
         session = active

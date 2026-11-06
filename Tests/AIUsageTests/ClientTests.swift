@@ -184,4 +184,26 @@ final class ClientTests: XCTestCase {
             guard case UsageError.loginTimeout = error else { return XCTFail("Unexpected error: \(error)") }
         }
     }
+    func testCodexProfileDirectoryReachesBothFetchAndLogin() async throws {
+        let accountFolder = directory.appendingPathComponent("work-account").path
+        let path = try executable("""
+        import os,sys,json
+        assert os.environ['CODEX_HOME']==\(String(reflecting: accountFolder))
+        for line in sys.stdin:
+            req=json.loads(line)
+            if 'id' not in req: continue
+            if req['method']=='initialize': result={}
+            elif req['method']=='account/read': result={'account':{'type':'chatgpt','email':'profile@example.com'}}
+            elif req['method']=='account/rateLimits/read': result={'rateLimits':{'secondary':{'usedPercent':10,'windowDurationMins':10080}}}
+            elif req['method']=='account/login/start': result={'loginId':'profile','authUrl':'https://auth.openai.com/authorize'}
+            else: raise RuntimeError('Unexpected RPC')
+            print(json.dumps({'id':req['id'],'result':result}),flush=True)
+            if req['method']=='account/login/start':
+                print(json.dumps({'method':'account/login/completed','params':{'loginId':'profile','success':True}}),flush=True)
+        """)
+        XCTAssertEqual(try CodexClient(timeout: 5).fetchBlocking(customPath: path, configDirectory: accountFolder).weekly.remainingPercent, 90)
+        try await CodexLoginAttempt(timeout: 5).login(customPath: path, configDirectory: accountFolder) { _ in }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: accountFolder), "The host must not create or alter the CLI account directory")
+    }
+
 }

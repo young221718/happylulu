@@ -926,6 +926,50 @@ private func checkUsageOption(root: URL) throws {
 }
 
 @MainActor
+private func checkIsolatedUsageOption(root: URL) throws {
+    let sync = CalendarSyncModel(calendarAccess: ProbeCalendarAccess(), runtimeAllowed: false)
+    let store = PluginCatalogStore(url: root.appendingPathComponent("isolated-usage-catalog.json"))
+    try store.save(PluginCatalogState(installed: ["mac-calendar": true, "leave-detection": true,
+        "daouoffice": true, "cpu-runner": true]))
+    func makeManager() -> PluginManagerModel {
+        let manager = PluginManagerModel(defaultAdapter: DefaultFeatureAdapter(),
+            routingStore: FeatureRoutingStore(url: nil), catalogStore: store)
+        manager.configureCatalog(sync: sync, presentations: PluginSettingsPresentationRegistry(),
+            modules: [UsageFixtureModule.self, CPURunnerModule.self, RetainedDaouModule.self],
+            allowsExternalIntegrations: false, isolatedPluginIDs: [UsageFixtureModule.id])
+        return manager
+    }
+    let manager = makeManager()
+    manager.start()
+    require(!manager.allowsExternalIntegrations && manager.canShowUsage && !manager.showUsage,
+        "Isolated usage must remain opt-in without opening the external integration gate")
+    require(manager.menuBarItems.isEmpty && manager.panelProviders.isEmpty && !sync.runtimeAllowed,
+        "Persisted non-usage modules must remain inactive")
+    require(!manager.registrations.contains { ["cpu-runner", "daouoffice"].contains($0.id) },
+        "Isolated usage must not register other bundled modules")
+    require(!manager.router.isEnabled("mac-calendar") && !manager.router.isEnabled("leave-detection"),
+        "Isolated usage must not restore calendar or leave routes")
+    manager.setShowUsage(true)
+    require(manager.showUsage && UsageFixtureModule.last?.starts == 1 && manager.menuBarItems.count == 1,
+        "Explicit usage opt-in must start and publish only the allowed module")
+    require(!sync.runtimeAllowed && !manager.router.isEnabled("leave-detection"),
+        "Enabling usage must not enable calendar sync or leave recognition")
+    manager.stop()
+    let restarted = makeManager()
+    restarted.start()
+    require(restarted.showUsage && restarted.menuBarItems.count == 1 && UsageFixtureModule.last?.starts == 1,
+        "The user's saved isolated usage opt-in must survive restart")
+    require(!restarted.allowsExternalIntegrations && !sync.runtimeAllowed
+        && !restarted.router.isEnabled("mac-calendar") && !restarted.router.isEnabled("leave-detection"),
+        "Restoring usage must keep all other development service gates closed")
+    restarted.setShowUsage(false)
+    require(restarted.menuBarItems.isEmpty && UsageFixtureModule.last?.enabled == false,
+        "Disabling isolated usage must stop its status")
+    restarted.stop()
+    print("PASS isolated usage opt-in: allowed module only, disabled default, saved choice and blocked calendar/leave/Daou/runner")
+}
+
+@MainActor
 private func checkRunnerCatalog(root: URL) throws {
     let sync = CalendarSyncModel(calendarAccess: ProbeCalendarAccess(), runtimeAllowed: false)
     let store = PluginCatalogStore(url: root.appendingPathComponent("runner-catalog.json"))
@@ -1035,6 +1079,7 @@ struct PluginArchitectureChecks {
         try await checkUnreadableCatalogPreservesAttendance(root: root)
         try await checkLeaveGateInvalidation(root: root)
         try checkUsageOption(root: root)
+        try checkIsolatedUsageOption(root: root)
         let catalogURL = root.appendingPathComponent("catalog.json")
         let catalogStore = PluginCatalogStore(url: catalogURL)
         let emptyCatalog = try catalogStore.load()

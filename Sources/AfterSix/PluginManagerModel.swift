@@ -75,7 +75,9 @@ final class PluginManagerModel: ObservableObject {
     private var hasCatalogState = false
     private var catalogWritable = true
     private var externalIntegrationsAllowed = true
+    private var isolatedPluginIDs: Set<String> = []
     var allowsExternalIntegrations: Bool { externalIntegrationsAllowed }
+    func allowsExecution(_ id: String) -> Bool { externalIntegrationsAllowed || isolatedPluginIDs.contains(id) }
     private var factories: [String: () throws -> Void] = [:]
     var needsLegacyMigration: Bool { !hasCatalogState && catalogWritable }
     var canChangeCatalog: Bool { catalogWritable }
@@ -109,9 +111,10 @@ final class PluginManagerModel: ObservableObject {
     }
     func configureCatalog(sync: CalendarSyncModel, presentations: PluginSettingsPresentationRegistry,
                           modules: [any PluginModule.Type] = BundledPlugins.modules,
-                          allowsExternalIntegrations: Bool = true) {
+                          allowsExternalIntegrations: Bool = true, isolatedPluginIDs: Set<String> = []) {
         guard !catalogConfigured else { return }
         externalIntegrationsAllowed = allowsExternalIntegrations
+        self.isolatedPluginIDs = isolatedPluginIDs
         catalogConfigured = true
         catalog = [
             PluginCatalogEntry(id: "mac-calendar", name: L("캘린더", "Calendar"), author: PluginAuthors.contributors,
@@ -148,7 +151,7 @@ final class PluginManagerModel: ObservableObject {
         }
         let context = PluginHostContext(registry: registry, presentations: presentations, register: register,
             rollback: rollbackRegistration, localize: L)
-        for module in modules where allowsExternalIntegrations { factories[module.id] = { try context.install(module) } }
+        for module in modules where allowsExecution(module.id) { factories[module.id] = { try context.install(module) } }
         for entry in installed where entry.available { activateInstalled(entry.id) }
         revision += 1
     }
@@ -219,8 +222,8 @@ final class PluginManagerModel: ObservableObject {
             if id == "leave-detection" { leaveDetectionGeneration += 1 }
             if value {
                 entry?.setEnabled?(true)
-                if started && externalIntegrationsAllowed { entry?.controller.start() }
-                router.setEnabled(entry?.controller.enabled == true && externalIntegrationsAllowed, for: id)
+                if started && allowsExecution(id) { entry?.controller.start() }
+                router.setEnabled(entry?.controller.enabled == true && allowsExecution(id), for: id)
                 if id == "mac-calendar", externalIntegrationsAllowed {
                     for feature in [AppFeature.calendar, .halfDay] where router.selectedID(for: feature) == router.defaultID
                         && savedRoutes[feature] == nil {
@@ -239,7 +242,7 @@ final class PluginManagerModel: ObservableObject {
         do {
             if !registrations.contains(where: { $0.id == id }) { try factory() }
             guard let entry = registrations.first(where: { $0.id == id }) else { return }
-            let active = isEnabled(id) && externalIntegrationsAllowed
+            let active = isEnabled(id) && allowsExecution(id)
             entry.setEnabled?(active)
             if !active { entry.controller.stop() }
             router.setEnabled(active && entry.controller.enabled, for: id)
@@ -256,7 +259,8 @@ final class PluginManagerModel: ObservableObject {
     func register(_ registration: PluginRegistration) throws {
         guard registration.id == registration.adapter.descriptor.id,
               !registrations.contains(where: { $0.id == registration.id }) else { throw PluginFailure.duplicatePlugin }
-        try router.register(registration.adapter, enabled: registration.controller.enabled)
+        try router.register(registration.adapter,
+            enabled: registration.controller.enabled && (!catalogConfigured || allowsExecution(registration.id)))
         registrations.append(registration)
         subscriptions[registration.id] = registration.controller.changes.sink { [weak self] in
             // ObservableObject emits before its @Published values change.
@@ -265,7 +269,7 @@ final class PluginManagerModel: ObservableObject {
         for (feature, id) in savedRoutes where id == registration.id {
             try? router.select(id, for: feature)
         }
-        if started && (!catalogConfigured || (isEnabled(registration.id) && externalIntegrationsAllowed)) { registration.controller.start() }
+        if started && (!catalogConfigured || (isEnabled(registration.id) && allowsExecution(registration.id))) { registration.controller.start() }
         revision += 1
     }
     func unregister(_ id: String) {
@@ -284,9 +288,12 @@ final class PluginManagerModel: ObservableObject {
         }
         revision += 1
     }
-    var canShowUsage: Bool { catalogWritable && externalIntegrationsAllowed && !usageModuleIDs.isEmpty }
-    var showUsage: Bool { usageModuleIDs.contains(where: { isEnabled($0) }) }
-    var usagePluginID: String? { usageModuleIDs.first(where: { isEnabled($0) }) ?? usageModuleIDs.first }
+    var canShowUsage: Bool { catalogWritable && usageModuleIDs.contains(where: allowsExecution) }
+    var showUsage: Bool { usageModuleIDs.contains(where: { allowsExecution($0) && isEnabled($0) }) }
+    var usagePluginID: String? {
+        let available = usageModuleIDs.filter(allowsExecution)
+        return available.first(where: { isEnabled($0) }) ?? available.first
+    }
     func setShowUsage(_ show: Bool) {
         guard canShowUsage else { return }
         if show {
@@ -298,22 +305,20 @@ final class PluginManagerModel: ObservableObject {
         }
     }
     var menuBarItems: [PluginMenuBarItem] {
-        guard externalIntegrationsAllowed else { return [] }
         return registrations.compactMap { entry in
-            guard isEnabled(entry.id), entry.controller.enabled else { return nil }
+            guard allowsExecution(entry.id), isEnabled(entry.id), entry.controller.enabled else { return nil }
             return (entry.controller as? any PluginMenuBarProviding)?.menuBarItem
         }
     }
     var panelProviders: [any PluginPanelProviding] {
-        guard externalIntegrationsAllowed else { return [] }
         return registrations.compactMap { entry in
-            guard isEnabled(entry.id), entry.controller.enabled else { return nil }
+            guard allowsExecution(entry.id), isEnabled(entry.id), entry.controller.enabled else { return nil }
             return entry.controller as? any PluginPanelProviding
         }
     }
     func start() {
         guard !started else { return }; started = true
-        registrations.filter { !catalogConfigured || (isEnabled($0.id) && externalIntegrationsAllowed) }.forEach { $0.controller.start() }
+        registrations.filter { !catalogConfigured || (isEnabled($0.id) && allowsExecution($0.id)) }.forEach { $0.controller.start() }
     }
     func reportMigrationFailure() {
         catalogWritable = false
@@ -328,7 +333,7 @@ final class PluginManagerModel: ObservableObject {
     var leaveSnapshot: PluginSnapshot? { router.leaveSnapshot() }
     func refreshSource(for feature: AppFeature) {
         let id = router.selectedID(for: feature)
-        if let entry = registrations.first(where: { $0.id == id }), entry.controller.enabled, !entry.controller.isRunning {
+        if let entry = registrations.first(where: { $0.id == id }), allowsExecution(id), entry.controller.enabled, !entry.controller.isRunning {
             entry.controller.refreshData()
         }
         revision += 1
@@ -351,7 +356,7 @@ final class PluginManagerModel: ObservableObject {
     private func synchronize() {
         let before = router.revision
         for entry in registrations {
-            router.setEnabled(entry.controller.enabled && (!catalogConfigured || (isEnabled(entry.id) && externalIntegrationsAllowed)), for: entry.id)
+            router.setEnabled(entry.controller.enabled && (!catalogConfigured || (isEnabled(entry.id) && allowsExecution(entry.id))), for: entry.id)
         }
         for (feature, source) in savedRoutes where router.isEnabled(source) {
             try? router.select(source, for: feature)
