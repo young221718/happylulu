@@ -24,6 +24,7 @@ internal static class Program
             if (args.Length != 0) throw new ArgumentException("Use no arguments for checks, or --interactive for isolated GUI QA.");
             ClockEditing();
             DayTypeSelection();
+            InvalidClockTypeSelection();
             MonthHistory();
             SettingsLayout();
             StorageFailures();
@@ -86,24 +87,50 @@ internal static class Program
         fixture.SaveArrival("09:00");
         using var form = fixture.Today();
         TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
-        ComboBox type = Find<ComboBox>(form, "Today's work type");
         Click(Find<Button>(form, "Edit arrival time"));
         input.Text = "09:30";
-        Choose(type, (int)ManualDayType.LuluDay);
+        ChooseType(form, "Lulu day");
         AttendanceState stored = fixture.Store.Load();
         Equal("09:30", fixture.StoredClock(), "Changing type commits an active valid clock edit");
         Equal(ManualDayType.LuluDay, stored.ManualDayTypes["2026-11-05"], "Refresh during clock save does not replace the requested type");
         Equal(120, stored.Arrivals["2026-11-05"].EarlyLeaveOverrideMinutes, "Lulu day saves its two-hour reduction");
 
-        Choose(type, (int)ManualDayType.AnnualLeave);
+        ChooseType(form, "Annual / official leave");
         Equal("09:30", fixture.StoredClock(), "Annual leave preserves the arrival file record");
         Equal(null, Attendance.Today(fixture.Controller.State, fixture.Now), "Annual leave pauses the active workday");
         Equal("—", Field<Label>(form, "departureTime").Text, "Annual leave removes the planned departure display");
 
         byte[] before = File.ReadAllBytes(fixture.Store.Path);
-        Choose(type, (int)ManualDayType.MorningHalf);
+        ChooseType(form, "Morning off");
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Incompatible half-day selection preserves the previous state");
-        Equal((int)ManualDayType.AnnualLeave, type.SelectedIndex, "Rejected type restores the displayed selection");
+        Equal("Selected", Find<Button>(form, "Annual / official leave").AccessibleDescription, "Rejected type restores the displayed selection");
+    }
+
+    private static void InvalidClockTypeSelection()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        using var form = fixture.Today();
+        TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        Click(Find<Button>(form, "Edit arrival time"));
+        input.Text = "25:61";
+        ChooseType(form, "Lulu day");
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Invalid clock blocks type changes without altering the saved file");
+        Equal("25:61", input.Text, "Rejected type change preserves the invalid clock for correction");
+        Equal("Selected", Find<Button>(form, "Regular work").AccessibleDescription, "Invalid clock keeps the original work type selected");
+
+        Raise(typeof(Form), form, "OnDeactivate", EventArgs.Empty);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Deactivation with invalid input preserves the saved file");
+        Equal("25:61", input.Text, "Deactivation keeps invalid input available to correct");
+        var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
+        Raise(typeof(Form), form, "OnFormClosing", closing);
+        Equal(true, closing.Cancel, "Closing with invalid input keeps the window reusable");
+        Equal("25:61", input.Text, "Closing keeps invalid input available to correct");
+
+        Key(input, Keys.Escape);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Escape after a rejected type change preserves saved bytes");
+        Equal("09:00", Find<Button>(form, "Edit arrival time").Text, "Escape restores the persisted arrival display");
     }
 
     private static void MonthHistory()
@@ -235,10 +262,12 @@ internal static class Program
     // Raise native control events without desktop input, app startup registration, or a real user profile.
     private static void Click(Button button) => Raise(typeof(Control), button, "OnClick", EventArgs.Empty);
     private static void Key(Control control, Keys key) => Raise(typeof(Control), control, "OnKeyDown", new KeyEventArgs(key));
-    private static void Choose(ComboBox choice, int index)
+    private static void ChooseType(TodayForm form, string accessibleName)
     {
-        choice.SelectedIndex = index;
-        Raise(typeof(ComboBox), choice, "OnSelectionChangeCommitted", EventArgs.Empty);
+        Control choices = Find<FlowLayoutPanel>(form, "Today's work type");
+        Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription == "Selected");
+        Click(selected);
+        Click(Find<Button>(choices, accessibleName));
     }
 
     private static void Raise(Type type, object target, string method, object argument) =>
