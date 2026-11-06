@@ -25,6 +25,7 @@ internal static class Program
             ClockEditing();
             DayTypeSelection();
             InvalidClockTypeSelection();
+            EscapeFromOtherControl();
             PopoverPlacement();
             OwlAssets();
             MonthHistory();
@@ -152,6 +153,28 @@ internal static class Program
             Equal(true, sample.Work.Contains(popup), "Popover remains inside the working area for edge trays, negative monitors, and small screens");
             Equal(true, popup.Width > 0 && popup.Height > 0, "Popover retains a usable positive size");
             Equal(true, popup.Width <= sample.Size.Width && popup.Height <= sample.Size.Height, "Working-area fitting does not enlarge the requested popover");
+        }
+    }
+
+    private static void EscapeFromOtherControl()
+    {
+        foreach (string focusName in new[] { "Regular work", "More" })
+        {
+            using var fixture = new Fixture();
+            fixture.SaveArrival("09:00");
+            using var form = fixture.Today();
+            byte[] before = File.ReadAllBytes(fixture.Store.Path);
+            TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+            Click(Find<Button>(form, "Edit arrival time"));
+            input.Text = "25:61";
+            Raise(typeof(Control), input, "OnLeave", EventArgs.Empty);
+            form.ActiveControl = Find<Button>(form, focusName);
+            Equal(focusName, form.ActiveControl?.AccessibleName, "Escape regression places focus outside the clock editor");
+
+            Equal(true, CommandKey(form, Keys.Escape), "The form consumes Escape after focus leaves an invalid clock edit");
+            Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Escape outside the editor preserves saved bytes");
+            Equal("09:00", Find<Button>(form, "Edit arrival time").Text, "Escape outside the editor restores the persisted arrival display");
+            Equal(true, form.Dismiss(), "Escape outside the editor cancels the invalid draft so the popover can dismiss");
         }
     }
 
@@ -299,6 +322,12 @@ internal static class Program
     // Raise native control events without desktop input, app startup registration, or a real user profile.
     private static void Click(Button button) => Raise(typeof(Control), button, "OnClick", EventArgs.Empty);
     private static void Key(Control control, Keys key) => Raise(typeof(Control), control, "OnKeyDown", new KeyEventArgs(key));
+    private static bool CommandKey(TodayForm form, Keys key)
+    {
+        object[] arguments = { new Message(), key };
+        return (bool)(typeof(TodayForm).GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Missing command-key handler")).Invoke(form, arguments)!;
+    }
     private static void ChooseType(TodayForm form, string accessibleName)
     {
         Control choices = Find<FlowLayoutPanel>(form, "Today's work type");
