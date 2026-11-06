@@ -202,9 +202,7 @@ internal sealed class TodayForm : Form
             else if (args.KeyCode == Keys.Escape)
             {
                 args.SuppressKeyPress = true;
-                FinishEditing();
-                inputError = null;
-                RefreshView();
+                CancelEditing();
             }
         };
         clockInput.Leave += (_, _) => SaveClock();
@@ -335,9 +333,10 @@ internal sealed class TodayForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (keyData == Keys.Escape && !editing)
+        if (keyData == Keys.Escape)
         {
-            if (typesExpanded)
+            if (editing) CancelEditing();
+            else if (typesExpanded)
             {
                 typesExpanded = false;
                 LayoutTypeButtons();
@@ -496,6 +495,13 @@ internal sealed class TodayForm : Form
         editing = false;
         clockInput.Visible = false;
         arrivalTime.Visible = true;
+    }
+
+    private void CancelEditing()
+    {
+        FinishEditing();
+        inputError = null;
+        RefreshView();
     }
 
     private void SkipToday()
