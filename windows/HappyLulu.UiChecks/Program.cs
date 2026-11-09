@@ -29,6 +29,7 @@ internal static class Program
             PopoverPlacement();
             OwlAssets();
             DayTypeLayout();
+            DayTypeDiscovery();
             MonthHistory();
             TrayDepartureSetting();
             SettingsLayout();
@@ -225,6 +226,28 @@ internal static class Program
                         $"{language} {selectedType} expanded {button.Text} fits its button without clipping");
                 }
             }
+        }
+        Words.Preference = UiLanguage.English;
+    }
+
+    private static void DayTypeDiscovery()
+    {
+        foreach (UiLanguage language in new[] { UiLanguage.English, UiLanguage.Korean })
+        {
+            Words.Preference = language;
+            using var fixture = new Fixture();
+            fixture.SaveArrival("09:00");
+            using var form = fixture.Today();
+            Button selected = Find<Button>(form, Words.T("일반근무", "Regular work"));
+            Equal(true, selected.Text.EndsWith(" ▾", StringComparison.Ordinal),
+                "The collapsed workday button shows that choices can be opened");
+            Click(selected);
+            Equal(false, selected.Text.EndsWith(" ▾", StringComparison.Ordinal),
+                "The expand indicator disappears while choices are visible");
+            Click(selected);
+            Equal(true, selected.Text.EndsWith(" ▾", StringComparison.Ordinal),
+                "The expand indicator returns after choosing a type");
+            Equal("09:00", fixture.StoredClock(), "Opening workday choices preserves attendance");
         }
         Words.Preference = UiLanguage.English;
     }
