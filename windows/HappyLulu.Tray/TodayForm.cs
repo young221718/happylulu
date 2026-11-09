@@ -269,6 +269,7 @@ internal sealed class TodayForm : Form
         displayedExpanded = typesExpanded;
         displayedTypeWidth = dayTypes.ClientSize.Width;
         ManualDayType[] ordered = new[] { selected }.Concat(Enum.GetValues<ManualDayType>().Where(type => type != selected)).ToArray();
+        dayTypes.SuspendLayout();
         foreach (ManualDayType type in ordered)
             typeButtons[type].Text = TypeTitle(type) + (!typesExpanded && type == selected ? " ▾" : "");
         int visibleCount = typesExpanded ? ordered.Length : 1;
@@ -279,7 +280,6 @@ internal sealed class TodayForm : Form
             TextFormatFlags.SingleLine | TextFormatFlags.NoPadding).Width).ToArray();
         int textTotal = textWidths.Sum();
         int padding = Math.Min(Scale(14), Math.Max(0, available - textTotal) / visibleCount);
-        dayTypes.SuspendLayout();
         dayTypes.Controls.Clear();
         for (int index = 0; index < ordered.Length; index++)
         {

@@ -209,6 +209,7 @@ internal static class Program
         {
             foreach (ManualDayType selectedType in Enum.GetValues<ManualDayType>())
             {
+                Console.WriteLine($"BEGIN workday layout {language} {selectedType}");
                 using var fixture = new Fixture();
                 Equal(true, fixture.Controller.SetDayType(selectedType), "Layout fixture can select each work type without an arrival");
                 Words.Preference = language;
@@ -232,6 +233,7 @@ internal static class Program
                     Equal(true, text.Width <= button.ClientSize.Width && text.Height <= button.ClientSize.Height,
                         $"{language} {selectedType} expanded {button.Text} fits its button without clipping");
                 }
+                Console.WriteLine($"PASS workday layout {language} {selectedType}");
             }
         }
         Words.Preference = UiLanguage.English;
