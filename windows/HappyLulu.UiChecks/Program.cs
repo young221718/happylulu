@@ -394,7 +394,7 @@ internal static class Program
         fixture.Now = fixture.Now.AddHours(1).AddMinutes(30);
         form.RefreshView();
         string mealClock = localArrival.AddHours(11).ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
-        Equal(true, Field<ToolStripMenuItem>(form, "overtimeMenu").Text.Contains(mealClock, StringComparison.Ordinal),
+        Equal(true, Field<ToolStripMenuItem>(form, "overtimeMenu").Text?.Contains(mealClock, StringComparison.Ordinal) == true,
             "Meal threshold is displayed in the current local time zone");
     }
 
