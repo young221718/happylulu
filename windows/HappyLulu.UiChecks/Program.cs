@@ -24,6 +24,7 @@ internal static class Program
             if (args.Length != 0) throw new ArgumentException("Use no arguments for checks, or --interactive for isolated GUI QA.");
             Run(nameof(ClockEditing), ClockEditing);
             Run(nameof(ReviewRegressions), ReviewRegressions);
+            Run(nameof(CombinedSaveFailure), CombinedSaveFailure);
             Run(nameof(DayTypeSelection), DayTypeSelection);
             Run(nameof(InvalidClockTypeSelection), InvalidClockTypeSelection);
             Run(nameof(EscapeFromOtherControl), EscapeFromOtherControl);
@@ -127,12 +128,47 @@ internal static class Program
             fixture.SaveArrival("09:00");
             fixture.Now = fixture.Now.AddHours(-3.5);
             using var form = fixture.Today();
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(-10000, -10000);
+            form.Show();
+            Application.DoEvents();
             MintProgressTrack? progress = Descendants(form).OfType<MintProgressTrack>()
                 .SingleOrDefault(control => control.AccessibleName == "Today's work progress");
             if (progress is null || Math.Abs(progress.Fraction - 0.5) > 0.001)
                 failures.Add("A 09:00–18:00 workday at 13:30 must display accessible 50% progress");
+            if (progress is not null)
+            {
+                Control card = progress.Parent!;
+                Panel viewport = Field<Panel>(form, "viewport");
+                var viewportBounds = new Rectangle(viewport.PointToClient(progress.PointToScreen(Point.Empty)), progress.Size);
+                Equal(true, progress.Visible && card.ClientRectangle.Contains(progress.Bounds) && viewport.ClientRectangle.Contains(viewportBounds),
+                    "Work progress is visible inside the card and default popover viewport");
+                Equal(AccessibleRole.ProgressBar, progress.AccessibleRole, "Work progress exposes a progress-bar role");
+            }
         }
         if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
+    }
+
+    private static void CombinedSaveFailure()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        using var form = fixture.Today();
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        Click(Find<Button>(form, "Edit arrival time"));
+        TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+        input.Text = "13:00";
+        Raise(typeof(Control), input, "OnLeave", EventArgs.Empty);
+        using (var locked = new FileStream(fixture.Store.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            ChooseType(form, "Morning off");
+            Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Failed combined save preserves stored bytes");
+            Equal(ManualDayType.Regular, fixture.Controller.State.ManualDayTypes["2026-11-05"], "Failed combined save preserves the work type in memory");
+            Equal("13:00", input.Text, "Failed combined save retains the editable draft");
+        }
+        Key(input, Keys.Escape);
+        Equal("09:00", Find<Button>(form, "Edit arrival time").Text, "Escape after a failed combined save restores the saved clock");
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Escape after a failed combined save preserves stored bytes");
     }
 
     private static void DayTypeSelection()
