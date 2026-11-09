@@ -30,6 +30,7 @@ internal static class Program
             OwlAssets();
             DayTypeLayout();
             MonthHistory();
+            TrayDepartureSetting();
             SettingsLayout();
             StorageFailures();
             InteractiveSafety();
@@ -291,6 +292,21 @@ internal static class Program
             CheckSettingRows(form, "work", "rest");
         }
         Words.Preference = UiLanguage.English;
+    }
+
+    private static void TrayDepartureSetting()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        using var form = new SettingsForm(fixture.Controller, SystemIcons.Application);
+        CheckBox visibility = Find<CheckBox>(form, "Show departure time in tray");
+        Equal(true, visibility.Checked, "Departure clock is shown by default for existing users");
+        visibility.Checked = false;
+        var restarted = new AppController(fixture.Store, () => fixture.Now);
+        using var reopened = new SettingsForm(restarted, SystemIcons.Application);
+        Equal(false, Find<CheckBox>(reopened, "Show departure time in tray").Checked,
+            "Hiding the departure clock survives restart");
+        Equal("09:00", fixture.StoredClock(), "Changing display settings preserves attendance");
     }
 
     private static void CheckSettingRows(SettingsForm form, params string[] controlNames)
