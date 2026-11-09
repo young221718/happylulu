@@ -13,6 +13,7 @@ internal sealed class SettingsForm : Form
     private readonly AppController controller;
     private readonly ComboBox language = Choice();
     private readonly ComboBox remainingUnit = Choice();
+    private readonly CheckBox showDeparture = new SettingsSwitch();
     private readonly CheckBox startup = new SettingsSwitch();
     private readonly Label startupHint = Help("");
     private readonly Label countdownPreview = Preview("");
@@ -178,6 +179,19 @@ internal sealed class SettingsForm : Form
         };
         group.Controls.Add(SettingRow(Words.T("퇴근까지 남은 시간 표시", "Countdown display"),
             countdownPreview, remainingUnit));
+        showDeparture.AccessibleName = Words.T("트레이 퇴근 예정 시각 표시", "Show departure time in tray");
+        showDeparture.CheckedChanged += (_, _) =>
+        {
+            if (refreshing) return;
+            if (!controller.SetShowDepartureInTray(showDeparture.Checked))
+            {
+                refreshing = true;
+                showDeparture.Checked = controller.State.ShowDepartureInTray;
+                refreshing = false;
+            }
+        };
+        group.Controls.Add(SettingRow(Words.T("퇴근 예정 시각", "Departure time"),
+            Help(Words.T("트레이에 예정 시각을 표시합니다.", "Show the planned time in the tray.")), showDeparture));
         startup.Text = "";
         startup.AccessibleName = Words.T("Windows 로그인 시 자동 실행", "Start when signing in to Windows");
         startup.CheckedChanged += (_, _) =>
@@ -566,6 +580,7 @@ internal sealed class SettingsForm : Form
             refreshing = true;
             language.SelectedIndex = (int)controller.State.Language;
             remainingUnit.SelectedIndex = (int)controller.State.RemainingTimeUnit;
+            showDeparture.Checked = controller.State.ShowDepartureInTray;
             work.Value = controller.State.Settings.WorkMinutes;
             rest.Value = controller.State.Settings.BreakMinutes;
             refreshing = false;

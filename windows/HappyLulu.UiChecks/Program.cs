@@ -274,19 +274,19 @@ internal static class Program
             // Native layout must run; constructor-only checks miss first-display sizing.
             form.Show();
             Application.DoEvents();
-            CheckSettingRows(form, "language", "remainingUnit", "startup");
-            CheckDefaultSettingLabels(form, "language", "remainingUnit", "startup");
+            CheckSettingRows(form, "language", "remainingUnit", "showDeparture", "startup");
+            CheckDefaultSettingLabels(form, "language", "remainingUnit", "showDeparture", "startup");
             Click(Find<Button>(form, Words.T("근무", "Work")));
             Application.DoEvents();
             CheckSettingRows(form, "work", "rest");
             Click(Find<Button>(form, Words.T("일반", "General")));
             Application.DoEvents();
-            CheckSettingRows(form, "language", "remainingUnit", "startup");
-            CheckDefaultSettingLabels(form, "language", "remainingUnit", "startup");
+            CheckSettingRows(form, "language", "remainingUnit", "showDeparture", "startup");
+            CheckDefaultSettingLabels(form, "language", "remainingUnit", "showDeparture", "startup");
 
             form.Size = form.MinimumSize;
             Application.DoEvents();
-            CheckSettingRows(form, "language", "remainingUnit", "startup");
+            CheckSettingRows(form, "language", "remainingUnit", "showDeparture", "startup");
             Click(Find<Button>(form, Words.T("근무", "Work")));
             Application.DoEvents();
             CheckSettingRows(form, "work", "rest");
@@ -307,6 +307,11 @@ internal static class Program
         Equal(false, Find<CheckBox>(reopened, "Show departure time in tray").Checked,
             "Hiding the departure clock survives restart");
         Equal("09:00", fixture.StoredClock(), "Changing display settings preserves attendance");
+        using (var locked = new FileStream(fixture.Store.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            visibility.Checked = true;
+            Equal(false, visibility.Checked, "Failed save restores the previous setting");
+        }
     }
 
     private static void CheckSettingRows(SettingsForm form, params string[] controlNames)

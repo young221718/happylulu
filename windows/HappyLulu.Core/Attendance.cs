@@ -36,6 +36,7 @@ public sealed class AttendanceState
     public UiLanguage Language { get; set; } = UiLanguage.System;
 
     public RemainingTimeUnit RemainingTimeUnit { get; set; } = RemainingTimeUnit.HoursMinutes;
+    public bool ShowDepartureInTray { get; set; } = true;
 
     public AttendanceState Copy() => new()
     {
@@ -53,7 +54,8 @@ public sealed class AttendanceState
         ManualDayTypes = new Dictionary<string, ManualDayType>(ManualDayTypes, StringComparer.Ordinal),
         LastUnlockAt = LastUnlockAt,
         Language = Language,
-        RemainingTimeUnit = RemainingTimeUnit
+        RemainingTimeUnit = RemainingTimeUnit,
+        ShowDepartureInTray = ShowDepartureInTray
     };
 }
 

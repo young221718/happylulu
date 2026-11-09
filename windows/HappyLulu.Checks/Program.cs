@@ -223,6 +223,35 @@ Check(RemainingTimeDisplay.RefreshInterval(RemainingTimeUnit.Milliseconds, true)
       RemainingTimeDisplay.RefreshInterval(RemainingTimeUnit.Seconds, true) == 1000,
       "fast timer only while millisecond countdown active");
 
+var trayState = new AttendanceState();
+var trayNow = At(2026, 10, 6, 16, 29).AddSeconds(30);
+Attendance.SetManual(trayState, At(2026, 10, 6, 9, 0), trayNow, WorkdayMode.Normal);
+var korea = TimeZoneInfo.CreateCustomTimeZone("fixture+09", TimeSpan.FromHours(9), "fixture", "fixture");
+Check(trayState.ShowDepartureInTray, "departure clock defaults on for old and new state");
+foreach (var unit in Enum.GetValues<RemainingTimeUnit>())
+{
+    trayState.RemainingTimeUnit = unit;
+    foreach (bool korean in new[] { true, false })
+    {
+        string remaining = RemainingTimeDisplay.Format(At(2026, 10, 6, 18, 0), trayNow, unit, korean);
+        string shown = TrayStatus.Format(trayState, trayNow, korean, korea);
+        trayState.ShowDepartureInTray = false;
+        string hidden = TrayStatus.Format(trayState, trayNow, korean, korea);
+        Check(shown.Contains("18:00") && shown.Contains(remaining) &&
+              !hidden.Contains("18:00") && hidden.Contains(remaining),
+              $"tray visibility preserves countdown for {unit}, korean={korean}");
+        trayState.ShowDepartureInTray = true;
+    }
+}
+Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea).Contains("추가 30분"),
+      "tray keeps overtime guidance when departure is visible");
+trayState.ShowDepartureInTray = false;
+Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea) == "추가 30분 중",
+      "hiding departure keeps overtime guidance");
+Attendance.SetDayType(trayState, ManualDayType.AnnualLeave, trayNow);
+Check(TrayStatus.Format(trayState, trayNow, false, korea) == "Annual leave",
+      "annual leave never displays a preserved arrival's departure");
+
 string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "happylulu-checks-" + Guid.NewGuid().ToString("N"));
 try
 {
@@ -230,6 +259,7 @@ try
     Check(Attendance.RecordUnlock(state, At(2026, 10, 24, 6, 0)), "early arrival prepared for persistence");
     state.Language = UiLanguage.Korean;
     state.RemainingTimeUnit = RemainingTimeUnit.Hours;
+    state.ShowDepartureInTray = false;
     store.Save(state);
     var loaded = store.Load();
     Check(loaded.Arrivals.Count == state.Arrivals.Count && loaded.SuppressedDays.SetEquals(state.SuppressedDays),
@@ -240,6 +270,8 @@ try
           loaded.Arrivals["2026-10-24"].Time == At(2026, 10, 24, 8, 0), "restart keeps first normalized arrival");
     Check(loaded.RemainingTimeUnit == RemainingTimeUnit.Hours && loaded.Copy().RemainingTimeUnit == RemainingTimeUnit.Hours,
           "remaining unit persists and survives copy");
+    Check(!loaded.ShowDepartureInTray && !loaded.Copy().ShowDepartureInTray,
+          "tray departure visibility persists and survives copy");
     Attendance.SetDayType(loaded, ManualDayType.LuluDay, At(2026, 10, 24, 14, 0));
     store.Save(loaded);
     loaded = store.Load();
@@ -249,12 +281,13 @@ try
     string original = File.ReadAllText(store.Path);
     var legacy = System.Text.Json.Nodes.JsonNode.Parse(original)!;
     legacy.AsObject().Remove("RemainingTimeUnit");
+    legacy.AsObject().Remove("ShowDepartureInTray");
     legacy.AsObject().Remove("ManualDayTypes");
     foreach (var arrivalNode in legacy["Arrivals"]!.AsObject())
         arrivalNode.Value!.AsObject().Remove("EarlyLeaveOverrideMinutes");
     File.WriteAllText(store.Path, legacy.ToJsonString());
     var legacyLoaded = store.Load();
-    Check(legacyLoaded.RemainingTimeUnit == RemainingTimeUnit.HoursMinutes &&
+    Check(legacyLoaded.RemainingTimeUnit == RemainingTimeUnit.HoursMinutes && legacyLoaded.ShowDepartureInTray &&
           legacyLoaded.ManualDayTypes.Count == 0 &&
           legacyLoaded.Arrivals.Values.All(arrival => arrival.EarlyLeaveOverrideMinutes is null),
           "legacy state defaults without migration");
