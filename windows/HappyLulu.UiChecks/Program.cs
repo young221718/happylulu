@@ -23,6 +23,7 @@ internal static class Program
             }
             if (args.Length != 0) throw new ArgumentException("Use no arguments for checks, or --interactive for isolated GUI QA.");
             Run(nameof(ClockEditing), ClockEditing);
+            Run(nameof(ReviewRegressions), ReviewRegressions);
             Run(nameof(DayTypeSelection), DayTypeSelection);
             Run(nameof(InvalidClockTypeSelection), InvalidClockTypeSelection);
             Run(nameof(EscapeFromOtherControl), EscapeFromOtherControl);
@@ -94,6 +95,44 @@ internal static class Program
         Key(input, Keys.Enter);
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Midnight rollover cannot move the old edit to another day");
         Equal(false, fixture.Store.Load().Arrivals.ContainsKey("2026-11-06"), "Rollover does not fabricate today's arrival");
+    }
+
+    private static void ReviewRegressions()
+    {
+        var failures = new List<string>();
+        foreach (var sample in new[]
+        {
+            (OldClock: "09:00", OldMode: WorkdayMode.Normal, NewClock: "13:00", NewType: "Morning off", Expected: ManualDayType.MorningHalf),
+            (OldClock: "13:00", OldMode: WorkdayMode.MorningHalf, NewClock: "09:00", NewType: "Regular work", Expected: ManualDayType.Regular)
+        })
+        {
+            using var fixture = new Fixture();
+            TimeOnly oldClock = TimeOnly.ParseExact(sample.OldClock, "HH:mm", CultureInfo.InvariantCulture);
+            DateTime local = fixture.Now.LocalDateTime.Date.Add(oldClock.ToTimeSpan());
+            Equal(true, fixture.Controller.ManualArrival(new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)), sample.OldMode),
+                "Fixture can save the original workday");
+            using var form = fixture.Today();
+            Click(Find<Button>(form, "Edit arrival time"));
+            TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+            input.Text = sample.NewClock;
+            Raise(typeof(Control), input, "OnLeave", EventArgs.Empty);
+            ChooseType(form, sample.NewType);
+            AttendanceState saved = fixture.Store.Load();
+            if (fixture.StoredClock() != sample.NewClock || saved.ManualDayTypes["2026-11-05"] != sample.Expected)
+                failures.Add($"Changing {sample.OldClock} {sample.OldMode} to {sample.NewClock} {sample.NewType} did not save both fields");
+        }
+
+        using (var fixture = new Fixture())
+        {
+            fixture.SaveArrival("09:00");
+            fixture.Now = fixture.Now.AddHours(-3.5);
+            using var form = fixture.Today();
+            MintProgressTrack? progress = Descendants(form).OfType<MintProgressTrack>()
+                .SingleOrDefault(control => control.AccessibleName == "Today's work progress");
+            if (progress is null || Math.Abs(progress.Fraction - 0.5) > 0.001)
+                failures.Add("A 09:00–18:00 workday at 13:30 must display accessible 50% progress");
+        }
+        if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
     }
 
     private static void DayTypeSelection()
