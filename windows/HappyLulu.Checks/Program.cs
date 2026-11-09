@@ -248,6 +248,9 @@ Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea).Contain
 trayState.ShowDepartureInTray = false;
 Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea) == "추가 30분 중",
       "hiding departure keeps overtime guidance");
+trayState.RemainingTimeUnit = RemainingTimeUnit.Seconds;
+Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30).AddSeconds(1), true, korea) == "추가 1801초 중",
+      "overtime uses the selected seconds display instead of fixed minutes");
 Attendance.SetDayType(trayState, ManualDayType.AnnualLeave, trayNow);
 Check(TrayStatus.Format(trayState, trayNow, false, korea) == "Annual leave",
       "annual leave never displays a preserved arrival's departure");
