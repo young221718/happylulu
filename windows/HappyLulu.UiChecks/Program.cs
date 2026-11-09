@@ -109,7 +109,7 @@ internal static class Program
         byte[] before = File.ReadAllBytes(fixture.Store.Path);
         ChooseType(form, "Morning off");
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Incompatible half-day selection preserves the previous state");
-        Equal("Selected", Find<Button>(form, "Annual / official leave").AccessibleDescription, "Rejected type restores the displayed selection");
+        Equal(true, Find<Button>(form, "Annual / official leave").AccessibleDescription?.StartsWith("Selected", StringComparison.Ordinal) == true, "Rejected type restores the displayed selection");
     }
 
     private static void InvalidClockTypeSelection()
@@ -124,7 +124,7 @@ internal static class Program
         ChooseType(form, "Lulu day");
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Invalid clock blocks type changes without altering the saved file");
         Equal("25:61", input.Text, "Rejected type change preserves the invalid clock for correction");
-        Equal("Selected", Find<Button>(form, "Regular work").AccessibleDescription, "Invalid clock keeps the original work type selected");
+        Equal(true, Find<Button>(form, "Regular work").AccessibleDescription?.StartsWith("Selected", StringComparison.Ordinal) == true, "Invalid clock keeps the original work type selected");
 
         Raise(typeof(Form), form, "OnDeactivate", EventArgs.Empty);
         Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)), "Deactivation with invalid input preserves the saved file");
@@ -211,7 +211,7 @@ internal static class Program
                 form.Show();
                 Application.DoEvents();
                 Control choices = Find<FlowLayoutPanel>(form, Words.T("오늘 근무 유형", "Today's work type"));
-                Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription == Words.T("선택됨", "Selected"));
+                Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription?.StartsWith(Words.T("선택됨", "Selected"), StringComparison.Ordinal) == true);
                 Click(selected);
                 Application.DoEvents();
                 Button[] buttons = choices.Controls.OfType<Button>().ToArray();
@@ -241,6 +241,8 @@ internal static class Program
             Button selected = Find<Button>(form, Words.T("일반근무", "Regular work"));
             Equal(true, selected.Text.EndsWith(" ▾", StringComparison.Ordinal),
                 "The collapsed workday button shows that choices can be opened");
+            Equal(true, selected.AccessibleDescription?.Contains(Words.T("근무 유형 선택", "workday choices"), StringComparison.Ordinal) == true,
+                "The collapsed workday button describes its action to assistive technology");
             Click(selected);
             Equal(false, selected.Text.EndsWith(" ▾", StringComparison.Ordinal),
                 "The expand indicator disappears while choices are visible");
@@ -433,7 +435,7 @@ internal static class Program
     private static void ChooseType(TodayForm form, string accessibleName)
     {
         Control choices = Find<FlowLayoutPanel>(form, "Today's work type");
-        Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription == "Selected");
+        Button selected = choices.Controls.OfType<Button>().Single(button => button.AccessibleDescription?.StartsWith("Selected", StringComparison.Ordinal) == true);
         Click(selected);
         Click(Find<Button>(choices, accessibleName));
     }

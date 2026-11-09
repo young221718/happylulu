@@ -269,6 +269,8 @@ internal sealed class TodayForm : Form
         displayedExpanded = typesExpanded;
         displayedTypeWidth = dayTypes.ClientSize.Width;
         ManualDayType[] ordered = new[] { selected }.Concat(Enum.GetValues<ManualDayType>().Where(type => type != selected)).ToArray();
+        foreach (ManualDayType type in ordered)
+            typeButtons[type].Text = TypeTitle(type) + (!typesExpanded && type == selected ? " ▾" : "");
         int visibleCount = typesExpanded ? ordered.Length : 1;
         int gap = Scale(4);
         int available = Math.Max(1, dayTypes.ClientSize.Width - gap * (visibleCount - 1));
@@ -284,7 +286,12 @@ internal sealed class TodayForm : Form
             ManualDayType type = ordered[index];
             DayTypeButton button = typeButtons[type];
             button.Selected = type == selected;
-            button.AccessibleDescription = button.Selected ? Words.T("선택됨", "Selected") : "";
+            button.AccessibleDescription = button.Selected
+                ? (typesExpanded ? Words.T("선택됨", "Selected")
+                    : Words.T("선택됨. 오늘 근무 유형 선택을 엽니다.", "Selected. Open today's workday choices."))
+                : Words.T("이 근무 유형을 선택합니다.", "Select this workday type.");
+            hints.SetToolTip(button, typesExpanded ? TypeName(type)
+                : Words.T("오늘 근무 유형 선택", "Choose today's workday type"));
             button.Visible = typesExpanded || button.Selected;
             if (index < visibleCount)
             {
