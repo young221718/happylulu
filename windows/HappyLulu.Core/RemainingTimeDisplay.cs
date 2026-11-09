@@ -21,6 +21,25 @@ public static class RemainingTimeDisplay
         return korean ? $"{minutes / 60}시간 {minutes % 60}분" : $"{minutes / 60}h {minutes % 60}m";
     }
 
+    // Elapsed time uses completed units rather than rounding up a remaining duration.
+    public static string Elapsed(DateTimeOffset departure, DateTimeOffset now, RemainingTimeUnit unit, bool korean)
+    {
+        double seconds = Math.Clamp((now - departure).TotalSeconds, 0, 72_000);
+        string Number(double value) => Math.Floor(value).ToString("0", CultureInfo.InvariantCulture);
+        if (unit == RemainingTimeUnit.Milliseconds) return Number(seconds * 1000) + (korean ? "밀리초" : " ms");
+        if (unit == RemainingTimeUnit.Seconds) return Number(seconds) + (korean ? "초" : " s");
+        if (unit == RemainingTimeUnit.Minutes) return Number(seconds / 60) + (korean ? "분" : " min");
+        if (unit == RemainingTimeUnit.Hours)
+        {
+            double hours = Math.Floor(seconds / 360) / 10;
+            return hours.ToString("0.#", CultureInfo.InvariantCulture) + (korean ? "시간" : " h");
+        }
+        long minutes = (long)Math.Floor(seconds / 60);
+        if (minutes < 60) return minutes.ToString(CultureInfo.InvariantCulture) + (korean ? "분" : " min");
+        string hoursText = minutes / 60 + (korean ? "시간" : "h");
+        return minutes % 60 == 0 ? hoursText : hoursText + " " + minutes % 60 + (korean ? "분" : "m");
+    }
+
     public static int RefreshInterval(RemainingTimeUnit unit, bool countdownActive) =>
         unit == RemainingTimeUnit.Milliseconds && countdownActive ? 100 : 1000;
 }

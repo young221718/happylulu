@@ -32,6 +32,7 @@ internal static class Program
             Run(nameof(DayTypeDiscovery), DayTypeDiscovery);
             Run(nameof(MonthHistory), MonthHistory);
             Run(nameof(TrayDepartureSetting), TrayDepartureSetting);
+            Run(nameof(OvertimeDisplayUnit), OvertimeDisplayUnit);
             Run(nameof(SettingsLayout), SettingsLayout);
             Run(nameof(StorageFailures), StorageFailures);
             Run(nameof(InteractiveSafety), InteractiveSafety);
@@ -346,6 +347,22 @@ internal static class Program
             visibility.Checked = true;
             Equal(false, visibility.Checked, "Failed save restores the previous setting");
         }
+    }
+
+    private static void OvertimeDisplayUnit()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        fixture.Now = fixture.Now.AddHours(1).AddMinutes(30).AddSeconds(1);
+        using var form = fixture.Today();
+        Equal(true, fixture.Controller.SetRemainingTimeUnit(RemainingTimeUnit.Seconds), "Seconds unit saves");
+        Equal("Extra 1801 s in progress", Field<Label>(form, "stateNote").Text,
+            "Today panel displays overtime in selected seconds");
+        fixture.Now = fixture.Now.AddMilliseconds(250);
+        Equal(true, fixture.Controller.SetRemainingTimeUnit(RemainingTimeUnit.Milliseconds), "Milliseconds unit saves");
+        Equal("Extra 1801250 ms in progress", Field<Label>(form, "stateNote").Text,
+            "Today panel displays overtime in selected milliseconds");
+        Equal("09:00", fixture.StoredClock(), "Changing overtime display preserves attendance");
     }
 
     private static void CheckSettingRows(SettingsForm form, params string[] controlNames)

@@ -19,9 +19,10 @@ public static class TrayStatus
             .ToString("HH:mm", CultureInfo.InvariantCulture);
         string departureText = korean ? $"퇴근 {clock}" : $"Leave {clock}";
         OvertimeStatus? overtime = Attendance.Overtime(state, now);
-        if (overtime is { ElapsedMinutes: >= Attendance.ExtraTimeDisplayDelayMinutes } status)
+        if (overtime is { ElapsedMinutes: >= Attendance.ExtraTimeDisplayDelayMinutes })
         {
-            string extra = korean ? $"추가 {status.ElapsedMinutes}분 중" : $"Extra {status.ElapsedMinutes} min in progress";
+            string elapsed = RemainingTimeDisplay.Elapsed(departure, now, state.RemainingTimeUnit, korean);
+            string extra = korean ? $"추가 {elapsed} 중" : $"Extra {elapsed} in progress";
             return state.ShowDepartureInTray ? $"{departureText} · {extra}" : extra;
         }
         if (Attendance.RemainingMinutes(departure, now) == 0)

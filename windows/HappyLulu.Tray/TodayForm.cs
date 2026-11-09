@@ -435,8 +435,10 @@ internal sealed class TodayForm : Form
         if (overtime is { } status && arrival is not null)
         {
             string mealClock = Attendance.MealThresholdAt(arrival, controller.State.Settings).ToString("HH:mm", CultureInfo.InvariantCulture);
+            string elapsed = RemainingTimeDisplay.Elapsed(Attendance.Departure(arrival, controller.State.Settings),
+                now, controller.State.RemainingTimeUnit, Words.Korean);
             stateNote.Text = status.ElapsedMinutes >= Attendance.ExtraTimeDisplayDelayMinutes
-                ? Words.T($"추가 {status.ElapsedMinutes}분 중", $"Extra {status.ElapsedMinutes} min in progress")
+                ? Words.T($"추가 {elapsed} 중", $"Extra {elapsed} in progress")
                 : Words.T("예정 퇴근 시각 지남", "Planned departure passed");
             overtimeMenu.Text = status.MealThresholdReached
                 ? Words.T($"식대 기준 {mealClock} · 시각 도달", $"Meal threshold {mealClock} · reached")

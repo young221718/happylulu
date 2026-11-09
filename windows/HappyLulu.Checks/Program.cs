@@ -243,6 +243,7 @@ foreach (var unit in Enum.GetValues<RemainingTimeUnit>())
         trayState.ShowDepartureInTray = true;
     }
 }
+trayState.RemainingTimeUnit = RemainingTimeUnit.HoursMinutes;
 Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea).Contains("추가 30분"),
       "tray keeps overtime guidance when departure is visible");
 trayState.ShowDepartureInTray = false;
@@ -251,6 +252,25 @@ Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30), true, korea) == "추
 trayState.RemainingTimeUnit = RemainingTimeUnit.Seconds;
 Check(TrayStatus.Format(trayState, At(2026, 10, 6, 18, 30).AddSeconds(1), true, korea) == "추가 1801초 중",
       "overtime uses the selected seconds display instead of fixed minutes");
+foreach (var (unit, korean, english) in new[] {
+    (RemainingTimeUnit.Milliseconds, "3661250밀리초", "3661250 ms"),
+    (RemainingTimeUnit.Seconds, "3661초", "3661 s"),
+    (RemainingTimeUnit.Minutes, "61분", "61 min"),
+    (RemainingTimeUnit.Hours, "1시간", "1 h"),
+    (RemainingTimeUnit.HoursMinutes, "1시간 1분", "1h 1m") })
+{
+    var elapsedAt = planned.AddSeconds(3661.25);
+    Check(RemainingTimeDisplay.Elapsed(planned, elapsedAt, unit, true) == korean &&
+          RemainingTimeDisplay.Elapsed(planned, elapsedAt, unit, false) == english,
+          "elapsed output uses completed units in both languages: " + unit);
+    Check(RemainingTimeDisplay.Elapsed(planned, planned.AddSeconds(-1), unit, false).StartsWith("0"),
+          "negative elapsed time clamps to zero: " + unit);
+}
+Check(RemainingTimeDisplay.Elapsed(planned, planned.AddSeconds(359.999), RemainingTimeUnit.Hours, false) == "0 h" &&
+      RemainingTimeDisplay.Elapsed(planned, planned.AddSeconds(360), RemainingTimeUnit.Hours, false) == "0.1 h" &&
+      RemainingTimeDisplay.Elapsed(planned, planned.AddSeconds(3599.999), RemainingTimeUnit.HoursMinutes, false) == "59 min" &&
+      RemainingTimeDisplay.Elapsed(planned, planned.AddSeconds(3600), RemainingTimeUnit.HoursMinutes, false) == "1h",
+      "elapsed hour and minute boundaries round down");
 Attendance.SetDayType(trayState, ManualDayType.AnnualLeave, trayNow);
 Check(TrayStatus.Format(trayState, trayNow, false, korea) == "Annual leave",
       "annual leave never displays a preserved arrival's departure");

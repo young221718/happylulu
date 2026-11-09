@@ -97,7 +97,9 @@ internal sealed class TrayContext : ApplicationContext
         DateTimeOffset now = DateTimeOffset.Now;
         Arrival? arrival = Attendance.Today(controller.State, now);
         DateTimeOffset? departure = arrival is null ? null : Attendance.Departure(arrival, controller.State.Settings);
-        timer.Interval = RemainingTimeDisplay.RefreshInterval(controller.State.RemainingTimeUnit, departure > now);
+        bool elapsedVisible = Attendance.Overtime(controller.State, now) is
+            { ElapsedMinutes: >= Attendance.ExtraTimeDisplayDelayMinutes };
+        timer.Interval = RemainingTimeDisplay.RefreshInterval(controller.State.RemainingTimeUnit, departure > now || elapsedVisible);
         string title = TrayStatus.Format(controller.State, now, Words.Korean);
         string tooltip = "HappyLulu · " + title;
         string displayedTooltip = tooltip.Length <= 63 ? tooltip : tooltip[..63];
