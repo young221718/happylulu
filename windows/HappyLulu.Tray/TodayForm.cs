@@ -290,8 +290,6 @@ internal sealed class TodayForm : Form
                 ? (typesExpanded ? Words.T("선택됨", "Selected")
                     : Words.T("선택됨. 오늘 근무 유형 선택을 엽니다.", "Selected. Open today's workday choices."))
                 : Words.T("이 근무 유형을 선택합니다.", "Select this workday type.");
-            hints.SetToolTip(button, typesExpanded ? TypeName(type)
-                : Words.T("오늘 근무 유형 선택", "Choose today's workday type"));
             button.Visible = typesExpanded || button.Selected;
             if (index < visibleCount)
             {
