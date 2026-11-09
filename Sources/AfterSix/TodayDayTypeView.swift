@@ -19,6 +19,9 @@ struct TodayDayTypeView: View {
             ForEach(expanded ? model.effectiveDayType.selectionOrder : [model.effectiveDayType], id: \.self) { type in
                 dayTypeButton(type)
                 .accessibilityLabel(type.displayLabel)
+                .accessibilityHint(Text(expanded
+                    ? L("이 근무 유형을 선택합니다.", "Select this workday type.")
+                    : L("오늘 근무 유형 선택을 엽니다.", "Open today's workday choices.")))
                 .accessibilityAddTraits(type == model.effectiveDayType ? .isSelected : [])
                 .help(expanded ? type.displayLabel : L("눌러서 오늘 근무 유형 변경", "Choose today's workday type"))
             }
@@ -32,21 +35,32 @@ struct TodayDayTypeView: View {
     @ViewBuilder private func dayTypeButton(_ type: ManualDayType) -> some View {
         if appearance.usesNativeAppearance {
             if type == model.effectiveDayType {
-                Button(title(type)) { select(type) }
+                Button { select(type) } label: { buttonTitle(type) }
                     .buttonStyle(.borderedProminent).controlSize(.small)
             } else {
-                Button(title(type)) { select(type) }
+                Button { select(type) } label: { buttonTitle(type) }
                     .buttonStyle(.bordered).controlSize(.small)
             }
         } else {
             Button { select(type) } label: {
-                Text(title(type))
+                buttonTitle(type)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1).minimumScaleFactor(0.85)
                     .padding(.horizontal, 7).frame(height: 27)
                     .foregroundStyle(type == model.effectiveDayType ? selectedForeground : appearance.text)
                     .background(type == model.effectiveDayType ? accent : Color.primary.opacity(0.045), in: Capsule())
             }.buttonStyle(.plain)
+        }
+    }
+
+    private func buttonTitle(_ type: ManualDayType) -> some View {
+        HStack(spacing: 4) {
+            Text(title(type))
+            if !expanded && type == model.effectiveDayType {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
         }
     }
 
