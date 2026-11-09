@@ -21,7 +21,7 @@ internal sealed class TodayForm : Form
         Padding = new Padding(16), BackColor = UiPalette.Page
     };
     private readonly Panel header = new() { Height = 28, BackColor = UiPalette.Page };
-    private readonly RoundedCard attendanceCard = new(UiPalette.Card) { Height = 156 };
+    private readonly RoundedCard attendanceCard = new(UiPalette.Card) { Height = 168 };
     private readonly FlowLayoutPanel dayTypes = new()
     {
         Height = 27, FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
@@ -35,6 +35,7 @@ internal sealed class TodayForm : Form
     private readonly Label departureTitle = Label(8.25f, false, UiPalette.Muted, UiPalette.Card, 18);
     private readonly Label departureTime = Label(23.25f, true, UiPalette.Mint, UiPalette.Card, 58);
     private readonly Panel timeDivider = new() { BackColor = UiPalette.Border };
+    private readonly MintProgressTrack progress = new();
     private readonly Panel divider = new() { Height = 1, BackColor = UiPalette.Border };
     private readonly Panel agenda = new() { Height = 96, BackColor = UiPalette.Page };
     private readonly Label agendaNote = Label(9, false, UiPalette.Muted, UiPalette.Page, 50);
@@ -212,16 +213,18 @@ internal sealed class TodayForm : Form
         timeDivider.SetBounds(165, 58, 1, 52);
         errorLabel.SetBounds(10, 134, 312, 18);
         errorLabel.AutoEllipsis = true;
+        progress.SetBounds(10, 156, 312, 8);
+        progress.AccessibleName = Words.T("오늘의 근무 진행률", "Today's work progress");
         attendanceCard.Controls.AddRange(new Control[]
         {
             dayTypes, stateNote, arrivalTitle, arrivalTime, clockInput,
-            departureTitle, departureTime, timeDivider, errorLabel
+            departureTitle, departureTime, timeDivider, errorLabel, progress
         });
         attendanceCard.Resize += (_, _) =>
         {
             int inset = Scale(10);
             int column = Math.Max(Scale(100), (attendanceCard.Width - Scale(53)) / 2);
-            dayTypes.Width = stateNote.Width = errorLabel.Width = attendanceCard.Width - inset * 2;
+            dayTypes.Width = stateNote.Width = errorLabel.Width = progress.Width = attendanceCard.Width - inset * 2;
             arrivalTitle.Width = arrivalTime.Width = column;
             int right = inset + column + Scale(33);
             departureTitle.Left = departureTime.Left = right;
@@ -257,7 +260,7 @@ internal sealed class TodayForm : Form
             LayoutTypeButtons();
             return;
         }
-        if (SaveClock() && controller.SetDayType(type)) typesExpanded = false;
+        if (SaveClock(type)) typesExpanded = false;
         RefreshView();
     }
 
@@ -389,6 +392,8 @@ internal sealed class TodayForm : Form
         bool annualLeave = selectedType == ManualDayType.AnnualLeave;
         bool skipped = controller.State.SuppressedDays.Contains(today);
         DateTimeOffset? departure = arrival is null ? null : Attendance.Departure(arrival, controller.State.Settings);
+        progress.Fraction = arrival is not null && departure is { } leaveAt
+            ? Attendance.Progress(arrival, leaveAt, now) : 0;
         OwlState iconState = annualLeave ? OwlState.AnnualLeave
             : skipped ? OwlState.DayOff
             : arrival is null ? OwlState.Waiting
@@ -474,15 +479,16 @@ internal sealed class TodayForm : Form
         RefreshView();
     }
 
-    private bool SaveClock()
+    private bool SaveClock(ManualDayType? requestedType = null)
     {
-        if (!editing || saving) return true;
+        if (saving) return false;
+        if (!editing) return requestedType is null || controller.SetDayType(requestedType.Value);
         if (clockInput.Text == originalClock)
         {
             FinishEditing();
             inputError = null;
             RefreshView();
-            return true;
+            return requestedType is null || controller.SetDayType(requestedType.Value);
         }
         DateTimeOffset now = controller.Now;
         if (Attendance.DayKey(now) != editDay)
@@ -500,7 +506,11 @@ internal sealed class TodayForm : Form
                 try
                 {
                     inputError = null;
-                    if (controller.ManualArrival(new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)), null))
+                    var at = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+                    bool saved = requestedType is { } type
+                        ? controller.ManualArrivalAndDayType(at, type)
+                        : controller.ManualArrival(at, null);
+                    if (saved)
                     {
                         FinishEditing();
                         RefreshView();

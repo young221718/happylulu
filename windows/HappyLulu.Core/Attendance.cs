@@ -191,6 +191,13 @@ public static class Attendance
         else state.SuppressedDays.Remove(day);
     }
 
+    public static void SetManualAndDayType(AttendanceState state, DateTimeOffset at,
+                                           DateTimeOffset now, ManualDayType type)
+    {
+        SetManual(state, at, now, ModeFor(type));
+        SetDayType(state, type, now);
+    }
+
     public static void SkipToday(AttendanceState state, DateTimeOffset now)
     {
         string day = DayKey(now);

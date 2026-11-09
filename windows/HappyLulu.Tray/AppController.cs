@@ -61,6 +61,8 @@ internal sealed class AppController
     public void ObservedUnlock(DateTimeOffset at) => Apply(candidate => Attendance.RecordUnlock(candidate, at));
     public bool ManualArrival(DateTimeOffset at, WorkdayMode? mode) =>
         Apply(candidate => Attendance.SetManual(candidate, at, Now, mode));
+    public bool ManualArrivalAndDayType(DateTimeOffset at, ManualDayType type) =>
+        Apply(candidate => Attendance.SetManualAndDayType(candidate, at, Now, type));
     public bool SetDayType(ManualDayType type) => Apply(candidate => Attendance.SetDayType(candidate, type, Now));
     public bool SkipToday() => Apply(candidate => Attendance.SkipToday(candidate, Now));
     public bool SetWork(int work, int rest) => Apply(candidate =>
