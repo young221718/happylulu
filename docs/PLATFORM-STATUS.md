@@ -2,7 +2,7 @@
 
 > 2026-11-05 Windows 작업 브랜치에서 컴팩트 오늘 창, 5개 수동 근무 유형과 월별 기록을 개발 중입니다. 이 후보는 아래 2026-10-15 기준표나 공개 버전 상태를 변경하지 않습니다. `3a997c9`의 Windows CI는 통과했으며 실제 사용자 세션 검증은 남았습니다. 상세는 [Windows 안내](../windows/README.md)를 확인하세요.
 
-HappyLulu는 **공통 `main` 하나**를 개발 기준으로 사용합니다. Mac과 Windows에 같은 기능과 근무 계산 규칙을 제공하는 것을 목표로 하며, 플랫폼별 상태와 차이를 아래 한 표에서 관리합니다.
+HappyLulu는 Mac의 `mac/dev`·`mac/main`과 Windows의 `windows/dev`·`windows/main`을 각각 사용합니다. 기존 공통 `main`은 보존합니다. Mac과 Windows의 근무 계산 규칙 및 기능 차이를 아래 표와 각 플랫폼 브랜치에서 관리합니다.
 
 확인일: 2026-10-15. [구현이 반영된 main 기준](https://github.com/young221718/happylulu-app/tree/ddedf83b0bfd14f0d47c0cdd7d93b2c3b33112f3). 공개 버전은 Mac 1.5.14 build30·Windows 1.5.13이며 Mac 1.5.15 build31은 배포 준비·미게시 후보입니다. 공개 버전은 [README](../README.md#다운로드), 자동 검사와 미완료 검증은 [플랫폼 검증 기록](PLATFORM-VALIDATION.md)에서 확인합니다.
 
@@ -38,9 +38,9 @@ HappyLulu는 **공통 `main` 하나**를 개발 기준으로 사용합니다. Ma
 
 구현 근거: [Mac 출근 처리](../Sources/AfterSix/AppModel.swift)·[캘린더 반차 읽기](../Sources/AfterSix/HalfDayCalendarReader.swift)·[근무 계산](../Sources/AfterSixCore/Attendance.swift)·[검사](../Tests/AfterSixCoreTests/AttendanceTests.swift), [Windows 출근 처리](../windows/HappyLulu.Tray/TrayContext.cs)·[근무 계산](../windows/HappyLulu.Core/Attendance.cs)·[검사](../windows/HappyLulu.Checks/Program.cs)·[기능 범위](../windows/README.md).
 
-## main 운영과 문서 갱신
+## 브랜치 운영과 문서 갱신
 
-1. 작업 브랜치는 최신 `main`에서 시작하고 PR 대상도 `main`으로 통일합니다. 작업이 끝나면 단기 작업 브랜치를 정리합니다.
+1. 플랫폼별 개발은 해당 `dev` 브랜치를 기준으로 하고, 안정화된 변경은 별도 승인 후 해당 플랫폼의 `main`에 반영합니다. 기존 공통 `main`과 다른 플랫폼 브랜치는 자동으로 변경하지 않습니다.
 2. 공통 기능은 양 플랫폼의 요구사항과 기대값을 먼저 맞춥니다. 한쪽 구현만 끝난 상태는 전체 완료로 표시하지 않습니다.
 3. 공통 기능·근무 규칙 변경은 Mac과 Windows의 검사·빌드를 모두 확인합니다. 플랫폼 전용 변경은 해당 검사·빌드와 상대 플랫폼 영향 여부를 확인합니다. 공통 [근무 규칙 fixture](../Tests/Shared/attendance.json)와 어느 쪽 Core 변경은 양 플랫폼 CI를 실행하며 그 외 변경은 플랫폼별 경로를 기준으로 실행됩니다([Mac](../.github/workflows/macos.yml), [Windows](../.github/workflows/windows.yml)).
 4. 새 공통 기능은 양쪽 구현과 검증이 준비된 뒤 제공하는 것을 원칙으로 합니다. 기존 기능 차이는 이 문서에서 남은 작업으로 추적합니다.

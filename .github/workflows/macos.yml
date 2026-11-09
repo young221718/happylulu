@@ -2,7 +2,7 @@ name: Mac HappyLulu
 
 on:
   push:
-    branches: [main, 'cy-agent/**', 'codex/**']
+    branches: [main, 'mac/**', 'windows/**', 'cy-agent/**', 'codex/**']
     paths:
       - 'Sources/**'
       - 'windows/HappyLulu.Core/**'
