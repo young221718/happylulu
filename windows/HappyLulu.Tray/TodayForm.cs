@@ -405,7 +405,7 @@ internal sealed class TodayForm : Form
         LayoutTypeButtons();
         arrivalTitle.Text = Words.T("출근", "Arrival");
         departureTitle.Text = Words.T("퇴근 예정", "Departure");
-        if (!editing) arrivalTime.Text = storedArrival?.Time.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—";
+        if (!editing) arrivalTime.Text = storedArrival?.Time.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—";
         hints.SetToolTip(arrivalTime, storedArrival is null ? Words.T("클릭해서 입력", "Click to enter")
             : storedArrival.Source == ArrivalSource.Unlock ? Words.T("잠금 해제", "Unlock") : Words.T("직접 입력", "Manual"));
         if (arrival is null)
@@ -425,7 +425,7 @@ internal sealed class TodayForm : Form
             stateNote.Text = ready ? Words.T("예정 퇴근 시각이 지났어요.", "Planned departure has passed.") : "";
             workStatusMenu.Text = ready ? Words.T("오늘도 수고했어요", "Great work today")
                 : Words.T("퇴근까지 ", "Leave in ") + RemainingTimeDisplay.Format(leave, now, controller.State.RemainingTimeUnit, Words.Korean);
-            departureTime.Text = leave.ToString("HH:mm", CultureInfo.InvariantCulture);
+            departureTime.Text = leave.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
             hints.SetToolTip(departureTime, arrival.Mode != WorkdayMode.Normal ? Words.T("휴게 없이 4시간", "4 hours, no break")
                 : selectedType == ManualDayType.LuluDay ? Words.T("2시간 단축", "2 hours early")
                 : Words.T("휴게시간 포함", "Includes break"));
@@ -434,7 +434,7 @@ internal sealed class TodayForm : Form
         overtimeMenu.Visible = overtime is not null;
         if (overtime is { } status && arrival is not null)
         {
-            string mealClock = Attendance.MealThresholdAt(arrival, controller.State.Settings).ToString("HH:mm", CultureInfo.InvariantCulture);
+            string mealClock = Attendance.MealThresholdAt(arrival, controller.State.Settings).ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
             string elapsed = RemainingTimeDisplay.Elapsed(Attendance.Departure(arrival, controller.State.Settings),
                 now, controller.State.RemainingTimeUnit, Words.Korean);
             stateNote.Text = status.ElapsedMinutes >= Attendance.ExtraTimeDisplayDelayMinutes
@@ -463,7 +463,7 @@ internal sealed class TodayForm : Form
         DateTimeOffset now = controller.Now;
         editDay = Attendance.DayKey(now);
         Arrival? arrival = controller.State.Arrivals.GetValueOrDefault(editDay);
-        originalClock = arrival?.Time.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "";
+        originalClock = arrival?.Time.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture) ?? "";
         clockInput.Text = originalClock.Length == 0 ? now.ToString("HH:mm", CultureInfo.InvariantCulture) : originalClock;
         inputError = null;
         editing = true;
