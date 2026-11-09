@@ -22,19 +22,19 @@ internal static class Program
                 return 0;
             }
             if (args.Length != 0) throw new ArgumentException("Use no arguments for checks, or --interactive for isolated GUI QA.");
-            ClockEditing();
-            DayTypeSelection();
-            InvalidClockTypeSelection();
-            EscapeFromOtherControl();
-            PopoverPlacement();
-            OwlAssets();
-            DayTypeLayout();
-            DayTypeDiscovery();
-            MonthHistory();
-            TrayDepartureSetting();
-            SettingsLayout();
-            StorageFailures();
-            InteractiveSafety();
+            Run(nameof(ClockEditing), ClockEditing);
+            Run(nameof(DayTypeSelection), DayTypeSelection);
+            Run(nameof(InvalidClockTypeSelection), InvalidClockTypeSelection);
+            Run(nameof(EscapeFromOtherControl), EscapeFromOtherControl);
+            Run(nameof(PopoverPlacement), PopoverPlacement);
+            Run(nameof(OwlAssets), OwlAssets);
+            Run(nameof(DayTypeLayout), DayTypeLayout);
+            Run(nameof(DayTypeDiscovery), DayTypeDiscovery);
+            Run(nameof(MonthHistory), MonthHistory);
+            Run(nameof(TrayDepartureSetting), TrayDepartureSetting);
+            Run(nameof(SettingsLayout), SettingsLayout);
+            Run(nameof(StorageFailures), StorageFailures);
+            Run(nameof(InteractiveSafety), InteractiveSafety);
             Console.WriteLine($"PASS Windows form behavior: {checks} assertions (isolated storage, no desktop input)");
             return 0;
         }
@@ -43,6 +43,13 @@ internal static class Program
             Console.Error.WriteLine("FAIL Windows form behavior: " + ex);
             return 1;
         }
+    }
+
+    private static void Run(string name, Action check)
+    {
+        Console.WriteLine("BEGIN " + name);
+        check();
+        Console.WriteLine("PASS " + name);
     }
 
     private static void ClockEditing()
