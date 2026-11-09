@@ -33,6 +33,7 @@ internal static class Program
             Run(nameof(MonthHistory), MonthHistory);
             Run(nameof(TrayDepartureSetting), TrayDepartureSetting);
             Run(nameof(OvertimeDisplayUnit), OvertimeDisplayUnit);
+            Run(nameof(CurrentDayTimeZoneDisplay), CurrentDayTimeZoneDisplay);
             Run(nameof(SettingsLayout), SettingsLayout);
             Run(nameof(StorageFailures), StorageFailures);
             Run(nameof(InteractiveSafety), InteractiveSafety);
@@ -363,6 +364,38 @@ internal static class Program
         Equal("Extra 1801250 ms in progress", Field<Label>(form, "stateNote").Text,
             "Today panel displays overtime in selected milliseconds");
         Equal("09:00", fixture.StoredClock(), "Changing overtime display preserves attendance");
+    }
+
+    private static void CurrentDayTimeZoneDisplay()
+    {
+        using var fixture = new Fixture();
+        fixture.SaveArrival("09:00");
+        const string day = "2026-11-05";
+        DateTimeOffset localArrival = fixture.Controller.State.Arrivals[day].Time;
+        TimeSpan alternateOffset = localArrival.Offset < TimeSpan.FromHours(14)
+            ? localArrival.Offset.Add(TimeSpan.FromHours(1)) : localArrival.Offset.Subtract(TimeSpan.FromHours(1));
+        DateTimeOffset recordedArrival = localArrival.ToOffset(alternateOffset);
+        Equal(true, fixture.Controller.Apply(state => state.Arrivals[day].Time = recordedArrival),
+            "Fixture preserves the original recorded offset");
+        byte[] before = File.ReadAllBytes(fixture.Store.Path);
+        using var form = fixture.Today();
+        string expectedDeparture = localArrival.AddHours(9).ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+        Equal(expectedDeparture, Field<Label>(form, "departureTime").Text,
+            "Today panel uses the same local departure clock as the tray");
+        Equal(localArrival.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture),
+            Find<Button>(form, "Edit arrival time").Text, "Today arrival uses the current local clock");
+        Click(Find<Button>(form, "Edit arrival time"));
+        TextBox input = Find<TextBox>(form, "Arrival time HH:mm");
+        Equal(localArrival.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture), input.Text,
+            "Editing starts with the displayed local time");
+        Key(input, Keys.Enter);
+        Equal(true, before.SequenceEqual(File.ReadAllBytes(fixture.Store.Path)),
+            "Closing an unchanged edit preserves original bytes and UTC offset");
+        fixture.Now = fixture.Now.AddHours(1).AddMinutes(30);
+        form.RefreshView();
+        string mealClock = localArrival.AddHours(11).ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+        Equal(true, Field<ToolStripMenuItem>(form, "overtimeMenu").Text.Contains(mealClock, StringComparison.Ordinal),
+            "Meal threshold is displayed in the current local time zone");
     }
 
     private static void CheckSettingRows(SettingsForm form, params string[] controlNames)
