@@ -10,10 +10,11 @@ swiftc -parse-as-library -swift-version 6 -I "$build_dir/Modules" \
   Sources/AfterSix/CalendarSyncModel.swift Sources/AfterSix/HalfDayCalendarReader.swift \
   Sources/AfterSix/DefaultFeatureAdapter.swift \
   Sources/AfterSix/PluginManagerModel.swift Sources/AfterSix/BundledPlugins.swift Sources/AfterSix/FeatureCalendarModel.swift \
-  Sources/AfterSix/PluginSettingsView.swift Tests/PluginArchitectureProbe/main.swift \
+  Sources/AfterSix/SettingsStyle.swift Sources/AfterSix/PluginSettingsView.swift Tests/PluginArchitectureProbe/main.swift \
   Sources/AfterSix/LuluMaterials.swift \
   "$build_dir"/AppPluginCore.build/*.swift.o "$build_dir"/AppPluginHost.build/*.swift.o \
   "$build_dir"/CPURunnerIntegration.build/*.swift.o \
+  "$build_dir"/MacUtilitiesIntegration.build/*.swift.o \
   "$build_dir"/AfterSixCore.build/*.swift.o "$build_dir"/CalendarSyncServices.build/*.swift.o \
   "$build_dir"/CalendarSyncCore.build/*.swift.o \
   -framework AppKit -framework Security -framework EventKit -framework ServiceManagement -lsqlite3 \

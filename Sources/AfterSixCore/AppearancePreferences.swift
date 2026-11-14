@@ -6,7 +6,8 @@ public enum AppearanceColorRole: String, Codable, CaseIterable, Sendable {
 }
 
 public enum AppearancePalette: String, Codable, CaseIterable, Sendable {
-    case softMint, warmStone, blueGray, dustyLavender, charcoal, offwhiteLilac, nativeGlass
+    case nativeGlass, offwhiteLilac, softMint, warmStone, blueGray, dustyLavender, charcoal
+    case customTheme = "warmPeach" // Preserve the already-saved development palette value.
 
     public var colors: [AppearanceColorRole: String] {
         let values: [String]
@@ -15,18 +16,19 @@ public enum AppearancePalette: String, Codable, CaseIterable, Sendable {
         // uses dynamic AppKit semantic colors at runtime, not these HEX values.
         case .nativeGlass: values = ["#F5F5F5", "#F0F0F0", "#FFFFFF", "#007AFF", "#1D1D1F"]
         case .offwhiteLilac: values = ["#FAF9FC", "#EEE8F8", "#FFFFFF", "#7054B3", "#2F2B3D"]
-        case .softMint: values = ["#E9EFEB", "#E0E7E2", "#F2F5F3", "#286F5D", "#26382E"]
-        case .warmStone: values = ["#EEEAE3", "#E4DED5", "#F6F2ED", "#786347", "#38342E"]
-        case .blueGray: values = ["#E7EDF1", "#DDE5EB", "#F0F4F7", "#426780", "#2B3741"]
-        case .dustyLavender: values = ["#EEEAF1", "#E4DEEA", "#F5F1F7", "#77608D", "#3A3242"]
+        case .softMint: values = ["#DDF4E9", "#C0E8D5", "#F4FFF9", "#087C57", "#173D2E"]
+        case .warmStone: values = ["#F5E8D4", "#E8CC9F", "#FFF8EC", "#91571D", "#3B291A"]
+        case .blueGray: values = ["#DCEBF7", "#B8D7EE", "#F3FAFF", "#245D9B", "#183145"]
+        case .dustyLavender: values = ["#EEE3FA", "#D8BDEA", "#F9F3FF", "#713CA6", "#372343"]
         case .charcoal: values = ["#252A2D", "#1E2326", "#303639", "#8CC5B4", "#E0E7E4"]
+        case .customTheme: values = ["#F4F4F6", "#E7E7EB", "#FFFFFF", "#536376", "#22252B"]
         }
         return Dictionary(uniqueKeysWithValues: zip(AppearanceColorRole.allCases, values))
     }
 }
 
 public enum AppearanceIcon: String, Codable, CaseIterable, Sendable {
-    case original, mint, blue, lavender, graphite, custom
+    case original, mint, blue, lavender, graphite, custom, happy, fiery, money, sad
 }
 
 public enum AppearanceError: LocalizedError {
@@ -45,9 +47,14 @@ public struct AppearancePreferences: Codable, Equatable, Sendable {
     public var version = 1
     public var palette: AppearancePalette = .offwhiteLilac
     public var customColors: [String: String] = [:]
+    public var customThemeColors: [String: String]?
     public var icon: AppearanceIcon = .original
     public var customImageFilename: String?
-    public init() {}
+    public init() {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { palette = .nativeGlass }
+        #endif
+    }
 
     public static func normalizedHex(_ value: String) throws -> String {
         let bytes = Array(value.utf8)
@@ -73,14 +80,24 @@ public struct AppearancePreferences: Codable, Equatable, Sendable {
     }
 
     public mutating func selectPalette(_ value: AppearancePalette) {
+        guard palette != value else { return }
+        if palette == .customTheme { customThemeColors = customColors }
+        let restored = value == .customTheme ? (customThemeColors ?? [:]) : [:]
         palette = value
+        customColors = restored
+    }
+
+    public mutating func resetColors() {
         customColors = [:]
+        if palette == .customTheme { customThemeColors = nil }
     }
 
     public func validate() throws {
-        guard version == 1, customColors.keys.allSatisfy({ AppearanceColorRole(rawValue: $0) != nil })
+        guard version == 1, customColors.keys.allSatisfy({ AppearanceColorRole(rawValue: $0) != nil }),
+              (customThemeColors ?? [:]).keys.allSatisfy({ AppearanceColorRole(rawValue: $0) != nil })
         else { throw AppearanceError.invalidPreferences }
         for color in customColors.values { _ = try Self.normalizedHex(color) }
+        for color in (customThemeColors ?? [:]).values { _ = try Self.normalizedHex(color) }
         if let filename = customImageFilename { try AppearanceStore.validateFilename(filename) }
         if icon == .custom && customImageFilename == nil { throw AppearanceError.invalidImage }
     }

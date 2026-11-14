@@ -37,7 +37,8 @@ struct AppearanceModelProbe {
         let original = NSImage(contentsOf: source)!
         let store = AppearanceStore(rootDirectory: root, bundleIdentifier: "test.happylulu.appearance-model")
         let model = AppearanceModel(store: store, originalIcon: original)
-        precondition(model.preferences.palette == .offwhiteLilac, "New profiles must use the approved palette")
+        let expectedDefault: AppearancePalette = AppearanceModel.supportsNativeAppearance ? .nativeGlass : .offwhiteLilac
+        precondition(model.preferences.palette == expectedDefault, "New profiles must use the supported default palette")
         var menuPixels = Set<Data>()
         var headerPixels = Set<Data>()
         let assets: [(LuluDisplayState, String)] = [(.waiting, "waiting"), (.regular, "regular"),
@@ -111,8 +112,8 @@ struct AppearanceModelProbe {
         precondition(headerPixels.count == 8, "Every state needs its matching color face")
         let mint = model.image(for: .mint)
         precondition(model.image(for: .mint) === mint, "Repeated preview requests must reuse the rendered icon")
-        let expected: [(AppearancePalette, String)] = [(.softMint,"#E9EFEB"),(.warmStone,"#EEEAE3"),
-            (.blueGray,"#E7EDF1"),(.dustyLavender,"#EEEAF1"),(.charcoal,"#252A2D"),(.offwhiteLilac,"#FAF9FC")]
+        let expected: [(AppearancePalette, String)] = [(.softMint,"#DDF4E9"),(.warmStone,"#F5E8D4"),
+            (.blueGray,"#DCEBF7"),(.dustyLavender,"#EEE3FA"),(.charcoal,"#252A2D"),(.offwhiteLilac,"#FAF9FC")]
         for (palette, background) in expected {
             model.selectPalette(palette)
             precondition(model.errorMessage == nil && model.hex(.background) == background)
@@ -191,6 +192,15 @@ struct AppearanceModelProbe {
             precondition(NSApplication.shared.applicationIconImage.size == model.iconImage.size)
         }
         precondition(images.count == 5, "Icon variants must produce five distinct images")
+        var owlImages = Set<Data>()
+        for icon in [AppearanceIcon.original, .happy, .fiery, .money, .sad] {
+            model.selectIcon(icon)
+            guard let data = model.iconImage.tiffRepresentation else { preconditionFailure("Missing owl icon") }
+            owlImages.insert(data)
+            let persistedOwl = try store.load()
+            precondition(persistedOwl?.icon == icon, "Owl selection must persist")
+        }
+        precondition(owlImages.count == 5, "Each owl expression must load a distinct bundled image")
         let otherOriginal = NSImage(cgImage: NSBitmapImageRep(data: originalBytes)!.cgImage!,
             size: NSSize(width: 32, height: 32))
         let other = AppearanceModel(store: AppearanceStore(rootDirectory: root,

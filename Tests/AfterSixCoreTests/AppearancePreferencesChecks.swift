@@ -3,15 +3,18 @@ import ImageIO
 import AfterSixCore
 
 func checkAppearancePreferences() throws {
-    expectEqual(AppearancePalette.allCases.count, 7)
-    expectEqual(AppearanceIcon.allCases.count, 6) // Five bundled choices plus imported image.
-    expectEqual(AppearancePalette.softMint.colors[.background], "#E9EFEB")
+    expectEqual(AppearancePalette.allCases.count, 8)
+    expectEqual(AppearancePalette.allCases.first?.rawValue, "nativeGlass")
+    expectTrue(["happy", "fiery", "money", "sad"].allSatisfy { name in
+        AppearanceIcon.allCases.contains { $0.rawValue == name }
+    })
+    expectEqual(AppearancePalette.softMint.colors[.background], "#DDF4E9")
     expectEqual(AppearancePalette.charcoal.colors[.text], "#E0E7E4")
     let paletteSpec: [(AppearancePalette, [String])] = [
-        (.softMint, ["#E9EFEB", "#E0E7E2", "#286F5D", "#26382E"]),
-        (.warmStone, ["#EEEAE3", "#E4DED5", "#786347", "#38342E"]),
-        (.blueGray, ["#E7EDF1", "#DDE5EB", "#426780", "#2B3741"]),
-        (.dustyLavender, ["#EEEAF1", "#E4DEEA", "#77608D", "#3A3242"]),
+        (.softMint, ["#DDF4E9", "#C0E8D5", "#087C57", "#173D2E"]),
+        (.warmStone, ["#F5E8D4", "#E8CC9F", "#91571D", "#3B291A"]),
+        (.blueGray, ["#DCEBF7", "#B8D7EE", "#245D9B", "#183145"]),
+        (.dustyLavender, ["#EEE3FA", "#D8BDEA", "#713CA6", "#372343"]),
         (.charcoal, ["#252A2D", "#1E2326", "#8CC5B4", "#E0E7E4"])
     ]
     for (palette, expected) in paletteSpec {
@@ -31,16 +34,63 @@ func checkAppearancePreferences() throws {
         expectEqual(saved.icon, .blue)
         try expectEqual(try JSONDecoder().decode(AppearancePreferences.self, from: JSONEncoder().encode(saved)), saved)
     }
+    #if compiler(>=6.2)
+    if #available(macOS 26.0, *) {
+        expectEqual(AppearancePreferences().palette, .nativeGlass)
+    } else {
+        expectEqual(AppearancePreferences().palette, .offwhiteLilac)
+    }
+    #else
+    expectEqual(AppearancePreferences().palette, .offwhiteLilac)
+    #endif
     var preferences = AppearancePreferences()
-    expectEqual(preferences.palette.rawValue, "offwhiteLilac")
+    preferences.selectPalette(.offwhiteLilac)
     expectEqual(preferences.colors[.background], "#FAF9FC")
     expectEqual(preferences.colors[.sidebar], "#EEE8F8")
     expectEqual(preferences.colors[.surface], "#FFFFFF")
     expectEqual(preferences.colors[.accent], "#7054B3")
     expectEqual(preferences.colors[.text], "#2F2B3D")
     expectTrue(preferences.contrastRatio > 4.5)
+    var customTheme = AppearancePreferences()
+    customTheme.selectPalette(.customTheme)
+    expectTrue(customTheme.contrastRatio >= 4.5)
+    try customTheme.setColor("#F0F1F2", for: .background)
+    try customTheme.setColor("#D0D1D2", for: .sidebar)
+    try customTheme.setColor("#FFFFFF", for: .surface)
+    try customTheme.setColor("#136B52", for: .accent)
+    try customTheme.setColor("#102030", for: .text)
+    customTheme.selectPalette(.nativeGlass)
+    customTheme = try JSONDecoder().decode(AppearancePreferences.self, from: JSONEncoder().encode(customTheme))
+    customTheme.selectPalette(.customTheme)
+    expectEqual(customTheme.colors[.accent], "#136B52")
+    expectEqual(customTheme.colors[.sidebar], "#D0D1D2")
+    try expectEqual(try JSONDecoder().decode(AppearancePreferences.self, from: JSONEncoder().encode(customTheme)), customTheme)
+    let beforeReselectingCustom = customTheme
+    customTheme.selectPalette(.customTheme)
+    expectEqual(customTheme, beforeReselectingCustom)
+    customTheme.resetColors()
+    expectTrue(customTheme.customColors.isEmpty)
+    expectTrue(customTheme.customThemeColors == nil)
+    customTheme.selectPalette(.warmStone)
+    customTheme.selectPalette(.customTheme)
+    expectEqual(customTheme.colors, AppearancePalette.customTheme.colors)
+    let oldPeach = Data("{\"version\":1,\"palette\":\"warmPeach\",\"customColors\":{\"accent\":\"#123456\"},\"icon\":\"original\"}".utf8)
+    let migratedPeach = try JSONDecoder().decode(AppearancePreferences.self, from: oldPeach)
+    expectEqual(migratedPeach.palette, .customTheme)
+    expectEqual(migratedPeach.colors[.accent], "#123456")
+    var invalidCustomTheme = customTheme
+    invalidCustomTheme.customThemeColors = ["accent": "invalid"]
+    expectThrows(try invalidCustomTheme.validate())
+    for icon in [AppearanceIcon.happy, .fiery, .money, .sad, .mint, .blue, .lavender, .graphite] {
+        var savedIcon = AppearancePreferences()
+        savedIcon.icon = icon
+        try expectEqual(try JSONDecoder().decode(AppearancePreferences.self, from: JSONEncoder().encode(savedIcon)), savedIcon)
+    }
     try preferences.setColor("#FAF9FC", for: .text)
     expectTrue(preferences.contrastRatio < 1.01)
+    let beforeReselectingPreset = preferences
+    preferences.selectPalette(preferences.palette)
+    expectEqual(preferences, beforeReselectingPreset)
     let beforeInvalid = preferences
     expectThrows(try preferences.setColor("red", for: .text))
     expectEqual(preferences, beforeInvalid)
@@ -166,5 +216,5 @@ func checkAppearancePreferences() throws {
     let unwritable = AppearanceStore(rootDirectory: blockedRoot, bundleIdentifier: "test")
     expectThrows(try unwritable.save(AppearancePreferences()))
     expectTrue(FileManager.default.fileExists(atPath: blockedRoot.path))
-    print("PASS appearance: seven palettes, native theme persistence/custom-color isolation, legacy persistence, HEX/contrast, independent icons, atomic isolated persistence, corrupt/read-only, validated image references and write failures")
+    print("PASS appearance: eight palettes, owl and legacy icon persistence, native theme/custom-color isolation, HEX/contrast, atomic isolated persistence, corrupt/read-only, validated image references and write failures")
 }

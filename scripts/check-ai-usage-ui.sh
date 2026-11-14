@@ -116,7 +116,7 @@ swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0"
   Sources/AfterSix/CalendarSyncModel.swift Sources/AfterSix/HalfDayCalendarReader.swift \
   Sources/AfterSix/DefaultFeatureAdapter.swift "$plugin_manager_source" \
   Sources/AfterSix/BundledPlugins.swift Sources/AfterSix/FeatureCalendarModel.swift \
-  Sources/AfterSix/PluginSettingsView.swift Sources/AfterSix/SettingsView.swift \
+  Sources/AfterSix/SettingsStyle.swift Sources/AfterSix/PluginSettingsView.swift Sources/AfterSix/SettingsView.swift \
   Sources/AfterSix/AppearanceSettingsView.swift Sources/AfterSix/AttendanceCalendarView.swift \
   Sources/AfterSix/AttendanceControlsView.swift Sources/AfterSix/TodayDayTypeView.swift \
   Sources/AfterSix/FeatureCalendarView.swift Sources/AfterSix/CalendarWorkspaceView.swift \
@@ -127,6 +127,7 @@ swiftc -parse-as-library -swift-version 6 -target "$(uname -m)-apple-macosx13.0"
   "$build_dir"/CalendarSyncCore.build/*.swift.o "$build_dir"/AIUsagePlugin.build/*.swift.o \
   "$build_dir"/AIUsageIntegration.build/*.swift.o \
   "$build_dir"/CPURunnerIntegration.build/*.swift.o \
+  "$build_dir"/MacUtilitiesIntegration.build/*.swift.o \
   -framework AppKit -framework SwiftUI -framework CoreImage -framework Security -framework IOKit -framework SystemConfiguration \
   -framework EventKit -framework ServiceManagement -framework UserNotifications -framework Sparkle -lsqlite3 \
   -o "$app/Contents/MacOS/UsageProbe"

@@ -9,24 +9,20 @@ struct MonthCalendarView<DayContent: View>: View {
     @Binding var selectedDay: Date
     let calendar: Calendar
     var compact = false
+    var settingsPresentation = false
+    var settingsAccent: Color? = nil
     @ViewBuilder let dayContent: (Date) -> DayContent
-    private let accent = Color(red: 0.16, green: 0.48, blue: 0.42)
+    private var accent: Color { settingsAccent ?? Color(red: 0.16, green: 0.48, blue: 0.42) }
 
     var body: some View {
         let grid = CalendarMonth(containing: month, calendar: calendar)
         VStack(spacing: 8) {
-            HStack {
-                Button { move(-1) } label: { Image(systemName: "chevron.left") }
-                    .accessibilityLabel(L("이전 달", "Previous month"))
-                Text(month.formatted(Date.FormatStyle(locale: displayLocale, calendar: calendar, timeZone: calendar.timeZone).year().month()))
-                    .font(.system(size: compact ? 12 : 18, weight: .semibold))
-                Button { move(1) } label: { Image(systemName: "chevron.right") }
-                    .accessibilityLabel(L("다음 달", "Next month"))
-                Spacer()
-                Button(L("오늘", "Today")) { month = Date(); selectedDay = Date() }
+            if settingsPresentation {
+                navigationButtons.buttonStyle(.bordered).controlSize(.small)
+                    .tint(.gray).foregroundStyle(.primary)
+            } else {
+                navigationButtons.luluGlassButton().padding(glass.isEnabled ? 8 : 0)
             }
-            .luluGlassButton()
-            .padding(glass.isEnabled ? 8 : 0)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
                 ForEach(0..<7, id: \.self) { index in
                     let weekday = (calendar.firstWeekday - 1 + index) % 7
@@ -38,7 +34,8 @@ struct MonthCalendarView<DayContent: View>: View {
                         Button { selectedDay = day } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("\(calendar.component(.day, from: day))")
-                                    .font(.system(size: compact ? 10 : 13, weight: calendar.isDateInToday(day) ? .bold : .medium))
+                                    .font(.system(size: compact ? 10 : 13,
+                                        weight: calendar.isDateInToday(day) ? (settingsPresentation ? .semibold : .bold) : (settingsPresentation ? .regular : .medium)))
                                     .foregroundStyle(calendar.isDateInToday(day) ? accent : .primary)
                                 dayContent(day)
                                 Spacer(minLength: 0)
@@ -61,6 +58,20 @@ struct MonthCalendarView<DayContent: View>: View {
         }
     }
 
+    private var navigationButtons: some View {
+        HStack {
+            Button { move(-1) } label: { Image(systemName: "chevron.left") }
+                .accessibilityLabel(L("이전 달", "Previous month"))
+            Text(month.formatted(Date.FormatStyle(locale: displayLocale, calendar: calendar, timeZone: calendar.timeZone).year().month()))
+                .font(.system(size: compact ? 12 : (settingsPresentation ? 14 : 18),
+                              weight: settingsPresentation ? .medium : .semibold))
+            Button { move(1) } label: { Image(systemName: "chevron.right") }
+                .accessibilityLabel(L("다음 달", "Next month"))
+            Spacer()
+            Button(L("오늘", "Today")) { month = Date(); selectedDay = Date() }
+        }
+    }
+
     private func move(_ months: Int) {
         let next = CalendarMonth(containing: month, calendar: calendar).shifted(by: months)
         month = next.start
@@ -78,9 +89,11 @@ struct MonthCalendarView<DayContent: View>: View {
 struct AttendanceCalendarView: View {
     @ObservedObject var model: AppModel
     var compact = false
+    var settingsPresentation = false
+    var settingsAccent: Color? = nil
     @CalendarState private var month = Date()
     @CalendarState private var selectedDay = Date()
-    private let accent = Color(red: 0.16, green: 0.48, blue: 0.42)
+    private var accent: Color { settingsAccent ?? Color(red: 0.16, green: 0.48, blue: 0.42) }
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = model.calendar.timeZone
@@ -91,7 +104,8 @@ struct AttendanceCalendarView: View {
     var body: some View {
         let history = model.arrivalHistory
         VStack(alignment: .leading, spacing: 12) {
-            MonthCalendarView(month: $month, selectedDay: $selectedDay, calendar: calendar, compact: compact) { day in
+            MonthCalendarView(month: $month, selectedDay: $selectedDay, calendar: calendar, compact: compact,
+                              settingsPresentation: settingsPresentation, settingsAccent: settingsAccent) { day in
                 let key = model.dayKey(day, calendar: calendar)
                 if model.dayType(on: day, calendar: calendar) == .annualLeave {
                     Text(ManualDayType.annualLeave.displayLabel)
@@ -111,7 +125,8 @@ struct AttendanceCalendarView: View {
             let key = model.dayKey(selectedDay, calendar: calendar)
             VStack(alignment: .leading, spacing: 6) {
                 Text(selectedDay.formatted(Date.FormatStyle(locale: displayLocale, calendar: calendar, timeZone: calendar.timeZone).month().day().weekday()))
-                    .font(.system(size: compact ? 11 : 15, weight: .semibold))
+                    .font(.system(size: compact ? 11 : (settingsPresentation ? 13 : 15),
+                                  weight: settingsPresentation ? .medium : .semibold))
                 if let type = model.dayType(on: selectedDay, calendar: calendar) {
                     Text(type.displayLabel + " · " + L("직접 지정", "Chosen manually"))
                         .foregroundStyle(accent)
