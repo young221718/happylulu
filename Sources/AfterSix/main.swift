@@ -40,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         manager.configureCatalog(sync: calendarSync, presentations: pluginPresentations,
             allowsExternalIntegrations: runtimeProfile.allowsExternalIntegrations,
             isolatedPluginIDs: Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
-                ? ["ai-usage"] : [])
+                ? ["ai-usage"] : [],
+            allowedLocalPluginIDs: Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
+                ? BundledPlugins.localUtilityIDs : [])
         return manager
     }()
     private lazy var model = AppModel(store: StateStore(url: runtimeProfile.stateURL), featureRouter: plugins.router,
@@ -291,7 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     private func openSettings(section: SettingsSection? = nil) {
-        if let section { settingsNavigation.selection = section }
+        if let section { settingsNavigation.open(section) }
         menuPanel?.dismiss()
         if popover.isShown { popover.performClose(nil) }
         NSApplication.shared.setActivationPolicy(.regular)

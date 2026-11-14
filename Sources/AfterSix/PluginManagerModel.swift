@@ -76,8 +76,11 @@ final class PluginManagerModel: ObservableObject {
     private var catalogWritable = true
     private var externalIntegrationsAllowed = true
     private var isolatedPluginIDs: Set<String> = []
+    private var allowedLocalPluginIDs: Set<String> = []
     var allowsExternalIntegrations: Bool { externalIntegrationsAllowed }
-    func allowsExecution(_ id: String) -> Bool { externalIntegrationsAllowed || isolatedPluginIDs.contains(id) }
+    func allowsExecution(_ id: String) -> Bool {
+        externalIntegrationsAllowed || isolatedPluginIDs.contains(id) || allowedLocalPluginIDs.contains(id)
+    }
     private var factories: [String: () throws -> Void] = [:]
     var needsLegacyMigration: Bool { !hasCatalogState && catalogWritable }
     var canChangeCatalog: Bool { catalogWritable }
@@ -111,10 +114,12 @@ final class PluginManagerModel: ObservableObject {
     }
     func configureCatalog(sync: CalendarSyncModel, presentations: PluginSettingsPresentationRegistry,
                           modules: [any PluginModule.Type] = BundledPlugins.modules,
-                          allowsExternalIntegrations: Bool = true, isolatedPluginIDs: Set<String> = []) {
+                          allowsExternalIntegrations: Bool = true, isolatedPluginIDs: Set<String> = [],
+                          allowedLocalPluginIDs: Set<String> = []) {
         guard !catalogConfigured else { return }
         externalIntegrationsAllowed = allowsExternalIntegrations
         self.isolatedPluginIDs = isolatedPluginIDs
+        self.allowedLocalPluginIDs = allowedLocalPluginIDs.intersection(BundledPlugins.localUtilityIDs)
         catalogConfigured = true
         catalog = [
             PluginCatalogEntry(id: "mac-calendar", name: L("캘린더", "Calendar"), author: PluginAuthors.contributors,

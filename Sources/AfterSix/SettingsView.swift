@@ -24,26 +24,14 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
     var symbol: String {
         switch self {
-        case .general: "gearshape"
-        case .appearance: "paintpalette"
+        case .general: "gearshape.fill"
+        case .appearance: "paintpalette.fill"
         case .plugin: "puzzlepiece.extension"
-        case .work: "clock"
+        case .work: "clock.fill"
         case .history: "calendar"
         case .calendar: "calendar"
         case .plugins: "puzzlepiece.extension"
-        case .updates: "arrow.down.circle"
-        }
-    }
-    var subtitle: String {
-        switch self {
-        case .general: L("언어와 앱 실행 방식을 관리합니다.", "Manage language and app launch behavior.")
-        case .appearance: L("눈에 편한 색상과 앱 아이콘을 설정합니다.", "Customize comfortable colors and the app icon.")
-        case .plugin: L("설치한 플러그인의 설정입니다.", "Settings for an installed plugin.")
-        case .work: L("근무 시간과 휴게 시간을 설정합니다.", "Set your work and break hours.")
-        case .history: L("저장된 출근 기록을 월별로 확인합니다.", "Browse saved arrivals by month.")
-        case .calendar: L("반차 인식과 캘린더 동기화를 관리합니다.", "Manage half-day detection and calendar sync.")
-        case .plugins: L("플러그인과 앱 기능의 연결을 관리합니다.", "Manage plugins and their connections to app features.")
-        case .updates: L("앱 버전과 자동 업데이트를 관리합니다.", "Manage the app version and automatic updates.")
+        case .updates: "arrow.down.circle.fill"
         }
     }
 }
@@ -52,6 +40,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 final class SettingsNavigation: ObservableObject {
     @Published var selection: SettingsSection? = .general
     @Published var pluginID: String?
+    @Published private(set) var requestID = 0
+
+    func open(_ section: SettingsSection) {
+        selection = section
+        requestID += 1
+    }
 }
 
 // Fixed fictional examples: formatting follows the selected option without reading attendance or a clock.
@@ -74,6 +68,8 @@ enum GeneralSettingsPreview {
 
 struct SettingsView: View {
     var glass = LuluGlass()
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.controlActiveState) private var controlActiveState
     @ObservedObject private var appearance = AppearanceModel.shared
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdater
@@ -84,68 +80,121 @@ struct SettingsView: View {
     let pluginPresentations: PluginSettingsPresentationRegistry
     @ObservedObject var navigation: SettingsNavigation
     @SettingsState private var showSyncSettings = false
+    @FocusState private var sidebarHasFocus: Bool
     private var accent: Color { appearance.accent }
     private var selectedLocale: Locale { _ = language.choice; return displayLocale }
+    private var settingsSurface: Color {
+        appearance.usesNativeAppearance ? Color(nsColor: .underPageBackgroundColor) : appearance.surface
+    }
 
-    @ViewBuilder var body: some View {
-        if appearance.usesNativeAppearance {
-            settingsContent.groupBoxStyle(DefaultGroupBoxStyle())
-        } else {
-            settingsContent.groupBoxStyle(LuluSettingsGroupBoxStyle(surface: appearance.surface))
-        }
+    var body: some View {
+        settingsContent.groupBoxStyle(LuluSettingsGroupBoxStyle(surface: settingsSurface))
     }
 
     private var settingsContent: some View {
         HStack(spacing: 0) {
             sidebar
-            if !glass.isEnabled { Divider() }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if selectedSection != .plugin && selectedSection != .calendar {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(selectedSection == .plugins ? L("플러그인 관리", "Manage plugins") : selectedSection.title)
-                                .font(glass.isEnabled ? .system(size: 28, weight: .bold) : .title.bold())
-                            Text(selectedSection == .plugins ? L("필요한 기능만 추가해 사용하세요.", "Add only the features you need.") : selectedSection.subtitle).foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                Text(pageTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, glass.isEnabled ? 24 : 28)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("settings-page-title")
+                    .allowsHitTesting(false)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: SettingsLayout.betweenSections) {
+                            switch selectedSection {
+                            case .general, .updates:
+                                generalSection
+                                updatesSection
+                                    .id(SettingsSection.updates)
+                                    .accessibilityIdentifier("settings-updates")
+                            case .work, .history:
+                                workSection
+                                GroupBox(SettingsSection.history.title) { historySection.padding(8) }
+                                    .id(SettingsSection.history)
+                                    .accessibilityIdentifier("settings-history")
+                            case .appearance: AppearanceSettingsView(appearance: appearance)
+                            case .calendar:
+                                pluginDetail(calendarPluginID)
+                            case .plugin:
+                                pluginDetail(navigation.pluginID ?? "")
+                            case .plugins:
+                                PluginSettingsView(model: plugins, presentations: pluginPresentations,
+                                    onOpenPlugin: { id in navigation.pluginID = id; navigation.selection = .plugin },
+                                    onInstall: installPlugin, onSetEnabled: setPluginEnabled,
+                                    needsSetup: { $0 == "leave-detection" && plugins.isEnabled($0) && !model.state.detectHalfDaysFromCalendar })
+                            }
+                            if let error = model.errorMessage {
+                                Label(visibleMessage(error), systemImage: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, glass.isEnabled ? 24 : 28)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
+                    }
+                    .accessibilityIdentifier("settings-page-content")
+                    .task(id: navigation.requestID) {
+                        // Wait until the merged page has laid out its destination, including on repeated opens.
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        if selectedSection == .history || selectedSection == .updates {
+                            proxy.scrollTo(selectedSection, anchor: .top)
                         }
                     }
-                    switch selectedSection {
-                    case .general: generalSection
-                    case .work: workSection
-                    case .history: historySection
-                    case .appearance: AppearanceSettingsView(appearance: appearance)
-                    case .calendar:
-                        pluginDetail(calendarPluginID)
-                    case .plugin:
-                        pluginDetail(navigation.pluginID ?? "")
-                    case .plugins:
-                        PluginSettingsView(model: plugins, presentations: pluginPresentations,
-                            onOpenPlugin: { id in navigation.pluginID = id; navigation.selection = .plugin },
-                            onInstall: installPlugin, onSetEnabled: setPluginEnabled,
-                            needsSetup: { $0 == "leave-detection" && plugins.isEnabled($0) && !model.state.detectHalfDaysFromCalendar })
-                    case .updates: updatesSection
-                    }
-                    if let error = model.errorMessage {
-                        Label(visibleMessage(error), systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(glass.isEnabled ? 24 : 28)
+                .id("\(selectedSection.rawValue)|\(navigation.pluginID ?? "")")
             }
-            .id("\(selectedSection.rawValue)|\(navigation.pluginID ?? "")")
-            .background(appearance.background)
+            .ignoresSafeArea(.container, edges: .top)
+            .background(appearance.usesNativeAppearance ? Color.clear : appearance.background)
         }
         .frame(minWidth: 820, minHeight: 620)
         .onAppear { model.refresh() }
         .foregroundStyle(appearance.text)
-        .background(appearance.background)
+        .background {
+            if appearance.usesNativeAppearance {
+                (colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white)
+                    .ignoresSafeArea()
+            } else {
+                appearance.background
+            }
+        }
+        .overlay {
+            if glass.isEnabled {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.20), lineWidth: 1)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+        }
         .luluWindowColorScheme(appearance.preferredColorScheme)
-        .luluGlassControls(usesSystemAppearance: appearance.usesNativeAppearance)
+        .luluGlassControls(usesSystemAppearance: true)
         .tint(accent)
         .environment(\.locale, selectedLocale)
     }
 
     private var selectedSection: SettingsSection { navigation.selection ?? .general }
+
+    private var pageSection: SettingsSection {
+        switch selectedSection {
+        case .history: .work
+        case .updates: .general
+        default: selectedSection
+        }
+    }
+
+    private var pageTitle: String {
+        switch pageSection {
+        case .plugin: plugins.catalog.first { $0.id == navigation.pluginID }?.name ?? pageSection.title
+        case .calendar: plugins.catalog.first { $0.id == calendarPluginID }?.name ?? pageSection.title
+        case .plugins: L("플러그인 관리", "Manage plugins")
+        default: pageSection.title
+        }
+    }
 
     private enum SidebarSelection: Hashable {
         case section(SettingsSection)
@@ -160,7 +209,7 @@ struct SettingsView: View {
             case .calendar:
                 .plugin(calendarPluginID)
             default:
-                .section(selectedSection)
+                .section(pageSection)
             }
         }, set: { selection in
             guard let selection else { return }
@@ -174,32 +223,23 @@ struct SettingsView: View {
         })
     }
 
-    @ViewBuilder private var sidebar: some View {
-        if appearance.usesNativeAppearance {
-            nativeSidebar
-        } else {
-            themedSidebar
-        }
-    }
-
-    private var nativeSidebar: some View {
+    private var sidebar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(nsImage: LuluBrand.headerIcon).resizable().interpolation(.high).frame(width: 24, height: 24)
-                Text("happylulu").font(.headline)
-            }.padding(.horizontal, 16).padding(.top, 20)
             List(selection: sidebarSelection) {
                 Section(L("기본 설정", "Core settings")) {
-                    ForEach([SettingsSection.general, .appearance, .work, .history, .updates]) { section in
-                        Label(section.title, systemImage: section.symbol)
+                    ForEach([SettingsSection.general, .appearance, .work]) { section in
+                        sidebarLabel(section.title, symbol: section.symbol,
+                                     selected: sidebarSelection.wrappedValue == .section(section))
                             .tag(SidebarSelection.section(section))
                     }
-                    Label(L("플러그인 관리", "Manage plugins"), systemImage: "puzzlepiece.extension")
+                    sidebarLabel(L("플러그인 관리", "Manage plugins"), symbol: "puzzlepiece.extension.fill",
+                                 selected: sidebarSelection.wrappedValue == .section(.plugins))
                         .tag(SidebarSelection.section(.plugins))
                 }
                 Section(L("설치된 플러그인", "Installed plugins")) {
                     ForEach(plugins.installed) { entry in
-                        Label(entry.name, systemImage: entry.symbol)
+                        sidebarLabel(entry.name, symbol: entry.id == "cpu-runner" ? "desktopcomputer" : entry.symbol,
+                                     selected: sidebarSelection.wrappedValue == .plugin(entry.id))
                             .tag(SidebarSelection.plugin(entry.id))
                     }
                     if plugins.installed.isEmpty {
@@ -210,70 +250,40 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
+            .focused($sidebarHasFocus)
+            .font(.system(size: 13))
             .scrollContentBackground(.hidden)
             .accessibilityLabel(L("설정 항목", "Settings sections"))
             Link(destination: GeneralSettingsPreview.guideURL) {
-                Label(L("사용 안내", "User guide"), systemImage: "book")
+                sidebarLabel(L("사용 안내", "User guide"), symbol: "book")
             }
             .accessibilityIdentifier("settings-user-guide")
             .padding(12)
         }
-        .frame(width: 205)
-        .luluGlassSurface(tint: appearance.sidebar, fallback: appearance.sidebar,
-                          cornerRadius: 20, legacyCornerRadius: 0, usesSystemAppearance: true)
-        .padding(glass.isEnabled ? 10 : 0)
-    }
-
-    private var themedSidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(nsImage: LuluBrand.headerIcon).resizable().interpolation(.high).frame(width: 24, height: 24)
-                Text("happylulu").font(.headline)
-            }.padding(.horizontal, 16).padding(.top, 20)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L("기본 설정", "Core settings")).font(.caption).foregroundStyle(.secondary).padding(8)
-                    ForEach([SettingsSection.general, .appearance, .work, .history, .updates]) { section in
-                        sidebarButton(section.title, symbol: section.symbol,
-                                      selected: selectedSection == section) { navigation.selection = section }
-                    }
-                    sidebarButton(L("플러그인 관리", "Manage plugins"), symbol: "puzzlepiece.extension",
-                                  selected: selectedSection == .plugins) { navigation.selection = .plugins }
-                        .padding(.top, 12)
-                    Divider().padding(.vertical, 12)
-                    Text(L("설치된 플러그인", "Installed plugins")).font(.caption).foregroundStyle(.secondary).padding(8)
-                    ForEach(plugins.installed) { entry in
-                        sidebarButton(entry.name, symbol: entry.symbol,
-                                      selected: selectedSection == .plugin && navigation.pluginID == entry.id) {
-                            navigation.pluginID = entry.id; navigation.selection = .plugin
-                        }
-                    }
-                    if plugins.installed.isEmpty {
-                        Text(L("설치된 항목이 없어요", "No plugins installed")).font(.caption).foregroundStyle(.secondary).padding(8)
-                    }
-                }.padding(.horizontal, 10)
-            }.accessibilityLabel(L("설정 항목", "Settings sections"))
-            Link(destination: GeneralSettingsPreview.guideURL) {
-                Label(L("사용 안내", "User guide"), systemImage: "book")
-            }
-            .accessibilityIdentifier("settings-user-guide")
-            .padding(12)
+        .frame(width: 230).frame(maxHeight: .infinity)
+        .background {
+            (appearance.usesNativeAppearance
+                ? (colorScheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(white: 0.92))
+                : appearance.sidebar).ignoresSafeArea(edges: [.top, .bottom])
         }
-        .frame(width: 205)
-        .luluGlassSurface(tint: appearance.sidebar, fallback: appearance.sidebar,
-                          cornerRadius: 20, legacyCornerRadius: 0)
-        .padding(glass.isEnabled ? 10 : 0)
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 1).allowsHitTesting(false)
+        }
     }
 
-    private func sidebarButton(_ title: String, symbol: String, selected: Bool,
-                               action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10).padding(.vertical, 9)
-                .contentShape(Rectangle())
-                .background(selected ? accent.opacity(glass.isEnabled ? 0.18 : 0.13) : .clear,
-                            in: RoundedRectangle(cornerRadius: glass.isEnabled ? 10 : 6))
-        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    private func sidebarLabel(_ title: String, symbol: String, selected: Bool = false) -> some View {
+        let highlighted = selected && controlActiveState == .key && sidebarHasFocus
+        return Label {
+            Text(title).foregroundStyle(highlighted ? Color.white : (selected ? Color.primary : appearance.text))
+        } icon: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .regular))
+                .imageScale(.medium)
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(highlighted ? Color.white : Color.blue)
+                .frame(width: 20, height: 20)
+                .accessibilityHidden(true)
+        }
     }
 
     private func installPlugin(_ id: String) {
@@ -294,14 +304,20 @@ struct SettingsView: View {
     @ViewBuilder private func pluginDetail(_ id: String) -> some View {
         if let entry = plugins.catalog.first(where: { $0.id == id }) {
             VStack(alignment: .leading, spacing: 6) {
-                Label(entry.name, systemImage: entry.symbol).font(.title.bold())
-                Text(L("개발자 · \(entry.author)", "Developer · \(entry.author)")).font(.caption).foregroundStyle(.secondary)
+                Text(L("개발자 · \(entry.author)", "Developer · \(entry.author)"))
                 Text(entry.summary).foregroundStyle(.secondary)
-            }
+            }.font(SettingsLayout.detailFont).foregroundStyle(.secondary)
             if plugins.isInstalled(id) {
-                Toggle(L("플러그인 사용", "Use plugin"), isOn: Binding(
+              settingsGroup(L("사용 설정", "Usage")) {
+                settingRow(id == "ai-usage" ? L("사용량 보기", "Show usage") : L("플러그인 사용", "Use plugin")) {
+                Toggle(id == "ai-usage" ? L("사용량 보기", "Show usage") : L("플러그인 사용", "Use plugin"), isOn: Binding(
                     get: { plugins.isEnabled(id) }, set: { setPluginEnabled(id, $0) }))
-                    .toggleStyle(.switch).disabled(!plugins.canChangeCatalog)
+                    .toggleStyle(.switch).labelsHidden()
+                    .accessibilityLabel(id == "ai-usage" ? L("사용량 보기", "Show usage") : L("플러그인 사용", "Use plugin"))
+                    .disabled(!plugins.canChangeCatalog || (id == "ai-usage" && !plugins.allowsExecution(id)))
+                    .accessibilityIdentifier(id == "ai-usage" ? "settings-usage-switch" : "settings-plugin-switch-\(id)")
+                }
+              }
                 if plugins.isEnabled(id) {
                     if id == "mac-calendar" {
                         Picker(L("캘린더 화면", "Calendar view"), selection: $showSyncSettings) {
@@ -346,102 +362,97 @@ struct SettingsView: View {
     }
 
     private var generalSection: some View {
-        GroupBox(L("일반", "General")) {
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 20) {
-                GridRow {
-                    Color.clear.frame(width: 140, height: 1).accessibilityHidden(true)
-                    Text(L("미리보기", "Preview")).font(.caption).foregroundStyle(.secondary)
-                        .accessibilityAddTraits(.isHeader)
-                    Color.clear.frame(width: 190, height: 1).accessibilityHidden(true)
-                }
-                GridRow {
-                    settingLabel(L("언어", "Language"))
-                    settingExample(L("안녕하세요, happylulu예요", "Hello from happylulu"))
-                    Picker(L("언어", "Language"), selection: Binding(
-                        get: { language.choice }, set: { language.select($0) })) {
-                        ForEach(LanguageChoice.allCases) { choice in
-                            Text(choice.label).tag(choice)
-                        }
-                    }.pickerStyle(.menu).labelsHidden()
-                        .accessibilityLabel(L("언어", "Language"))
-                        .frame(width: 190, alignment: .trailing)
-                        .gridColumnAlignment(.trailing)
-                }
-                GridRow {
-                    settingLabel(L("퇴근까지 남은 시간 표시", "Countdown display"))
-                    VStack(alignment: .leading, spacing: 5) {
-                        settingExample(GeneralSettingsPreview.countdown(model.countdownDisplay))
-                        Text(L("시간은 0.1시간씩, 다른 단위는 올림합니다. 밀리초는 0.1초마다 갱신합니다.",
-                               "Hours round up in 0.1-hour steps; other units round up. Milliseconds refresh every 0.1 seconds."))
-                            .font(.caption).foregroundStyle(.secondary)
+        settingsGroup(L("사용 환경", "Preferences")) {
+          VStack(spacing: 0) {
+            settingRow(L("언어", "Language")) {
+                Picker(L("언어", "Language"), selection: Binding(
+                    get: { language.choice }, set: { language.select($0) })) {
+                    ForEach(LanguageChoice.allCases) { choice in
+                        Text(choice.label).tag(choice)
                     }
-                    Picker(L("퇴근까지 남은 시간 표시", "Countdown display"), selection: Binding(
-                        get: { model.countdownDisplay }, set: { model.setCountdownDisplay($0) })) {
-                        ForEach(CountdownDisplay.allCases, id: \.self) { choice in
-                            Text(choice.displayLabel).tag(choice)
-                        }
-                    }.pickerStyle(.menu).labelsHidden()
-                        .accessibilityLabel(L("퇴근까지 남은 시간 표시", "Countdown display"))
-                        .frame(width: 190, alignment: .trailing)
-                }
-                GridRow {
-                    settingLabel(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar"))
-                    VStack(alignment: .leading, spacing: 5) {
-                        settingExample(GeneralSettingsPreview.departure(model.countdownDisplay, shown: model.showDepartureInMenuBar))
-                        Text(L("꺼도 남은 시간과 표시 단위는 유지됩니다.", "The countdown and selected format remain when off."))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Toggle(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar"), isOn: Binding(
-                        get: { model.showDepartureInMenuBar }, set: { model.setShowDepartureInMenuBar($0) }))
-                        .toggleStyle(.switch).labelsHidden()
-                        .accessibilityLabel(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar"))
-                        .accessibilityIdentifier("settings-departure-switch")
-                }
-                GridRow {
-                    settingLabel(L("사용량 보기", "Show usage"))
-                    VStack(alignment: .leading, spacing: 5) {
-                        let titles = plugins.menuBarItems.map(\.title).joined(separator: " · ")
-                        settingExample(titles.isEmpty ? L("표시 안 함", "Hidden") : titles)
-                        if plugins.showUsage, let id = plugins.usagePluginID {
-                            Button(L("사용량 설정", "Usage settings")) {
-                                navigation.pluginID = id; navigation.selection = .plugin
-                            }
-                        }
-                    }
-                    Toggle(L("사용량 보기", "Show usage"), isOn: Binding(
-                        get: { plugins.showUsage }, set: { plugins.setShowUsage($0) }))
-                        .toggleStyle(.switch).labelsHidden().disabled(!plugins.canShowUsage)
-                        .accessibilityLabel(L("사용량 보기", "Show usage"))
-                        .accessibilityIdentifier("settings-usage-switch")
-                }
-                GridRow {
-                    settingLabel(L("로그인 시 자동 실행", "Launch at login"))
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(model.loginDescription).font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if model.loginStatus == .requiresApproval {
-                            Button(L("시스템 설정에서 허용", "Allow in System Settings")) { SMAppService.openSystemSettingsLoginItems() }
-                        }
-                    }
-                    Toggle(L("로그인 시 자동 실행", "Launch at login"), isOn: Binding(
-                        get: { model.loginEnabled }, set: { model.setLoginEnabled($0) }))
-                        .toggleStyle(.switch).labelsHidden().disabled(!model.allowsLoginItemChanges)
-                        .accessibilityLabel(L("로그인 시 자동 실행", "Launch at login"))
-                        .accessibilityIdentifier("settings-login-switch")
-                }
+                }.pickerStyle(.menu).labelsHidden()
+                    .accessibilityLabel(L("언어", "Language"))
+                    .fixedSize(horizontal: true, vertical: false)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
+            generalDivider
+            settingRow(L("퇴근까지 남은 시간 표시", "Countdown display")) {
+                settingExample(GeneralSettingsPreview.countdown(model.countdownDisplay))
+                DisclosureGroup(L("표시 방식 안내", "About display formats")) {
+                    Text(L("시간은 0.1시간씩, 다른 단위는 올림합니다. 밀리초는 0.1초마다 갱신합니다.",
+                           "Hours round up in 0.1-hour steps; other units round up. Milliseconds refresh every 0.1 seconds."))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } control: {
+                Picker(L("퇴근까지 남은 시간 표시", "Countdown display"), selection: Binding(
+                    get: { model.countdownDisplay }, set: { model.setCountdownDisplay($0) })) {
+                    ForEach(CountdownDisplay.allCases, id: \.self) { choice in
+                        Text(choice.displayLabel).tag(choice)
+                    }
+                }.pickerStyle(.menu).labelsHidden()
+                    .accessibilityLabel(L("퇴근까지 남은 시간 표시", "Countdown display"))
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            generalDivider
+            settingRow(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar")) {
+                settingExample(GeneralSettingsPreview.departure(model.countdownDisplay, shown: model.showDepartureInMenuBar))
+            } control: {
+                Toggle(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar"), isOn: Binding(
+                    get: { model.showDepartureInMenuBar }, set: { model.setShowDepartureInMenuBar($0) }))
+                    .toggleStyle(.switch).labelsHidden()
+                    .accessibilityLabel(L("메뉴바에 퇴근 예정 시각 표시", "Show expected departure in menu bar"))
+                    .accessibilityIdentifier("settings-departure-switch")
+            }
+            generalDivider
+            settingRow(L("로그인 시 자동 실행", "Launch at login")) {
+                Text(model.loginDescription)
+                if model.loginStatus == .requiresApproval {
+                    Button(L("시스템 설정에서 허용", "Allow in System Settings")) { SMAppService.openSystemSettingsLoginItems() }
+                }
+            } control: {
+                Toggle(L("로그인 시 자동 실행", "Launch at login"), isOn: Binding(
+                    get: { model.loginEnabled }, set: { model.setLoginEnabled($0) }))
+                    .toggleStyle(.switch).labelsHidden().disabled(!model.allowsLoginItemChanges)
+                    .accessibilityLabel(L("로그인 시 자동 실행", "Launch at login"))
+                    .accessibilityIdentifier("settings-login-switch")
+            }
+          }
         }
     }
 
-    private func settingLabel(_ title: String) -> some View {
-        Text(title).fixedSize(horizontal: false, vertical: true)
-            .frame(width: 140, alignment: .leading)
+    private var generalDivider: some View {
+        Divider().padding(.horizontal, SettingsLayout.rowHorizontal).accessibilityHidden(true)
+    }
+
+    private func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        GroupBox(title) { content() }
+            .groupBoxStyle(LuluSettingsGroupBoxStyle(surface: settingsSurface, contentPadding: 0))
+    }
+
+    private func settingRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
+        settingRow(title, detail: { EmptyView() }, control: control)
+    }
+
+    private func settingRow<Detail: View, Control: View>(
+        _ title: String, @ViewBuilder detail: () -> Detail, @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(SettingsLayout.bodyFont)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) { detail() }
+                    .font(SettingsLayout.detailFont).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            control()
+        }
+        .font(SettingsLayout.bodyFont)
+        .padding(.horizontal, SettingsLayout.rowHorizontal).padding(.vertical, SettingsLayout.rowVertical)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func settingExample(_ value: String) -> some View {
-        Text(value).font(.callout.monospacedDigit())
+        Text(L("예시: \(value)", "Example: \(value)"))
+            .font(.system(size: 11).monospacedDigit())
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(L("표시 예시", "Display example"))
@@ -450,32 +461,65 @@ struct SettingsView: View {
 
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            AttendanceCalendarView(model: model)
-            Button(L("기록 폴더 열기", "Open records folder")) { model.showData() }
+            AttendanceCalendarView(model: model, settingsPresentation: true, settingsAccent: accent)
+            HStack {
+                Spacer()
+                Button(L("기록 폴더 열기", "Open records folder")) { model.showData() }
+            }
         }
     }
 
     private var workSection: some View {
-        GroupBox(L("근무", "Work")) {
-            VStack(alignment: .leading, spacing: 12) {
-                TodayDayTypeView(model: model)
-                AttendanceControlsView(model: model)
-                Divider()
-                Stepper(L("근무  \(model.duration(model.state.settings.workMinutes))", "Work  \(model.duration(model.state.settings.workMinutes))"), value: Binding(
-                    get: { model.state.settings.workMinutes },
-                    set: { model.updateSettings(work: $0, rest: model.state.settings.breakMinutes) }
-                ), in: 60...960, step: 30)
-                Stepper(L("휴게  \(model.duration(model.state.settings.breakMinutes))", "Break  \(model.duration(model.state.settings.breakMinutes))"), value: Binding(
-                    get: { model.state.settings.breakMinutes },
-                    set: { model.updateSettings(work: model.state.settings.workMinutes, rest: $0) }
-                ), in: 0...240, step: 15)
-                Text(L("오늘 퇴근 예정에도 바로 반영됩니다. 잠금·절전 중에도 시간이 흘러갑니다.", "Changes affect today’s departure immediately. Time continues while the Mac is locked or asleep."))
-                    .foregroundStyle(.secondary)
-                Text(L("매달 마지막 금요일에는 퇴근 예정이 2시간 빨라집니다. 반차는 휴게 없이 출근 4시간 뒤 퇴근하며, 마지막 금요일 단축과 중복 적용하지 않아요.", "On the last Friday of each month, departure is 2 hours earlier. A half-day ends 4 hours after arrival with no break or additional Friday reduction."))
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: SettingsLayout.betweenSections) {
+            settingsGroup(L("오늘 근무", "Today's work")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    TodayDayTypeView(model: model)
+                    AttendanceControlsView(model: model)
+                }
+                .font(SettingsLayout.bodyFont)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(SettingsLayout.rowHorizontal)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
+            VStack(alignment: .leading, spacing: SettingsLayout.titleToCard) {
+              settingsGroup(L("근무 시간", "Work schedule")) {
+                VStack(spacing: 0) {
+                    settingRow(L("근무", "Work")) {
+                        HStack(spacing: 8) {
+                            Text(model.duration(model.state.settings.workMinutes)).monospacedDigit().accessibilityHidden(true)
+                            Stepper(L("근무 시간", "Work duration"), value: Binding(
+                                get: { model.state.settings.workMinutes },
+                                set: { model.updateSettings(work: $0, rest: model.state.settings.breakMinutes) }
+                            ), in: 60...960, step: 30)
+                                .labelsHidden()
+                                .accessibilityLabel(L("근무 시간", "Work duration"))
+                                .accessibilityValue(model.duration(model.state.settings.workMinutes))
+                        }.fixedSize()
+                    }
+                    generalDivider
+                    settingRow(L("휴게", "Break")) {
+                        HStack(spacing: 8) {
+                            Text(model.duration(model.state.settings.breakMinutes)).monospacedDigit().accessibilityHidden(true)
+                            Stepper(L("휴게 시간", "Break duration"), value: Binding(
+                                get: { model.state.settings.breakMinutes },
+                                set: { model.updateSettings(work: model.state.settings.workMinutes, rest: $0) }
+                            ), in: 0...240, step: 15)
+                                .labelsHidden()
+                                .accessibilityLabel(L("휴게 시간", "Break duration"))
+                                .accessibilityValue(model.duration(model.state.settings.breakMinutes))
+                        }.fixedSize()
+                    }
+                }
+              }
+              VStack(alignment: .leading, spacing: 4) {
+                Text(L("오늘 퇴근 예정에도 바로 반영됩니다. 잠금·절전 중에도 시간이 흘러갑니다.", "Changes affect today’s departure immediately. Time continues while the Mac is locked or asleep."))
+                DisclosureGroup(L("단축 근무와 반차 안내", "About shorter days and half-days")) {
+                    Text(L("매달 마지막 금요일에는 퇴근 예정이 2시간 빨라집니다. 반차는 휴게 없이 출근 4시간 뒤 퇴근하며, 마지막 금요일 단축과 중복 적용하지 않아요.", "On the last Friday of each month, departure is 2 hours earlier. A half-day ends 4 hours after arrival with no break or additional Friday reduction."))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+              }
+              .font(SettingsLayout.detailFont).foregroundStyle(.secondary)
+              .padding(.horizontal, SettingsLayout.rowHorizontal)
+            }
         }
     }
 
@@ -505,50 +549,52 @@ struct SettingsView: View {
     }
 
     private var updatesSection: some View {
-        GroupBox(L("업데이트 · \(updater.version)", "Updates · \(updater.version)")) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L("서명된 새 버전을 앱에서 받아 설치합니다. 출근 기록과 설정은 유지됩니다.", "Downloads and installs signed updates in the app, preserving your records and settings."))
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle(L("새 버전 자동 확인", "Automatically check for updates"), isOn: Binding(
-                    get: { updater.automaticallyChecks },
-                    set: { updater.setAutomaticallyChecks($0) }))
-                    .disabled(!updater.canCheckForUpdates)
-                Toggle(L("자동 다운로드 및 설치", "Automatically download and install"), isOn: Binding(
-                    get: { updater.automaticallyInstalls },
-                    set: { updater.setAutomaticallyInstalls($0) }))
-                    .disabled(!updater.canCheckForUpdates || updater.isPreparingInstallation || !updater.automaticallyChecks)
-                Text(L("자동 확인을 켜면 1시간마다 새 버전을 찾습니다. 자동 설치를 켜면 창을 닫고 출근 처리·캘린더 동기화가 끝난 뒤 앱이 자동으로 재시작됩니다. 끄면 설치 전에 확인합니다. 설치 준비가 끝나면 재시작까지 설정을 잠시 바꿀 수 없습니다.", "When enabled, checks for updates hourly. With automatic installation on, the app restarts after its windows are closed and attendance/calendar work has finished. Otherwise, installation asks for confirmation. Once installation is prepared, settings are locked until restart."))
-                    .foregroundStyle(.secondary)
-                Button(L("지금 업데이트 확인", "Check for updates now")) { updater.checkForUpdates() }
-                    .disabled(!updater.canCheckForUpdates)
-                if let error = updater.startupError {
-                    Text(visibleMessage(error)).foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: SettingsLayout.titleToCard) {
+          settingsGroup(L("업데이트", "Updates")) {
+            VStack(spacing: 0) {
+                settingRow(L("현재 버전", "Current version")) {
+                    Text(updater.version).foregroundStyle(.secondary)
                 }
+                generalDivider
+                HStack {
+                    Spacer()
+                    Button(L("지금 업데이트 확인", "Check for updates now")) { updater.checkForUpdates() }
+                        .disabled(!updater.canCheckForUpdates)
+                }
+                .padding(.horizontal, SettingsLayout.rowHorizontal).padding(.vertical, SettingsLayout.rowVertical)
             }
-            .toggleStyle(.switch)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
+          }
+          VStack(alignment: .leading, spacing: 4) {
+            Text(L("업데이트는 출근 기록과 설정을 유지합니다.", "Updates preserve your records and settings."))
+            DisclosureGroup(L("업데이트 동작 안내", "About updates")) {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(L("서명된 새 버전을 앱에서 받아 설치합니다. 출근 기록과 설정은 유지됩니다.", "Downloads and installs signed updates in the app, preserving your records and settings."))
+                Text(L("기존 자동 확인·설치 설정은 유지됩니다. 자동 설치를 사용 중이면 창을 닫고 출근 처리·캘린더 동기화가 끝난 뒤 앱이 재시작됩니다. 설치 준비가 끝나면 재시작까지 설정을 잠시 바꿀 수 없습니다.", "Your existing automatic update preferences are retained. If automatic installation is enabled, the app restarts after its windows are closed and attendance/calendar work has finished. Settings are locked from installation preparation until restart."))
+              }.fixedSize(horizontal: false, vertical: true)
+            }
+            if let error = updater.startupError {
+                Text(visibleMessage(error)).foregroundStyle(.orange)
+            }
+          }
+          .font(SettingsLayout.detailFont).foregroundStyle(.secondary)
+          .padding(.horizontal, SettingsLayout.rowHorizontal)
         }
     }
 }
 
 private struct LuluSettingsGroupBoxStyle: GroupBoxStyle {
-    var glass = LuluGlass()
     let surface: Color
-    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
-        if glass.isEnabled {
-            VStack(alignment: .leading, spacing: 10) {
-                configuration.label.font(.headline).padding(.horizontal, 4)
-                configuration.content
-                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(surface.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                configuration.label.font(.headline)
-                configuration.content
-            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(surface, in: RoundedRectangle(cornerRadius: 10))
+    var contentPadding: CGFloat = 6
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: SettingsLayout.titleToCard) {
+            configuration.label
+                .font(SettingsLayout.sectionFont)
+                .padding(.horizontal, SettingsLayout.rowHorizontal)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+            configuration.content
+                .padding(contentPadding).frame(maxWidth: .infinity, alignment: .leading)
+                .background(surface, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 }

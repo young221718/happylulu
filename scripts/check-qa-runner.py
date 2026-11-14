@@ -122,6 +122,7 @@ class RunnerTests(unittest.TestCase):
         self.assertIn('daou-model', ids)
         self.assertIn('edit-menu', ids)
         self.assertIn('ai-tests', ids)
+        self.assertIn('mac-utilities-tests', ids)
         self.assertIn('ai-ui', ids)
 
     def test_full_command_inventory_matches_original_ci(self):
@@ -134,7 +135,8 @@ class RunnerTests(unittest.TestCase):
             ('CalendarSyncChecks', []), ('CalendarSyncServiceChecks', []),
             ('CPURunnerChecks', []), ('SystemMetricsChecks', []), ('AppPluginChecks', [])]]
         expected += [tuple(['swift', 'build', '--build-system', 'native', '--product', 'HappyLulu']),
-                     tuple(['swift', 'test', '--build-system', 'native', '--filter', 'AIUsageTests'])]
+                     tuple(['swift', 'test', '--build-system', 'native', '--filter', 'AIUsageTests']),
+                     tuple(['swift', 'test', '--build-system', 'native', '--filter', 'MacUtilitiesTests'])]
         scripts = ['codex-symbol', 'ai-usage-ui'] + ['design-render'] * 5 + [
             'daouoffice-write', 'runner-artwork', 'owl-orbit', 'calendar-model',
             'calendar-diagnostics', 'calendar-runtime', 'automatic-install', 'runtime-profile',

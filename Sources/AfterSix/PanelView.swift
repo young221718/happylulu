@@ -18,7 +18,8 @@ struct PanelView: View {
     @PanelState private var focusedDigit: Int?
     @PanelState private var saveGeneration = 0
     @PanelState private var selectingType = false
-    @FocusState private var moreMenuFocused: Bool
+    @FocusState private var headerFocus: HeaderAction?
+    private enum HeaderAction: Hashable { case settings, quit }
     let onOpenHistory: () -> Void
     let onOpenSettings: () -> Void
     let onOpenCalendar: () -> Void
@@ -43,7 +44,10 @@ struct PanelView: View {
                     .accessibilityLabel("happylulu, \(model.luluStateLabel)")
                 Text("happylulu").font(.system(size: 16, weight: .semibold))
                 Spacer()
-                moreMenu
+                HStack(spacing: 4) {
+                    headerButton(.settings, symbol: "gearshape", title: L("설정", "Settings"), action: onOpenSettings)
+                    headerButton(.quit, symbol: "power", title: L("종료", "Quit")) { NSApplication.shared.terminate(nil) }
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -130,26 +134,25 @@ struct PanelView: View {
         .onDisappear { if editing { _ = saveClock() } }
     }
 
-    @ViewBuilder private var moreMenu: some View {
-        let menu = Menu {
-            Button(L("설정", "Settings"), action: onOpenSettings)
-            Button(L("종료", "Quit")) { NSApplication.shared.terminate(nil) }
+    @ViewBuilder private func headerButton(_ item: HeaderAction, symbol: String, title: String,
+                                           action: @escaping () -> Void) -> some View {
+        let button = Button {
+            // A direct Quit can run before the deferred click-away save.
+            // Commit synchronously, keeping an invalid draft visible for correction.
+            guard saveClock() else { return }
+            action()
         } label: {
-            Image(systemName: "ellipsis").font(.system(size: 16))
+            Image(systemName: symbol).font(.system(size: 14)).frame(width: 28, height: 28)
         }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
         .fixedSize()
-        .focused($moreMenuFocused)
-        .accessibilityLabel(L("더 보기", "More"))
-        if appearance.usesNativeAppearance {
-            menu.luluGlassButton()
-        } else if #available(macOS 14, *) {
-            // Custom palettes retain the existing transparent header control.
-            menu.buttonStyle(PanelMenuButtonStyle(accent: accent, isFocused: moreMenuFocused))
+        .focused($headerFocus, equals: item)
+        .accessibilityLabel(title).help(title)
+        .accessibilityIdentifier(item == .settings ? "panel-settings" : "panel-quit")
+        if #available(macOS 14, *) {
+            button.buttonStyle(PanelMenuButtonStyle(accent: accent, isFocused: headerFocus == item))
                 .focusEffectDisabled()
         } else {
-            menu.buttonStyle(PanelMenuButtonStyle(accent: accent, isFocused: moreMenuFocused))
+            button.buttonStyle(PanelMenuButtonStyle(accent: accent, isFocused: headerFocus == item))
         }
     }
 
