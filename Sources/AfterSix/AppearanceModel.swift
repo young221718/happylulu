@@ -74,8 +74,11 @@ final class AppearanceModel: ObservableObject {
         setColor(hex, for: role)
     }
 
-    func selectPalette(_ palette: AppearancePalette) { change { $0.selectPalette(palette) } }
-    func resetColors() { selectPalette(preferences.palette) }
+    func selectPalette(_ palette: AppearancePalette) {
+        guard preferences.palette != palette else { return }
+        change { $0.selectPalette(palette) }
+    }
+    func resetColors() { change { $0.resetColors() } }
     func selectIcon(_ icon: AppearanceIcon) { change { $0.icon = icon } }
 
     private func change(_ update: (inout AppearancePreferences) throws -> Void) {
@@ -123,6 +126,13 @@ final class AppearanceModel: ObservableObject {
             return image
         }
         if let image = builtInIcons[icon] { return image }
+        if [.happy, .fiery, .money, .sad].contains(icon) {
+            guard let url = Bundle.main.url(forResource: icon.rawValue, withExtension: "png", subdirectory: "OwlIcons"),
+                  let image = NSImage(contentsOf: url) else { return originalIcon }
+            image.size = originalIcon.size
+            builtInIcons[icon] = image
+            return image
+        }
         let tint: String
         switch icon {
         case .mint: tint = "#52AC91"

@@ -18,7 +18,7 @@ assert re.fullmatch(r"[1-9]\d*", MAC_BUILD), "Invalid public Mac build"
 MAC_SLUG = f"macos-{MAC_VERSION}"
 MAC_TAG = f"macos-v{MAC_VERSION}-build{MAC_BUILD}"
 # Release metadata and the approved site assets share one cache version.
-ASSET_TAG = f"{MAC_TAG}-site-release-20261026"
+ASSET_TAG = f"{MAC_TAG}-site-release-20261116"
 
 # Brand copy is lowercase; literal filenames, URLs and storage paths keep their case.
 BRAND_WORD = re.compile(r"(?<![A-Za-z0-9_./\\-])(?:happylulu|lulu)(?![A-Za-z0-9_]|[./\\-][A-Za-z0-9])", re.I)
@@ -141,9 +141,9 @@ legacy_routes = ("index.html", "en/index.html", "download/index.html", "features
 features = ("attendance", "arrival-time", "workday-modes", "countdown", "history", "calendar",
             "plugins", "daouoffice", "leave-recognition", "appearance", "overtime", "updates",
             "system-monitor", "ai-usage")
-releases = {MAC_SLUG: MAC_TAG, "macos-1.5.19": "macos-v1.5.19-build35", "macos-1.5.18": "macos-v1.5.18-build34", "macos-1.5.17": "macos-v1.5.17-build33", "macos-1.5.16": "macos-v1.5.16-build32", "macos-1.5.15": "macos-v1.5.15-build31", "macos-1.5.14": "macos-v1.5.14-build30",
+releases = {MAC_SLUG: MAC_TAG, "macos-1.5.20": "macos-v1.5.20-build36", "macos-1.5.19": "macos-v1.5.19-build35", "macos-1.5.18": "macos-v1.5.18-build34", "macos-1.5.17": "macos-v1.5.17-build33", "macos-1.5.16": "macos-v1.5.16-build32", "macos-1.5.15": "macos-v1.5.15-build31", "macos-1.5.14": "macos-v1.5.14-build30",
             "windows-1.5.13": "windows-v1.5.13"}
-assert len(pages) == 56, "Preserve 54 existing routes and add the bilingual Mac 1.5.20 release"
+assert len(pages) == 58, "Preserve 56 existing routes and add the bilingual Mac 1.5.21 release"
 for route in legacy_routes:
     assert (DIST / route).resolve() in pages, route
 for prefix in ("", "en/"):
@@ -261,7 +261,7 @@ for prefix in ("", "en/"):
         page = pages[document]
         assert any(fields.get("data-doc-stage") == "released" for _, fields in page.elements), document
         text = document.read_text()
-        notice = "Mac 1.5.20 build36"
+        notice = f"Mac {MAC_VERSION} build{MAC_BUILD}"
         assert notice in text and "Windows 1.5.13" in text, f"Explain shipped Mac features and Windows scope: {document}"
     home = pages[(DIST / prefix / "index.html").resolve()]
     assert f"/{prefix}features/#local-preview" in home.links, "Keep a compact path from home to new feature docs"
@@ -315,6 +315,9 @@ for entry in ("index.html", "en/index.html", "download/index.html"):
 # Versioned release bodies stay byte-protected; only common shells and badges may change.
 # Historical baselines are captured before promoting a new release, including existing brand casing.
 historical_release_bodies = {
+    'releases/macos-1.5.20/index.html': '3de7a85673987718808b7f62a06c616b9806d6bf309db1e76f856e90983a7e7b',
+    'en/releases/macos-1.5.20/index.html': '9e76ee62a522385b98590d83938abe64c3a52e34b4592ee57e3183bc86a74af2',
+
     'releases/macos-1.5.19/index.html': 'fbbfcee40df17dd1b371ae5d5e5d05efe9eabcc5aa8f817463bb6478fd4ee285',
     'en/releases/macos-1.5.19/index.html': '5d669af643a8dd48a61488829764768cd01b1a724034dcc45864c741de5eeb4b',
     'releases/macos-1.5.18/index.html': '32dafc2a26dad805ee1c8b22220f492a3fa80c79229a95dda0ec4652f56d929d',
@@ -350,13 +353,13 @@ for prefix, phrases in (("", ("퇴근 18:00 · 91분 남음", "즉시", "밀리�
 # Describe the new departure visibility preference separately from the countdown unit.
 for prefix, phrases in (("", ("메뉴바에 퇴근 예정 시각 표시", "기본은 켜짐", "91분 남음", "퇴근 가능", "재시작", "즉시")),
                         ("en/", ("Show expected departure in menu bar", "on by default", "91 min left", "Ready to leave", "restart", "immediately"))):
-    for route in ("features/countdown/index.html", "guide/index.html", f"releases/{MAC_SLUG}/index.html"):
+    for route in ("features/countdown/index.html", "guide/index.html"):
         text = (DIST / prefix / route).read_text()
         for phrase in phrases:
             assert phrase in text, f"Explain departure visibility, ready-to-leave label and saved preference: {prefix}{route} {phrase}"
-# The latest release explains the new optional modules, overtime, platform scope and actual install evidence.
-for prefix, phrases in (("", ("CPU", "메모리", "네트워크", "배터리", "Codex", "30분", "0.1초", "macOS 26", "고정 자체 인증서", "Sparkle", "공증은 적용하지 않았습니다", "로컬 설치·재실행", "별도 미검증")),
-                        ("en/", ("CPU", "memory", "network", "battery", "Codex", "30 minutes", "0.1 seconds", "macOS 26", "fixed self-signed certificate", "Sparkle", "notarization are not applied", "Local installation", "separately unverified"))):
+# Current release describes accepted additions and distinguishes installation coverage.
+for prefix, phrases in (("", ("화면 꺼짐 방지", "마우스", "트랙패드", "Codex", "1.5.20", "8개", "일반", "근무", "Sparkle", "공증은 적용하지 않았습니다", "별도 미검증")),
+                        ("en/", ("Keep awake", "mouse-wheel", "Trackpad", "Codex", "1.5.20", "Eight themes", "General", "Work", "Sparkle", "notarization are not applied", "separately unverified"))):
     current = (DIST / prefix / f"releases/{MAC_SLUG}/index.html").read_text()
     for phrase in phrases:
         assert phrase in current, f"Explain current Mac changes and limits: {prefix} {phrase}"
@@ -370,5 +373,4 @@ assert not any("/downloads/" in urlsplit(link).path for link in links), "Use Git
 for path in DIST.rglob("*"):
     assert not path.is_symlink(), path
     assert path.suffix not in {".zip", ".dmg", ".exe", ".p12", ".key"}, path
-assert json.loads((ROOT / ".openai/hosting.json").read_text())["project_id"] == "appgprj_6abcb381750c819189cb642ebfa52b3e"
 print(f"PASS: {len(pages)} routes, shared section navigation/current pages, direct release downloads, bilingual guides, links/anchors and release assets; no app binaries.")

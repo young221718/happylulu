@@ -71,7 +71,7 @@ private func capture<V: View>(_ view: V, size: NSSize, to url: URL) throws {
         if switches.isEmpty {
             print("SKIP general native control geometry/AX: CLI SwiftUI host does not expose NSSwitch descendants; inspect retained renders")
         } else {
-            precondition(switches.count == 3, "Departure, usage and login must each have one switch")
+            precondition(switches.count == 2, "General must contain only departure and login switches; usage belongs to its plugin")
             let frames = switches.map { host.convert($0.bounds, from: $0) }
             precondition(frames.allSatisfy { abs($0.midX - frames[0].midX) < 1 }, "General switches must share the right column")
             let pickers = controls(host).compactMap { $0 as? NSPopUpButton }
@@ -85,7 +85,7 @@ private func capture<V: View>(_ view: V, size: NSSize, to url: URL) throws {
             } else {
                 print("SKIP picker native geometry: CLI SwiftUI menus have no NSPopUpButton descendants; inspect retained same-row/right-column renders")
             }
-            print("PASS general native geometry: exactly three switches share the right column")
+            print("PASS general native geometry: exactly two switches share the right column")
             // SwiftUI exposes accessibility on semantic wrappers, not the backing NSSwitch.
             // Inspect the actual hit-test element and its accessibility parents when the CLI host vends them.
             func attribute(_ object: NSObject, _ name: String) -> AnyObject? {
@@ -104,14 +104,14 @@ private func capture<V: View>(_ view: V, size: NSSize, to url: URL) throws {
                 for _ in 0..<8 {
                     guard let current = element else { break }
                     let labels = ["accessibilityLabel", "accessibilityTitle"].compactMap { attribute(current, $0) as? String }
-                    if labels.contains(expected) || labels.contains(L("사용량 보기", "Show usage")) { accessibleSwitches += 1; break }
+                    if labels.contains(expected) { accessibleSwitches += 1; break }
                     element = attribute(current, "accessibilityParent") as? NSObject
                 }
             }
-            if accessibleSwitches == 3 {
-                print("PASS general accessibility: all three semantic switches expose localized setting names")
+            if accessibleSwitches == 2 {
+                print("PASS general accessibility: both semantic switches expose localized setting names")
             } else {
-                print("SKIP general semantic AX names: CLI SwiftUI host exposes \(accessibleSwitches)/3 named hit-test elements; explicit labels retained for desktop validation")
+                print("SKIP general semantic AX names: CLI SwiftUI host exposes \(accessibleSwitches)/2 named hit-test elements; explicit labels retained for desktop validation")
             }
         }
     }

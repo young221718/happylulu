@@ -32,12 +32,12 @@ struct PluginSettingsView: View {
             ForEach(model.catalog) { entry in
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(spacing: 13) {
-                        Image(systemName: entry.symbol).font(.title3).frame(width: 36, height: 36)
+                        Image(systemName: entry.symbol).font(.system(size: 15)).imageScale(.medium).frame(width: 36, height: 36)
                             .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.name).font(.headline)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.name).font(SettingsLayout.sectionFont)
                             Text(L("개발자 · \(entry.author)", "Developer · \(entry.author)"))
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(SettingsLayout.detailFont).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
                         if model.isInstalled(entry.id) {
@@ -52,7 +52,7 @@ struct PluginSettingsView: View {
                                 .accessibilityLabel(L("\(entry.name) 설치", "Install \(entry.name)"))
                         }
                     }
-                    Text(entry.summary).font(.callout).foregroundStyle(.secondary)
+                    Text(entry.summary).font(SettingsLayout.detailFont).foregroundStyle(.secondary)
                     if needsSetup(entry.id) {
                         Label(L("설정 필요 · 연결과 권한을 확인해 주세요.", "Setup required · check the source and permissions."), systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.orange)
@@ -80,9 +80,9 @@ struct FeatureSourceSettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(features, id: \.self) { feature in
                     HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(feature.title)
-                            Text(feature.detail).font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(feature.title).font(SettingsLayout.bodyFont)
+                            Text(feature.detail).font(SettingsLayout.detailFont).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Picker(feature.title, selection: Binding(

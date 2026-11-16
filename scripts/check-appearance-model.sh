@@ -9,6 +9,7 @@ app="$probe_dir/AppearanceProbe.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp Resources/HappyLuluBrand.png "$app/Contents/Resources/"
 cp -R Resources/OwlStates "$app/Contents/Resources/"
+cp -R Resources/OwlIcons "$app/Contents/Resources/"
 python3 - "$app/Contents/Info.plist" <<'PY2'
 import pathlib, plistlib, sys
 with pathlib.Path(sys.argv[1]).open('wb') as stream:

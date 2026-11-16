@@ -17,41 +17,16 @@ private func pump(_ host: NSView) {
 @MainActor
 private final class TerminationProbe: NSObject, NSApplicationDelegate {
     var requests = 0
+    var onRequest: (() -> Void)?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         requests += 1
+        onRequest?()
         return .terminateCancel
     }
 }
 
 @MainActor
-private final class MenuTrackingProbe: NSObject {
-    var menu: NSMenu?
-    @objc func didBeginTracking(_ notification: Notification) {
-        menu = notification.object as? NSMenu
-        DispatchQueue.main.async {
-            if let output = ProcessInfo.processInfo.environment["HAPPY_LULU_PANEL_CAPTURE_OUTPUT"] {
-                do {
-                    let directory = URL(fileURLWithPath: output, isDirectory: true)
-                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                    for (index, window) in NSApplication.shared.windows.enumerated() where window.isVisible {
-                        guard let view = window.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
-                        view.cacheDisplay(in: view.bounds, to: bitmap)
-                        let filename = "panel-more-\(AppLanguage.shared.choice.rawValue)-\(index)-\(String(describing: type(of: window))).png"
-                        try bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(filename))
-                    }
-                } catch { preconditionFailure("Could not capture isolated menu: \(error)") }
-            }
-            self.menu?.cancelTracking()
-        }
-    }
-}
-
-@MainActor
-private func openHeaderMenu(in host: NSView, window: NSWindow, at point: NSPoint = NSPoint(x: 334, y: 30)) -> NSMenu? {
-    let observation = MenuTrackingProbe()
-    NotificationCenter.default.addObserver(observation, selector: #selector(MenuTrackingProbe.didBeginTracking(_:)),
-                                           name: NSMenu.didBeginTrackingNotification, object: nil)
-    defer { NotificationCenter.default.removeObserver(observation) }
+private func clickHeader(in host: NSView, window: NSWindow, at point: NSPoint) {
     let location = host.convert(point, to: nil)
     for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
         let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [],
@@ -60,16 +35,14 @@ private func openHeaderMenu(in host: NSView, window: NSWindow, at point: NSPoint
         window.sendEvent(event)
     }
     pump(host)
-    return observation.menu
 }
 
 @main
 struct PanelFocusProbe {
     @MainActor static func main() throws {
         _ = NSApplication.shared
-        let identity = Bundle.main.bundleIdentifier!
-        precondition(identity == "test.happylulu.panel-focus-probe")
-        defer { UserDefaults.standard.removePersistentDomain(forName: identity) }
+        precondition(Bundle.main.bundleIdentifier == nil, "Run this probe without an app bundle")
+        UserDefaults.standard.setVolatileDomain([AppLanguage.key: "english"], forName: UserDefaults.argumentDomain)
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         let timeZone = TimeZone(identifier: CommandLine.arguments[2])!
         checkPlacement()
@@ -282,48 +255,70 @@ struct PanelFocusProbe {
             popup.setFrameOrigin(NSPoint(x: -10000, y: -10000))
             pump(host)
         }
-        let beforeMenus = try Data(contentsOf: store.url)
-        for point in [NSPoint(x: 321, y: 17), NSPoint(x: 347, y: 43)] {
-            precondition(openHeaderMenu(in: host, window: window, at: point) != nil,
-                         "More menu must preserve the full 28-point header hit target")
-        }
-        for (language, titles) in [(LanguageChoice.english, ["Settings", "Quit"]), (.korean, ["설정", "종료"])] {
+        let beforeButtons = try Data(contentsOf: store.url)
+        for language in [LanguageChoice.english, .korean] {
             AppLanguage.shared.select(language)
             pump(host)
-            let opensBeforeMenu = settingsOpens
-            let menu = openHeaderMenu(in: host, window: window)
-            precondition(settingsOpens == opensBeforeMenu,
-                         "Header control opened Settings directly instead of presenting the more menu")
-            precondition(menu != nil, "Header control did not open a native menu")
-            let items = menu!.items.filter { !$0.isSeparatorItem }
-            precondition(items.map(\.title) == titles, "More menu must expose localized Settings and Quit only")
-            menu!.performActionForItem(at: menu!.index(of: items[0]))
-            pump(host)
-            precondition(settingsOpens == opensBeforeMenu + 1, "Settings menu item did not use the panel callback")
+            for point in [NSPoint(x: 289, y: 17), NSPoint(x: 315, y: 43)] {
+                let before = settingsOpens
+                clickHeader(in: host, window: window, at: point)
+                precondition(settingsOpens == before + 1, "Settings button must preserve its 28pt target and direct callback")
+            }
             let termination = TerminationProbe()
             NSApplication.shared.delegate = termination
-            menu!.performActionForItem(at: menu!.index(of: items[1]))
-            pump(host)
-            precondition(termination.requests == 1, "Quit menu item did not request graceful application termination")
+            for point in [NSPoint(x: 321, y: 17), NSPoint(x: 347, y: 43)] {
+                clickHeader(in: host, window: window, at: point)
+            }
+            precondition(termination.requests == 2, "Quit button must request graceful termination")
             NSApplication.shared.delegate = nil
         }
-        let image = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
-        host.cacheDisplay(in: host.bounds, to: image)
-        func color(_ x: CGFloat, _ y: CGFloat) -> NSColor {
-            image.colorAt(x: Int(x * CGFloat(image.pixelsWide) / host.bounds.width),
-                          y: Int(y * CGFloat(image.pixelsHigh) / host.bounds.height))!.usingColorSpace(.deviceRGB)!
+        let afterButtons = try Data(contentsOf: store.url)
+        precondition(afterButtons == beforeButtons, "Header buttons changed attendance")
+        print("PASS real PanelView buttons: separate 28pt Settings/Quit targets, English/Korean, direct callback, graceful Quit cancelled by isolated delegate")
+        clickHeader(in: host, window: window, at: NSPoint(x: 66, y: 154))
+        let quitFields = descendants(host).compactMap { $0 as? NSTextField }.filter { $0.cell is ArrivalClockDigitCell }
+            .sorted { $0.convert(.zero, to: host).x < $1.convert(.zero, to: host).x }
+        precondition(quitFields.count == 4, "Could not reopen the editor for direct Quit")
+        precondition(window.makeFirstResponder(quitFields[0]))
+        let quitEditor = quitFields[0].currentEditor() as! ArrivalClockFieldEditor
+        quitEditor.readPasteboard = { "08:15" }; quitEditor.paste(nil)
+        pump(host)
+        var timeAtTermination: String?
+        let editingTermination = TerminationProbe()
+        editingTermination.onRequest = {
+            let state = try! store.load()
+            let arrival = state.arrivals[model.dayKey(model.now)]!
+            timeAtTermination = Attendance.clockLabel(arrival.time, timeZone: model.calendar.timeZone)
         }
-        let background = color(310, 22)
-        for x in [CGFloat(324), 334, 344] {
-            let buttonBackground = color(x, 22)
-            precondition(abs(buttonBackground.redComponent - background.redComponent) < 0.03 &&
-                         abs(buttonBackground.greenComponent - background.greenComponent) < 0.03 &&
-                         abs(buttonBackground.blueComponent - background.blueComponent) < 0.03,
-                         "More menu trigger must preserve the transparent header background")
-        }
-        let afterMenus = try Data(contentsOf: store.url)
-        precondition(afterMenus == beforeMenus, "Menu changed attendance")
-        print("PASS real PanelView more menu: 28-point transparent trigger, Korean/English Settings/Quit, Settings callback, graceful Quit cancelled by isolated probe delegate")
+        NSApplication.shared.delegate = editingTermination
+        let beforeQuitSaves = saves
+        clickHeader(in: host, window: window, at: NSPoint(x: 334, y: 30))
+        NSApplication.shared.delegate = nil
+        precondition(editingTermination.requests == 1 && timeAtTermination == "08:15" && saves == beforeQuitSaves + 1,
+                     "Direct Quit must save the edited clock exactly once before requesting termination")
+        print("PASS direct Quit while editing: clock saved exactly once before termination delegate")
+        clickHeader(in: host, window: window, at: NSPoint(x: 66, y: 154))
+        let invalidFields = descendants(host).compactMap { $0 as? NSTextField }.filter { $0.cell is ArrivalClockDigitCell }
+            .sorted { $0.convert(.zero, to: host).x < $1.convert(.zero, to: host).x }
+        precondition(invalidFields.count == 4 && window.makeFirstResponder(invalidFields[0]))
+        let invalidEditor = invalidFields[0].currentEditor() as! ArrivalClockFieldEditor
+        invalidEditor.readPasteboard = { "23:59" }; invalidEditor.paste(nil)
+        pump(host)
+        let beforeInvalidQuit = try Data(contentsOf: store.url)
+        NSApplication.shared.delegate = editingTermination
+        clickHeader(in: host, window: window, at: NSPoint(x: 334, y: 30))
+        NSApplication.shared.delegate = nil
+        let afterInvalidQuit = try Data(contentsOf: store.url)
+        precondition(editingTermination.requests == 1 && model.errorMessage != nil && beforeInvalidQuit == afterInvalidQuit,
+                     "An invalid draft must block direct Quit without changing attendance")
+        precondition(window.makeFirstResponder(invalidFields[0]))
+        (invalidFields[0].currentEditor() as! ArrivalClockFieldEditor).doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+        pump(host)
+        let afterInvalidCancel = try Data(contentsOf: store.url)
+        precondition(descendants(host).allSatisfy { !(($0 as? NSTextField)?.cell is ArrivalClockDigitCell) }
+                     && model.errorMessage == nil && afterInvalidCancel == beforeInvalidQuit,
+                     "Escape must cancel the invalid draft and preserve the saved attendance")
+        print("PASS invalid clock blocks direct Quit, preserves attendance and remains cancellable")
         print("PASS real PanelView focus [host \(ProcessInfo.processInfo.environment["TZ"] ?? "default"), fixture \(timeZone.identifier)]: fixed Friday 16:00, 07:59/08:11 future guards, actual first-digit typing, internal move/pause, production Tab/pause, no intermediate writes, outside click closes and persists once")
     }
 }

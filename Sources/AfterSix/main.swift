@@ -7,21 +7,8 @@ import ServiceManagement
 import AfterSixCore
 import MacLaunchSupport
 import AppPluginCore
-#if HAPPY_LULU_AI_USAGE_ENABLED
-import AIUsagePlugin
-#endif
-
-if CommandLine.arguments.contains("--token-speed-bridge") {
-    guard CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--token-speed-bridge" else { exit(64) }
-    #if HAPPY_LULU_AI_USAGE_ENABLED
-    let provider = CommandLine.arguments[2]
-    Task.detached { exit(await TokenSpeedBridge.run(provider: provider)) }
-    dispatchMain()
-    #else
-    FileHandle.standardError.write(Data("HappyLulu: AI usage support is not included in this build.\n".utf8))
-    exit(64)
-    #endif
-}
+// The previous development-only token bridge is not part of the released Codex plugin.
+if CommandLine.arguments.contains("--token-speed-bridge") { exit(64) }
 
 let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdentifier,
     applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
@@ -40,7 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         manager.configureCatalog(sync: calendarSync, presentations: pluginPresentations,
             allowsExternalIntegrations: runtimeProfile.allowsExternalIntegrations,
             isolatedPluginIDs: Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
-                ? ["ai-usage"] : [])
+                ? ["ai-usage"] : [],
+            allowedLocalPluginIDs: Bundle.main.bundleIdentifier == "local.chanyoung.HappyLulu.Dev.manual-leave.20261015"
+                ? BundledPlugins.localUtilityIDs : [])
         return manager
     }()
     private lazy var model = AppModel(store: StateStore(url: runtimeProfile.stateURL), featureRouter: plugins.router,
@@ -291,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     private func openSettings(section: SettingsSection? = nil) {
-        if let section { settingsNavigation.selection = section }
+        if let section { settingsNavigation.open(section) }
         menuPanel?.dismiss()
         if popover.isShown { popover.performClose(nil) }
         NSApplication.shared.setActivationPolicy(.regular)

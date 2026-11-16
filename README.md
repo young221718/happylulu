@@ -25,10 +25,10 @@
 
 | 운영체제 | 바로 받기 | 실행 조건 · 안내 |
 | --- | --- | --- |
-| **Mac 1.5.19 · build35** | [DMG 다운로드](https://github.com/young221718/happylulu-app/releases/download/macos-v1.5.19-build35/HappyLulu-1.5.19-universal.dmg) · [ZIP](https://github.com/young221718/happylulu-app/releases/download/macos-v1.5.19-build35/HappyLulu-1.5.19-universal.zip) | macOS 13 이상 · Universal · [릴리즈·체크섬](https://github.com/young221718/happylulu-app/releases/tag/macos-v1.5.19-build35) |
+| **Mac 1.5.21 · build37** | [DMG 다운로드](https://github.com/young221718/happylulu-app/releases/download/macos-v1.5.21-build37/HappyLulu-1.5.21-universal.dmg) · [ZIP](https://github.com/young221718/happylulu-app/releases/download/macos-v1.5.21-build37/HappyLulu-1.5.21-universal.zip) | macOS 13 이상 · Universal · [릴리즈·체크섬](https://github.com/young221718/happylulu-app/releases/tag/macos-v1.5.21-build37) |
 | **Windows 1.5.13** | [ZIP 다운로드](https://github.com/young221718/happylulu-app/releases/download/windows-v1.5.13/HappyLulu-1.5.13-windows-x64-runtime-required.zip) | Windows 10/11 x64 · .NET 10 Desktop Runtime x64 필요 · [설치 안내](windows/README.md) |
 
-**Mac 1.5.19 · build35**은 소문자 앱 이름과 부엉이 상태 디자인, 표준 복사·붙여넣기, 휴가 전날 표시, 일반 설정의 3열 정렬과 사용 설명서 링크를 제공합니다. 설정 → 일반의 메뉴바 퇴근 예정 시각 표시 옵션도 유지합니다. 끄면 선택한 단위의 남은 시간만 표시하며, 단위와 표시 옵션은 바로 반영되고 재시작 후 유지됩니다. 기존 오늘 화면, 출근 시각 편집, 근무 유형, 플러그인·외관 설정을 포함합니다. 캘린더·다우오피스·휴가 자동 인식의 범위와 개발자는 [플러그인 안내](docs/PLUGINS.md)를 확인하세요. Windows는 1.5.13을 유지하며 캘린더 동기화와 앱 자체 자동 업데이트가 없습니다. [릴리즈 노트](RELEASE-NOTES.md)와 [배포 절차](DEPLOYMENT.md)에서 설치·권한 보존 검증 범위를 구분합니다.
+**Mac 1.5.21 · build37**은 설정 화면과 테마·부엉이 아이콘을 정리하고 화면 꺼짐 방지와 마우스 휠 반전을 선택형 플러그인으로 제공합니다. 메뉴바 팝업에는 설정·종료 버튼이 각각 표시됩니다. AI 사용량은 이전 공개 1.5.20의 Codex 기능을 유지합니다. 자세한 사용 범위는 [플러그인 안내](docs/PLUGINS.md), 변경과 검증 범위는 [릴리즈 노트](RELEASE-NOTES.md)와 [배포 절차](DEPLOYMENT.md)를 확인하세요. Windows는 1.5.13을 유지합니다.
 
 <a id="세-단계로-시작하기"></a>
 
@@ -66,7 +66,7 @@ HappyLulu는 개인 편의 도구입니다. 회사의 공식 근태 시스템이
 | [사용자 가이드](docs/USER-GUIDE.md) | 설치, 설정, 근무 계산, 기록과 알려진 범위 |
 | [CPU 러너 개발 후보](docs/CPU-RUNNER.md) | Mac 메뉴바의 햄스터·토끼·고양이 선택형 플러그인. 공개 버전 미포함 |
 | [Windows 가이드](windows/README.md) | 런타임, 트레이, 자동 실행과 빌드 |
-| [Mac·Windows 기능 현황](docs/PLATFORM-STATUS.md) | 개발 계획 없음·개발 중·개발 완료와 공통 main 운영 기준 |
+| [Mac·Windows 기능 현황](docs/PLATFORM-STATUS.md) | 플랫폼별 기능 상태와 브랜치 운영 기준 |
 | [캘린더 안내](CALENDAR.md) | Mac의 지원 범위, 연결·미리보기와 복구 |
 | [Mac 변경 기록](RELEASE-NOTES.md) · [Windows 변경 기록](windows/RELEASE-NOTES.md) | 버전별 기능과 공개 상태 |
 | [업데이트](UPDATES.md) · [배포 절차](DEPLOYMENT.md) · [검증 기록](VALIDATION.md) | 서명, 배포 준비와 남은 실기기 확인 |
@@ -78,7 +78,7 @@ HappyLulu는 개인 편의 도구입니다. 회사의 공식 근태 시스템이
 
 [이슈](https://github.com/young221718/happylulu-app/issues)에서 개선할 점을 먼저 이야기해 주세요. 변경은 이슈 → 작업 브랜치 → 검사·독립 검토 → PR 순서로 진행합니다. [빌드·검사 안내](docs/USER-GUIDE.md#개발과-검증)와 [QA 파이프라인](docs/QA.md)을 확인하고 개인 기록·키·계정정보와 생성 앱은 Git에 넣지 않습니다.
 
-개발 기준과 PR 대상은 **공통 `main`**입니다. 새 공통 기능은 Mac·Windows 양쪽의 구현과 검증을 맞추고, 현재 차이와 남은 작업은 [기능 현황](docs/PLATFORM-STATUS.md)에 기록합니다.
+Mac은 `mac/dev`와 `mac/main`, Windows는 `windows/dev`와 `windows/main`을 사용합니다. 기존 공통 `main`은 보존합니다. 새 공통 기능은 Mac·Windows 양쪽의 구현과 검증을 맞추고, 현재 차이와 남은 작업은 [기능 현황](docs/PLATFORM-STATUS.md)에 기록합니다.
 
 ## 라이선스
 
