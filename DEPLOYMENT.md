@@ -19,7 +19,7 @@ python3 scripts/release_delivery.py check dist/releases/1.5.21-build37
 
 ```sh
 python3 scripts/check-update-feed-generation.py \
-  dist/releases/1.5.21-build37/HappyLulu-1.5.20-universal.zip
+  dist/releases/1.5.21-build37/HappyLulu-1.5.21-universal.zip
 ```
 
 `generate_appcast --disable-signing-warning`은 노트에 붙이는 안내 주석만 억제합니다. archive·노트·feed 서명은 유지하며, 서명 후 노트를 원문으로 되돌리지 않습니다.
