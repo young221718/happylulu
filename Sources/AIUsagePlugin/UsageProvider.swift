@@ -35,11 +35,3 @@ private final class CodexProviderLogin: UsageLoginAttempt, @unchecked Sendable {
         } onCancel: { self.cancel() }
     }
 }
-
-/// Retains unsupported saved profiles without reading or running their former provider.
-public struct UnavailableUsageProvider: UsageProvider {
-    public let name = "지원하지 않는 연결"
-    public init() {}
-    public func fetch() async throws -> UsageSnapshot { throw UsageError.unsupportedProvider }
-    public func makeLoginAttempt() -> (any UsageLoginAttempt)? { nil }
-}

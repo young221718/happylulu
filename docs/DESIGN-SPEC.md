@@ -1,6 +1,18 @@
 # HappyLulu 디자인 명세
 
-## 2026-10-23 main 디자인·상호작용 · 현재 기준
+2026-11-14 Mac 로컬 후보 추가: 업데이트 자동 확인/설치 토글 제거(저장값 유지), 팝업 설정·종료 독립 버튼, `keep-awake`/`scroll-reverse` 플러그인. 현재 계약과 검사 범위는 [Mac 유틸리티 설계](../design/plugins/2026-11-14-mac-utilities.md)를 따른다. 아래 이전 업데이트 토글 설명은 당시 기준이다. 공개 배포 상태는 변경하지 않는다.
+
+## 2026-11-14 Mac 설정 · 개발 후보
+
+추가 디테일 개선은 [현재 규칙](../design/settings/README.md)과 [적용 기록](../design/settings/2026-11-14-settings-detail-update.md)을 따른다. 본문 13pt regular·구역 제목 13pt medium·사이드바 문양 13pt regular, 제목/카드 10pt·구역 24pt·공통 행 좌우 14pt/상하 12pt로 위계를 정리한다. 일반/업데이트의 제목과 오른쪽 조작 열, 근무의 기능별 묶음, 외관의 약한 비선택 경계를 적용한다. 아래 이력의 13pt semibold·8pt는 이전 상태다.
+
+사이드바는 단색 파란색 SF Symbols로 바꾸고 본문 상단에 작은 현재 화면 제목을 복원한다. 업데이트는 일반 하단, 출근 기록은 근무 하단으로 통합하며 기존 기록 진입은 기록 구역으로 바로 이동한다. 기존 `HL-UI-006/010`과 탐색 기능 ID를 유지한다. [현재 규칙](../design/settings/README.md)과 [Apple 설정 비교](../design/settings/2026-11-14-sidebar-and-navigation.md)를 따른다. 아래 날짜별 내용은 해당 변경 당시의 이력이며 이번 후보가 공개 릴리즈에 포함됐다는 뜻은 아니다.
+
+## 2026-11-11 Mac 설정 · 개발 후보
+
+이번 로컬 개발 후보의 설정 규칙은 [설정 디자인](../design/settings/README.md)을 따른다. 기존 ID를 유지하고 `HL-UI-006`의 브랜드 위치, `HL-UI-007`의 일반 설정 행 구성, `HL-UI-010`의 구역 간격을 갱신한다. `HL-UI-011/017`의 사용량 보기 스위치는 일반이 아닌 AI 사용량 플러그인 상세에 둔다. 다음 main 기준 이력의 3열·20pt 및 일반에서의 사용량 설정 설명은 해당 과거 버전의 기록이다. 개발 후보와 공개 배포 상태는 별개다.
+
+## 2026-10-23 main 디자인·상호작용 · 배포 기준 이력
 
 기준 checkout `app/happylulu/develop` / `main` / `58fe8df4b32eac479f6ff6f3fc9e71c0751fb632`. 현재 기능은 [기능 명세의 2026-10-23 절](FEATURE-SPEC.md)을 따른다. 아래 2026-10-21/34.x 설명·수치·제안·PR 상태는 역사 기록으로 유지하며 충돌하는 현재 규칙은 이 절을 우선한다. 이 갱신은 로컬 문서·사이트 작업이며 공개 배포나 새 앱 설치의 증거가 아니다.
 
@@ -12,7 +24,7 @@
 | HL-UI-002/003/005 | 패널 폭364 pt, 기본 높이350 pt에 활성 사용량행당40 pt·시스템 러너184 pt 추가. 28 pt 상태별 헤더 얼굴·5유형·출근/퇴근·오늘 일정 유지. 퇴근30분후 상태 설명은 선택 단위의 `추가 … 중` | 기존 일정/출근 영역을 러너로 대체하지 않는다. 사용량행은 해당 상세로 이동. 야근 갱신이 멈추지 않고 빈 기록/휴무 상태에는 나타나지 않아야 함. [PanelView.swift](../Sources/AfterSix/PanelView.swift) |
 | HL-UI-006 | 패널 우상단은 `…` → 설정/종료. 설정 사이드바 하단은 사용 안내 링크. 표시 브랜드는 `happylulu` 소문자 | 기존 테마의 메뉴 버튼은 투명 배경·포커스 표시 사용. 종료·설정 경로와 창닫기 상주 동작 보존. 저장 경로/bundle ID/기술 심볼의 대소문자를 브랜드 변경으로 바꾸지 않음 |
 | HL-UI-007 | **기본 설정 행은 왼쪽 항목명·가운데 변화 예시/도움말·오른쪽 조작** 3열. 언어 Picker도 오른쪽. 일반 설정의 이름열140 pt·선택열190 pt, 사이 간격16 pt | 한영 긴 문구에서 겹침/잘림 없는지 확인. 토글·Picker 라벨을 숨겨도 접근성 이름 유지. 실제 사용자 조작값과 가운데 예시를 혼동하지 않게 설명. [SettingsView.swift](../Sources/AfterSix/SettingsView.swift) |
-| HL-UI-010 | 오프화이트 라일락을 포함한 색상 테마6개·개인색/아이콘 유지. macOS26+ 지원 빌드에는 순정 리퀴드 글래스 선택. 기존 테마에도 새 재질·패널·제목줄 자동 적용 | 저장된 테마 강제 변경 없음. 순정 테마만 시스템 동적 색/밝기·세부색 편집 숨김. 투명도 줄이기/대비 증가는 재질 fallback. [LuluMaterials.swift](../Sources/AfterSix/LuluMaterials.swift), [AppearanceSettingsView.swift](../Sources/AfterSix/AppearanceSettingsView.swift) |
+| HL-UI-010 | 기본을 맨 앞에 두고 색상 테마와 커스텀을 모두 2열로 배치. 카드 왼쪽 위에 이름과 넓은 색상 미리보기를 둔다. 테마와 부엉이 아이콘 선택은 고정 크기 테두리와 우상단 체크로 표시한다. 제목은 13pt semibold, 제목과 카드는 8pt, 설정 구역 사이는 20pt 간격을 사용한다. 색상 편집은 별도 창으로 열어 테마 전환 시 본문 구성을 유지한다 | 저장된 테마와 이전 색상 아이콘 선택은 보존. 기본 테마는 지원 빌드의 시스템 동적 색/밝기·세부색 편집 숨김. 투명도 줄이기/대비 증가는 재질 fallback. [LuluMaterials.swift](../Sources/AfterSix/LuluMaterials.swift), [AppearanceSettingsView.swift](../Sources/AfterSix/AppearanceSettingsView.swift) |
 | HL-UI-011 | 설치된 플러그인 목록에 AI 사용량/시스템 러너 상세 유지. 관리의 설정 버튼, 일반의 사용량 설정, 패널 사용량 행에서 같은 상세 연결 | 설치와 사용·미포함 빌드·오류 상태 분리. AI/러너가 일정·휴가·반차 출처 선택을 바꾸지 않음. [PluginManagerModel.swift](../Sources/AfterSix/PluginManagerModel.swift) |
 | HL-ASSET-009 | Codex 표시 심볼은 현행 [CodexMenuBarIcon.swift](../Sources/AIUsageIntegration/CodexMenuBarIcon.swift)의16 pt template, 텍스트와 같은 기준으로 정렬. 글자+%/심볼+%/%만 선택·같은 상세 미리보기 | 얇거나 뭉친 렌더·선택 강조·다크/라이트·1×/2× 확인. 심볼 실패 시 Codex 글자로 fallback. 수작업 대체 마크를 추가하지 않음 |
 | HL-ASSET-010 | 고양이는 고정 원본5프레임, 햄스터/토끼는 기존 코드 자산. 같은 메뉴바 그룹에서 부엉이와 함께 사용 | [RunCat 출처·해시](../Sources/CPURunnerIntegration/Resources/RunCat/provenance.json)와 [Apache-2.0](../Sources/CPURunnerIntegration/Resources/RunCat/LICENSE.txt) 보존. 기존 심볼·사용자 아이콘 설정을 교체하지 않음 |
@@ -136,7 +148,7 @@ Mac은 현재 시스템 글꼴을 유지하는 방향을 권한다. 웹에는 �
 | HL-UI-003 근무 유형 / HL-DAY-001~003 | [TodayDayTypeView](../Sources/AfterSix/TodayDayTypeView.swift); 캡슐 높이 27·글자 11. 근무유형 옆 부엉이 장식은 34.2에 제거 | 일반/오전반차/오후반차/룰루데이/연차·공가 5개. 캡슐 아래 같은 유형 설명은 제거하고 출근 대기·예정 시각 경과·오늘 쉬는 날 추가 설명은 유지. 선택 캡슐 앞 배치·펼침/접힘·선택 강조와 유형만 선택해 출근 생성 금지, 날짜 전환/오류 시 원본 보존 |
 | HL-UI-004 인라인 출근 / HL-ATT-003 | [ArrivalClockDigitField](../Sources/AfterSix/ArrivalClockDigitField.swift), [PanelView](../Sources/AfterSix/PanelView.swift); 같은 숫자 자리의 HH:mm 4자리 | 직접 입력·붙여넣기·+/−, 자리올림/순환 없음. Enter/외부 클릭/패널 닫기 저장, Escape 취소. 저장 실패·형식 오류·미래·날짜/유형 불일치를 인라인 설명. 검증 실패가 조용히 숫자를 바꾸지 않음 |
 | HL-UI-005 오늘 일정 / HL-CAL-002 | [TodayAgendaView](../Sources/AfterSix/TodayAgendaView.swift); 높이 96, 제목 13 semibold·시간 11·일정 제목 12 | 종일 우선/시작 순 최대 3개·+N·전체 보기. 연결 없음/미설치/로딩/권한 거부/실패/빈 결과 구분. 긴 제목 생략+도움말, 실제 일정 가상 시안에 금지 |
-| HL-UI-006 설정 쉘 / HL-GEN-003 | [SettingsView](../Sources/AfterSix/SettingsView.swift); 최소 820×620, 사이드바 205, 선택 R6 | 일반/외관/근무/출근 기록/업데이트·플러그인 관리·구분선·설치 모듈 상세·종료. 창 닫기는 상주 유지. #53의 전체 행의 클릭 영역을 기존 보완으로 반영, 텍스트만 클릭되는 회귀 금지 |
+| HL-UI-006 설정 쉘 / HL-GEN-003 | [SettingsView](../Sources/AfterSix/SettingsView.swift); 최소 820×620, 모든 테마에서 사이드바 230 | 일반/외관/근무/출근 기록/업데이트·플러그인 관리·설치 모듈 상세. 컬러 SF Symbols와 동일한 네이티브 목록을 모든 테마에 사용하며 색상만 바뀐다. 창 닫기는 상주 유지. #53의 전체 행의 클릭 영역을 기존 보완으로 반영, 텍스트만 클릭되는 회귀 금지 |
 | HL-UI-007 일반 / HL-GEN-001/002, HL-TIME | [SettingsView](../Sources/AfterSix/SettingsView.swift); 역할형 SwiftUI form | 시스템/한국어/영어·5개 단위·퇴근 예정 표시·로그인 자동 실행. 자동 실행 enabled/requiresApproval/notRegistered/notFound 구분·시스템 설정 열기. 즉시/재시작 보존 |
 | HL-UI-008 근무 / HL-ATT-004/005, HL-DAY-004, HL-WORK | [AttendanceControlsView](../Sources/AfterSix/AttendanceControlsView.swift), [SettingsView](../Sources/AfterSix/SettingsView.swift) | 근무/휴게, 출근 수정 sheet, 오늘 쉬는 날 확인, 추가 시간/식대 참고·최근 잠금 해제. 연차는 기록 보존·쉬는 날은 삭제 차이를 문구/확인으로 드러냄. 실패 시 sheet 닫지 않음 |
 | HL-UI-009 출근 기록 / HL-HIST | [AttendanceCalendarView](../Sources/AfterSix/AttendanceCalendarView.swift); 월 달력·선택 셀 R6·날짜 상세 | 이전/다음/오늘·날짜 선택·모든 저장 월·여러 기록·원래 출처/날짜/시간대. 빈 기록/휴무/연차 구분. 기록 폴더는 Finder 탐색만. 과거 수정/삭제 버튼을 새로 만들지 않음 |

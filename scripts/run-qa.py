@@ -55,6 +55,7 @@ def checks_for(profile, root):
     ai_reason = None if ai_present else 'AI usage module excluded by source composition or HAPPY_LULU_DISABLE_AI_USAGE=1'
     if profile == 'full':
         checks.append(Check('ai-tests', ['swift', 'test', '--build-system', 'native', '--filter', 'AIUsageTests'], excluded=ai_reason))
+        checks.append(Check('mac-utilities-tests', ['swift', 'test', '--build-system', 'native', '--filter', 'MacUtilitiesTests']))
     for identifier, name in [('codex-symbol', 'codex-symbol'), ('ai-ui', 'ai-usage-ui')]:
         check = script(identifier, name, {'HAPPY_LULU_SKIP_BUILD': '1'})
         check.excluded = ai_reason

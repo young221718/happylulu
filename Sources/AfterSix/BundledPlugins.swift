@@ -1,5 +1,6 @@
 import AppPluginHost
 import CPURunnerIntegration
+import MacUtilitiesIntegration
 #if HAPPY_LULU_DAOUOFFICE_ENABLED && canImport(DaouOfficeIntegration)
 import DaouOfficeIntegration
 #endif
@@ -11,8 +12,9 @@ import AIUsageIntegration
 /// The only composition boundary that knows which optional modules ship in this build.
 @MainActor
 enum BundledPlugins {
+    static let localUtilityIDs: Set<String> = [KeepAwakeModule.id, ScrollReverseModule.id]
     static var modules: [any PluginModule.Type] {
-        var result: [any PluginModule.Type] = [CPURunnerModule.self]
+        var result: [any PluginModule.Type] = [CPURunnerModule.self, KeepAwakeModule.self, ScrollReverseModule.self]
         #if HAPPY_LULU_DAOUOFFICE_ENABLED && canImport(DaouOfficeIntegration)
         result.append(DaouOfficeModule.self)
         #endif

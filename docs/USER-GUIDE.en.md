@@ -35,17 +35,16 @@ Mac first launch attempts login-item registration and may require system approva
 ## Today in the menu bar. Settings in one place.
 
 Mac puts settings in one window with a sidebar, including Calendar.
+The menu layout below describes the November 14, 2026 local Mac development candidate. Released builds may still have separate Attendance and Updates entries.
 
 | View | Controls |
 | --- | --- |
-| Menu bar panel | Arrival, expected departure, workday choices, inline edits, today’s events, enabled usage/system summaries, and the `…` Settings/Quit menu |
-| General | Language, time format, menu bar departure visibility, Show usage and login startup; label, preview and right-hand control columns |
-| Appearance | Six color themes, Native Liquid Glass on supported systems, custom colors, five icons and image import |
-| Work | Work and break hours, manual arrival and day off |
-| Attendance | Monthly arrival calendar, date details and record folder |
+| Menu bar panel | Arrival, expected departure, workday choices, inline edits, today’s events, enabled usage/system summaries, and separate Settings (gear) and Quit (power) buttons |
+| General | Language, time format, menu bar departure visibility and login startup; version and Check for updates now in Updates below |
+| Appearance | Default on supported systems, six color themes and a custom theme, five owl expressions and image import |
+| Work | Work and break hours, manual arrival and day off; monthly arrival calendar, date details and record folder in Arrival history below |
 | Plugin management | Install/enable bundled optional modules and view developers |
 | Installed plugins | Calendar sync, Daouoffice, half-day recognition, System Runner and AI Usage when included in the build |
-| Updates | Version and automatic check/install preferences |
 
 In General settings, choose milliseconds, seconds, minutes, hours or hours/minutes for the remaining-time display in the menu bar and Work settings. Hours round up to one decimal: **90 minutes → 1.5 hours**, **30 minutes → 0.5 hours**. By default, the menu bar shows the expected departure time alongside the countdown (for example, `Leave 18:00 · 1.5 hr left`). With departure visibility on, only the expected departure time remains for the first 30 minutes after departure. Then it also shows elapsed time in the selected unit (for example, `Leave 18:00 · Extra 1 hr 1 min`). Elapsed time rounds down to completed units. Preferences survive a restart.
 
@@ -54,11 +53,11 @@ On Mac, **Show expected departure in menu bar** is on by default. Turn it off to
 ## Optional features merged into main
 
 - **System Runner:** Settings → Plugin management → System Runner → Install, then enable it. Open its settings from Installed plugins. The default Owl orbit keeps the eye shapes fixed while light rotates around their outlines with CPU activity. Choose start/end colors or restore defaults. Animal mode offers a hamster, rabbit or cat. The panel and settings show CPU, memory, startup disk, physical-network transfer rates and battery; CPU alone controls animation speed. Reduce Motion stops movement. [Details (Korean)](CPU-RUNNER.md)
-- **AI Usage:** Enable General → Show usage, or install and enable AI Usage in Plugin management. Open it from Installed plugins, Usage settings in General, or the panel usage row. Choose Codex text + %, icon + %, or % only. Defaults are text + %, a five-minute refresh, and notifications off. It reuses the Codex CLI ChatGPT sign-in; API-key accounts do not provide a weekly allowance. Signing in with another account also changes the CLI account. [Connection and display details (Korean)](AI-MODEL-USAGE.md)
-- **Appearance and menus:** Supported builds on macOS 26+ apply glass materials, an arrowless panel and unified titlebar to existing themes. Native Liquid Glass separately follows system colors and appearance. Older macOS retains the previous UI; Reduce Transparency and Increase Contrast use opaque surfaces. The panel `…` menu contains Settings and Quit; the settings sidebar ends with a User guide link. [Material details (Korean)](liquid-glass.md)
+- **AI Usage:** Install AI Usage in Plugin management, then enable **Show usage** under Installed plugins → AI Usage. When enabled, the panel usage row also opens its settings. Choose Codex text + %, icon + %, or % only. Defaults are text + %, a five-minute refresh, and notifications off. It reuses the Codex CLI ChatGPT sign-in; API-key accounts do not provide a weekly allowance. Signing in with another account also changes the CLI account. [Connection and display details (Korean)](AI-MODEL-USAGE.md)
+- **Appearance and menus:** Supported builds on macOS 26+ apply glass materials, an arrowless panel and unified titlebar to existing themes. The Default theme follows system colors and appearance. Older macOS retains the previous UI; Reduce Transparency and Increase Contrast use opaque surfaces. The panel `…` menu contains Settings and Quit; the settings sidebar ends with a User guide link. [Material details (Korean)](liquid-glass.md)
 - **Leave tomorrow:** A fresh source reading that confirms approved full-day leave tomorrow can add a hat/sunglasses decoration ten minutes before today’s scheduled departure. Readings must be at most fifteen minutes old. Half days and ambiguous dates are excluded. This never submits a leave request.
 
-These optional Mac modules start disabled after installation. Show usage also installs and enables the available AI module when needed. Disabling a module preserves attendance, preferences and calendar/leave routing. Windows 1.5.13 does not include these modules.
+These optional Mac modules start disabled after installation. A disabled module remains available under Installed plugins. Disabling a module preserves attendance, preferences and calendar/leave routing. Windows 1.5.13 does not include these modules.
 
 ## How a day is calculated
 
@@ -132,3 +131,9 @@ GitHub owns source, CI, release assets, checksums and the signed update feed. Th
 ## License
 
 [HappyLulu Noncommercial Source-Sharing License 1.0](../LICENSE): commercial use is prohibited without separate written permission. Modifying or reusing the code requires publishing the complete corresponding source of the resulting work under the same license before first use, including private use and network services. Individuals may run the unmodified official app to track their own working hours, including at work. Personal data and signing keys are never subject to source publication. This is **source-available, not OSI open source**. [Third-party notices](../THIRD_PARTY_NOTICES.md) remain under their original licenses.
+
+### Mac utility plugins (local development candidate)
+
+Install **Keep Display Awake** or **Reverse Mouse Scrolling** in Plugin management, then enable it. Both start disabled. Keep Display Awake releases its effect when disabled or when the app quits. Reverse Mouse Scrolling reverses ordinary vertical/horizontal mouse-wheel scrolling while leaving trackpad and continuous scrolling unchanged; some smooth-scrolling mice may not be affected. Use **Open Accessibility Settings** in the plugin if permission is needed, then allow this app.
+
+The automatic check/install switches have been removed from General → Updates. Existing automatic-update preferences are retained; **Check for updates now** remains available.

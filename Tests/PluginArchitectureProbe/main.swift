@@ -4,6 +4,7 @@ import Combine
 import AppPluginCore
 import AppPluginHost
 import CPURunnerIntegration
+import MacUtilitiesIntegration
 import AfterSixCore
 import CalendarSyncServices
 
@@ -889,6 +890,66 @@ private enum UsageFixtureModule: PluginModule {
 }
 
 @MainActor
+private enum LocalUtilityFixture: PluginModule {
+    static let id = "keep-awake"
+    static var last: ProbeController?
+    static var catalogMetadata: PluginModuleMetadata? { KeepAwakeModule.catalogMetadata }
+    static func register(in context: PluginHostContext) throws {
+        let controller = ProbeController(id); controller.enabled = false; last = controller
+        let adapter = SnapshotFeatureAdapter(descriptor: FeatureAdapterDescriptor(id: id, name: id, features: []),
+            api: context.registry, timeZone: .current)
+        try context.register(PluginRegistration(controller: controller, adapter: adapter, symbol: "sun.max", summary: "Fixture",
+            setEnabled: { controller.enabled = $0 }))
+    }
+}
+
+@MainActor
+private func checkLocalUtilityGate(root: URL) throws {
+    let sync = CalendarSyncModel(calendarAccess: ProbeCalendarAccess(), runtimeAllowed: false)
+    let store = PluginCatalogStore(url: root.appendingPathComponent("local-utility-catalog.json"))
+    let manager = PluginManagerModel(defaultAdapter: DefaultFeatureAdapter(),
+        routingStore: FeatureRoutingStore(url: nil), catalogStore: store)
+    manager.configureCatalog(sync: sync, presentations: PluginSettingsPresentationRegistry(),
+        modules: [LocalUtilityFixture.self, UsageFixtureModule.self, ScrollReverseModule.self],
+        allowsExternalIntegrations: false,
+        allowedLocalPluginIDs: [LocalUtilityFixture.id, "scroll-reverse", "mac-calendar", UsageFixtureModule.id])
+    require(!manager.allowsExternalIntegrations && !manager.allowsExecution("mac-calendar")
+        && !manager.allowsExecution(UsageFixtureModule.id) && manager.allowsExecution("scroll-reverse"),
+        "Local allow-list must never open other integration gates")
+    manager.start()
+    manager.install(LocalUtilityFixture.id)
+    require(manager.isInstalled(LocalUtilityFixture.id) && !manager.isEnabled(LocalUtilityFixture.id)
+        && LocalUtilityFixture.last?.starts == 0 && LocalUtilityFixture.last?.enabled == false,
+        "Installing local utilities must not start them")
+    manager.setEnabled(LocalUtilityFixture.id, true)
+    require(LocalUtilityFixture.last?.starts == 1 && LocalUtilityFixture.last?.enabled == true && !sync.runtimeAllowed,
+        "Explicit enable must start only the permitted local utility")
+    require(manager.router.descriptors.first { $0.id == LocalUtilityFixture.id }?.features.isEmpty == true,
+        "A local utility must not replace calendar or attendance features")
+    manager.setEnabled(LocalUtilityFixture.id, false)
+    let controller = LocalUtilityFixture.last!
+    let startsBeforeFailure = controller.starts
+    try FileManager.default.removeItem(at: store.url!)
+    try FileManager.default.createDirectory(at: store.url!, withIntermediateDirectories: false)
+    manager.setEnabled(LocalUtilityFixture.id, true)
+    require(!manager.isEnabled(LocalUtilityFixture.id) && !controller.enabled && controller.starts == startsBeforeFailure
+        && manager.message != nil, "A failed catalog save must not enable a system effect")
+    manager.stop()
+
+    let isolatedStore = PluginCatalogStore(url: root.appendingPathComponent("blocked-local-utilities.json"))
+    try isolatedStore.save(PluginCatalogState(installed: ["keep-awake": true, "scroll-reverse": true]))
+    let isolated = PluginManagerModel(defaultAdapter: DefaultFeatureAdapter(),
+        routingStore: FeatureRoutingStore(url: nil), catalogStore: isolatedStore)
+    isolated.configureCatalog(sync: sync, presentations: PluginSettingsPresentationRegistry(),
+        modules: [KeepAwakeModule.self, ScrollReverseModule.self], allowsExternalIntegrations: false)
+    isolated.start()
+    require(isolated.registrations.isEmpty && !isolated.allowsExecution("keep-awake") && !isolated.allowsExecution("scroll-reverse"),
+        "Headless/default Dev configuration must never start persisted native utilities")
+    isolated.stop()
+    print("PASS local utility gate: default off, narrow allow-list, explicit start, no feature routing, failed save cannot start, headless denies persisted hooks")
+}
+
+@MainActor
 private func checkUsageOption(root: URL) throws {
     let sync = CalendarSyncModel(runtimeAllowed: false, storeURL: root.appendingPathComponent("usage-sync.sqlite"))
     let catalog = PluginCatalogStore(url: root.appendingPathComponent("usage-catalog.json"))
@@ -1080,6 +1141,7 @@ struct PluginArchitectureChecks {
         try await checkLeaveGateInvalidation(root: root)
         try checkUsageOption(root: root)
         try checkIsolatedUsageOption(root: root)
+        try checkLocalUtilityGate(root: root)
         let catalogURL = root.appendingPathComponent("catalog.json")
         let catalogStore = PluginCatalogStore(url: catalogURL)
         let emptyCatalog = try catalogStore.load()
