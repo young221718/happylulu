@@ -362,9 +362,16 @@ struct SettingsNavigationProbe {
             }
             let titleFrame = pageFrames.frames["title:\(title)"]
             if let scroll = scrollViews(in: host).first(where: { $0.bounds.width > 300 }) {
-                scroll.contentView.scroll(to: .zero)
+                let maximumOffset = max(0, (scroll.documentView?.bounds.height ?? 0) - scroll.contentView.bounds.height)
+                let away = scroll.contentView.bounds.minY > maximumOffset / 2 ? CGFloat.zero : maximumOffset
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: away))
                 scroll.reflectScrolledClipView(scroll.contentView)
                 pump(host)
+                // SwiftUI can publish its geometry after the native clip view has moved.
+                let deadline = Date().addingTimeInterval(2)
+                while maximumOffset > 1 && pageFrames.frames[destination.rawValue] == section && Date() < deadline {
+                    pump(host)
+                }
                 let unscrolled = pageFrames.frames[destination.rawValue]
                 navigation.open(destination)
                 pump(host)
@@ -375,8 +382,8 @@ struct SettingsNavigationProbe {
                 if !restoredPosition || pageFrames.frames["title:\(title)"] != titleFrame {
                     failures.append("Repeated \(destination.rawValue) open must restore its scroll position and keep the title fixed: first=\(section), unscrolled=\(String(describing: unscrolled)), restored=\(String(describing: restored)), original title=\(String(describing: titleFrame)), page=\(pageFrames.frames)")
                 }
-                if destination == .history && unscrolled == restored {
-                    failures.append("History repeat-open test must actually scroll away before reopening")
+                if maximumOffset > 1 && unscrolled == restored {
+                    failures.append("History repeat-open test must actually scroll away before reopening: clip=\(scroll.contentView.bounds), document=\(String(describing: scroll.documentView?.frame)), viewport=\(viewport), first=\(section), unscrolled=\(String(describing: unscrolled))")
                 }
             } else {
                 failures.append("Missing body scroll view for repeated \(destination.rawValue) navigation")

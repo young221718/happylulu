@@ -7,21 +7,8 @@ import ServiceManagement
 import AfterSixCore
 import MacLaunchSupport
 import AppPluginCore
-#if HAPPY_LULU_AI_USAGE_ENABLED
-import AIUsagePlugin
-#endif
-
-if CommandLine.arguments.contains("--token-speed-bridge") {
-    guard CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--token-speed-bridge" else { exit(64) }
-    #if HAPPY_LULU_AI_USAGE_ENABLED
-    let provider = CommandLine.arguments[2]
-    Task.detached { exit(await TokenSpeedBridge.run(provider: provider)) }
-    dispatchMain()
-    #else
-    FileHandle.standardError.write(Data("HappyLulu: AI usage support is not included in this build.\n".utf8))
-    exit(64)
-    #endif
-}
+// The previous development-only token bridge is not part of the released Codex plugin.
+if CommandLine.arguments.contains("--token-speed-bridge") { exit(64) }
 
 let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdentifier,
     applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
