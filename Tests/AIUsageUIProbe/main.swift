@@ -541,8 +541,10 @@ private final class InteractiveUsageSession: NSObject {
 
     private static let bannerHeight: CGFloat = 30
     private var panelSize: NSSize {
-        NSSize(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count)
-            + plugins.panelProviders.reduce(0) { $0 + $1.panelHeight } + Self.bannerHeight)
+        var size = model.panelContentSize(menuBarItemCount: plugins.menuBarItems.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
+        size.height += Self.bannerHeight
+        return size
     }
 
     private var banner: some View {
