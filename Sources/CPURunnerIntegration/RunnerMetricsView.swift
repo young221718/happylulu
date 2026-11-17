@@ -20,7 +20,7 @@ public enum RunnerMetricsFormatter {
         case .normal: return localize("정상", "Normal")
         case .warning: return localize("주의", "Warning")
         case .critical: return localize("위험", "Critical")
-        case nil: return "—"
+        case nil: return localize("미측정", "Unavailable")
         }
     }
 
@@ -58,8 +58,16 @@ public struct RunnerMetricsSummaryView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(localize("시스템 러너", "System Runner"))
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            HStack {
+                Text(localize("시스템 러너", "System Runner"))
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    .fixedSize()
+                Spacer()
+                HStack(spacing: 4) {
+                    Text(localize("메모리", "Memory")).foregroundStyle(.secondary).accessibilityHidden(true)
+                    RunnerMemoryPressureBadge(pressure: model.metrics.memory?.pressure, localize: localize)
+                }.font(.system(size: 11)).fixedSize()
+            }.frame(maxWidth: .infinity).lineLimit(1)
             row("CPU", value: model.usageText)
             row(localize("메모리", "Memory"), value: memoryText)
             row(localize("시동 디스크", "Startup disk"), value: storageText)
@@ -84,10 +92,8 @@ public struct RunnerMetricsSummaryView: View {
 
     private var memoryText: String {
         guard let memory = model.metrics.memory else { return "—" }
-        let capacity = RunnerMetricsFormatter.bytes(memory.usedBytes, memory: true)
+        return RunnerMetricsFormatter.bytes(memory.usedBytes, memory: true)
             + " / " + RunnerMetricsFormatter.bytes(memory.totalBytes, memory: true)
-        guard memory.pressure != nil else { return capacity }
-        return capacity + " · " + RunnerMetricsFormatter.pressure(memory.pressure, localize: localize)
     }
     private var storageText: String {
         guard let storage = model.metrics.storage else { return "—" }
@@ -156,5 +162,26 @@ struct RunnerMetricsDetailView: View {
         guard let network = model.metrics.network, network.isConnected else { return "—" }
         return "↓ " + RunnerMetricsFormatter.rate(network.receivedBytesPerSecond)
             + "\n↑ " + RunnerMetricsFormatter.rate(network.sentBytesPerSecond)
+    }
+}
+
+struct RunnerMemoryPressureBadge: View {
+    let pressure: MemoryPressure?
+    let localize: PluginLocalizer
+
+    var body: some View {
+        let rgb = RunnerMemoryPressureStyle.palette(pressure).startRGB
+        HStack(spacing: 4) {
+            Circle().fill(Color(red: Double((rgb >> 16) & 255) / 255,
+                green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255))
+                .frame(width: 6, height: 6).accessibilityHidden(true)
+            Text(RunnerMetricsFormatter.pressure(pressure, localize: localize))
+                .foregroundStyle(.secondary)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(localize("메모리 압력: ", "Memory pressure: ")
+            + RunnerMetricsFormatter.pressure(pressure, localize: localize))
+        .help(localize("macOS 메모리 압력 · 사용률과 별개", "macOS memory pressure · independent of percentage used"))
     }
 }
