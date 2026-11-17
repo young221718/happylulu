@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import AppPluginCore
 import AppPluginHost
+import CalendarSyncServices
 
 /// Core attendance never touches optional services.
 @MainActor
@@ -22,8 +23,7 @@ final class MacCalendarFeatureAdapter: FeatureAdapter {
     init(sync: CalendarSyncModel) { self.sync = sync }
     func calendarEvents(in interval: DateInterval) async throws -> [FeatureCalendarEvent] {
         try await sync.featureEvents(in: interval).map {
-            FeatureCalendarEvent(sourceID: descriptor.id, eventID: $0.id, calendarID: $0.calendarID,
-                title: $0.title, start: $0.start, end: $0.end, isAllDay: $0.isAllDay, location: $0.location)
+            FeatureCalendarEvent(systemEvent: $0, sync: sync, sourceID: descriptor.id)
         }
     }
     func leaveSnapshot() -> PluginSnapshot? { nil }
@@ -57,4 +57,14 @@ final class LeaveDetectionFeatureAdapter: FeatureAdapter {
     func leaveSnapshot() -> PluginSnapshot? { nil }
     func requestHalfDayAccess() async throws { throw FeatureAdapterFailure.unsupported }
     func halfDayTitles(on day: Date, timeZone: TimeZone) async throws -> [String] { [] }
+}
+
+extension FeatureCalendarEvent {
+    @MainActor
+    init(systemEvent event: SystemCalendarDisplayEvent, sync: CalendarSyncModel, sourceID: String) {
+        self.init(sourceID: sourceID, eventID: event.id, calendarID: event.calendarID,
+            title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
+            location: event.location, duplicateIdentity: sync.displayIdentity(for: event),
+            contentSignature: event.contentSignature, allowsContentMatching: event.allowsContentMatching)
+    }
 }

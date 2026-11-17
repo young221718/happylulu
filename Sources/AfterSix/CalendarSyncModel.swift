@@ -320,6 +320,14 @@ final class CalendarSyncModel: ObservableObject {
         return try await eventDisplayAccess.displayEvents(calendarIDs: ids, start: interval.start, end: interval.end)
     }
 
+    func displayIdentity(for event: SystemCalendarDisplayEvent) -> String? {
+        guard let state = appliedState, state.configuration.daouBaseURL == "eventkit",
+              state.configuration.daouCalendarURL == selectedDaouCalendar,
+              state.configuration.googleCalendarID == selectedGoogleCalendar else { return event.duplicateIdentity }
+        return event.displayIdentity(mappings: Array(state.mappings.values),
+            daouCalendarID: selectedDaouCalendar, googleCalendarID: selectedGoogleCalendar)
+    }
+
     func loadDisplayedEvents(start: Date, end: Date) async {
         guard runtimeAllowed else { return }
         eventReadGeneration += 1

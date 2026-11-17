@@ -26,7 +26,7 @@ final class FeatureCalendarModel: ObservableObject {
         do {
             let values = try await router.calendarEvents(in: interval)
             guard generation == current, !Task.isCancelled else { return }
-            events = values.sorted { $0.start < $1.start }
+            events = FeatureCalendarEvent.coalescedForDisplay(values)
             loadedSource = router.selectedID(for: .calendar)
         } catch is CancellationError {
         } catch {

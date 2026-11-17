@@ -104,6 +104,7 @@ func checkConfigurationStore() throws {
 }
 
 checkDailyAgenda()
+checkCalendarDisplayCopies()
 checkVacationPreview()
 try checkAddress()
 try checkParser()

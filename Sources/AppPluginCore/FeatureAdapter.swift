@@ -23,12 +23,54 @@ public struct FeatureCalendarEvent: Equatable, Sendable, Identifiable {
     public let end: Date
     public let isAllDay: Bool
     public let location: String?
+    public private(set) var calendarIDs: [String]
+    /// Opaque, provider-verified event/occurrence or local sync-mapping identity.
+    public let duplicateIdentity: String?
+    /// Provider-normalized meaningful content not otherwise visible in this value.
+    public let contentSignature: Data?
+    public let allowsContentMatching: Bool
     public init(sourceID: String, eventID: String, calendarID: String, title: String,
-                start: Date, end: Date, isAllDay: Bool, location: String? = nil) {
+                start: Date, end: Date, isAllDay: Bool, location: String? = nil,
+                duplicateIdentity: String? = nil, contentSignature: Data? = nil,
+                allowsContentMatching: Bool = true) {
         // JSON avoids collisions when an external ID itself contains a separator.
         id = String(decoding: try! JSONEncoder().encode([sourceID, calendarID, eventID]), as: UTF8.self)
         self.sourceID = sourceID; self.calendarID = calendarID; self.title = title
         self.start = start; self.end = end; self.isAllDay = isAllDay; self.location = location
+        calendarIDs = [calendarID]
+        self.duplicateIdentity = duplicateIdentity
+        self.contentSignature = contentSignature
+        self.allowsContentMatching = allowsContentMatching
+    }
+}
+
+extension FeatureCalendarEvent {
+    /// A display projection only; raw adapter values and source calendars remain intact.
+    public static func coalescedForDisplay(_ events: [Self]) -> [Self] {
+        var groups: [[Self]] = []
+        for event in events {
+            if let index = groups.firstIndex(where: { group in
+                let other = group[0]
+                return event.sourceID == other.sourceID && event.title == other.title &&
+                    event.start == other.start && event.end == other.end &&
+                    event.isAllDay == other.isAllDay && event.location == other.location &&
+                    event.contentSignature == other.contentSignature
+            }) { groups[index].append(event) }
+            else { groups.append([event]) }
+        }
+        return groups.flatMap { group -> [Self] in
+            let identity = group[0].duplicateIdentity
+            let verified = identity != nil && group.allSatisfy { $0.duplicateIdentity == identity }
+            // shortcut: exact unlinked clones are indistinguishable, prefer provider identity when available.
+            guard group.count > 1,
+                  verified || (group.count == 2 && group.allSatisfy(\.allowsContentMatching)),
+                  !group[0].title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  group[0].end > group[0].start,
+                  Set(group.map(\.calendarID)).count == group.count else { return group }
+            var representative = group.min { $0.id < $1.id }!
+            representative.calendarIDs = Set(group.flatMap(\.calendarIDs)).sorted()
+            return [representative]
+        }.sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
     }
 }
 

@@ -1351,6 +1351,13 @@ struct PluginArchitectureChecks {
         builtin.events = [FeatureCalendarEvent(sourceID: "builtin", eventID: "one", calendarID: "one", title: "Fixture", start: start, end: interval.end, isAllDay: true)]
         await model.load(in: interval)
         require(model.events.count == 1 && !model.isLoading && model.errorMessage == nil, "Calendar view model did not consume the selected default adapter")
+        let duplicate = FeatureCalendarEvent(sourceID: "builtin", eventID: "two", calendarID: "two", title: "Fixture",
+            start: start, end: interval.end, isAllDay: true)
+        builtin.events.append(duplicate)
+        await model.load(in: interval)
+        require(model.events.count == 1 && model.events(on: start, calendar: model.calendar).count == 1,
+            "Month and selected-day projections must display one cross-calendar copy")
+        require(builtin.events.count == 2, "Display coalescing must preserve the adapter's raw events")
         builtin.pauses = true
         let pending = Task { await model.load(in: interval) }
         while builtin.held == nil { await Task.yield() }

@@ -302,3 +302,69 @@ func testSystemConvertedLegacySeriesIsolation() async throws {
                                  "no direct, planned, delete, or recovery write reaches the series")
     }
 }
+
+func testSystemDisplayIdentity() throws {
+    let event = expandedFixtureEvent()
+    var snapshot = try SystemCalendarEventSnapshot(event: event, localID: "local-a")
+    snapshot.externalID = "shared-uid"
+    snapshot.hasRecurrenceRules = false; snapshot.isDetached = false
+    snapshot.url = nil; snapshot.isFloating = false
+    let first = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "a")
+    snapshot.localID = "local-b"; snapshot.timeZoneID = "Asia/Seoul"
+    let copy = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b")
+    try expandedServiceCheck(first.syncEventID == "external:shared-uid" && first.duplicateIdentity == copy.duplicateIdentity && first.duplicateIdentity != nil,
+        "Display must preserve server identity across local IDs and calendars")
+    try expandedServiceCheck(first.contentSignature != nil && first.contentSignature == copy.contentSignature,
+        "Equivalent timed instants in different named zones must have the same meaningful-content signature")
+    let mapping = CalendarMapping(id: "fixture-mapping", daouEventID: "external:shared-uid", googleEventID: "external:copy-uid", baseline: nil)
+    snapshot.externalID = "copy-uid"
+    let mapped = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b")
+    try expandedServiceCheck(first.displayIdentity(mappings: [mapping], daouCalendarID: "a", googleCalendarID: "b") == "mapping:fixture-mapping" &&
+        mapped.displayIdentity(mappings: [mapping], daouCalendarID: "a", googleCalendarID: "b") == "mapping:fixture-mapping",
+        "A persisted exact calendar/event mapping must identify copies with different server UIDs")
+    try expandedServiceCheck(first.displayIdentity(mappings: [mapping], daouCalendarID: "other", googleCalendarID: "b") == first.duplicateIdentity,
+        "Mappings must be scoped to their configured calendar pair")
+    snapshot.externalID = "shared-uid"
+    snapshot.url = URL(string: "https://example.invalid/meeting-one")
+    let link = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b")
+    snapshot.url = URL(string: "https://example.invalid/meeting-two")
+    try expandedServiceCheck(SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").contentSignature != link.contentSignature,
+        "Different meeting URLs must not be discarded by display matching")
+    snapshot.url = nil; snapshot.hasAttendees = true
+    try expandedServiceCheck(!SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").allowsContentMatching,
+        "Invitations with different identities must not be guessed equivalent without full participant metadata")
+    snapshot.hasAttendees = false
+    snapshot.notes = "changed notes"
+    try expandedServiceCheck(SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").contentSignature != first.contentSignature,
+        "Notes-only changes must reach the display comparison boundary")
+    snapshot.notes = event.notes; snapshot.hasRecurrenceRules = true
+    snapshot.occurrenceDate = event.startDate
+    let occurrence = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b")
+    try expandedServiceCheck(occurrence.duplicateIdentity?.hasPrefix("occurrence:") == true && !occurrence.allowsContentMatching,
+        "Recurring events require a trustworthy original occurrence identity, never a series UID/content fallback")
+    snapshot.occurrenceDate = event.startDate.addingTimeInterval(86400)
+    try expandedServiceCheck(SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").duplicateIdentity != occurrence.duplicateIdentity,
+        "Moved occurrences with the same current start must retain their distinct original dates")
+    snapshot.occurrenceDate = nil
+    let uncertain = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b")
+    try expandedServiceCheck(uncertain.duplicateIdentity == nil && !uncertain.allowsContentMatching,
+        "A recurring event missing its original date must remain independently visible")
+    snapshot.hasRecurrenceRules = true; snapshot.isAllDay = true
+    snapshot.defaultTimeZone = TimeZone(identifier: "America/New_York")!
+    let dates = ISO8601DateFormatter()
+    snapshot.startDate = dates.date(from: "2026-03-08T00:00:00-05:00")!
+    snapshot.endDate = dates.date(from: "2026-03-09T00:00:00-04:00")!
+    snapshot.occurrenceDate = snapshot.startDate
+    let allDay = SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "a")
+    try expandedServiceCheck(allDay.duplicateIdentity?.hasSuffix(":day:2026-03-08") == true && allDay.contentSignature != nil,
+        "All-day recurrence identity must use the original civil date on a DST boundary")
+    snapshot.occurrenceDate = snapshot.endDate
+    try expandedServiceCheck(SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").duplicateIdentity != allDay.duplicateIdentity,
+        "Two all-day original occurrences must not collapse even with identical moved display bounds")
+    snapshot.hasRecurrenceRules = false; snapshot.isAllDay = false
+    snapshot.startDate = event.startDate; snapshot.endDate = event.endDate
+    snapshot.defaultTimeZone = TimeZone(secondsFromGMT: 0)!
+    snapshot.hasRecurrenceRules = false; snapshot.alarmExclusion = .other("alarmEmail")
+    try expandedServiceCheck(!SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: "b").allowsContentMatching,
+        "Unsupported meaningful metadata must prevent a content-only guess")
+}
