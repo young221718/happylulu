@@ -45,8 +45,8 @@ struct UtilitySettingsView: View {
                 }.padding(8)
             }
             Text(isScroll
-                 ? t("일반 마우스 휠의 세로·가로 방향을 반전합니다. 트랙패드와 연속 스크롤은 그대로 유지합니다. 부드러운 스크롤을 보내는 일부 마우스에는 적용되지 않을 수 있습니다.",
-                     "Reverses vertical and horizontal mouse-wheel scrolling. Trackpad and continuous scrolling stay unchanged. Some mice that send smooth scrolling may not be affected.")
+                 ? t("라인 방식이며 제스처·관성 단계가 없는 휠 이벤트의 세로·가로 방향을 반전합니다. 물리 장치를 식별하지 않습니다. 트랙패드 보호를 위해 연속·제스처·관성 이벤트는 변경하지 않으므로 부드러운 스크롤 마우스도 반전되지 않을 수 있습니다. 장치 드라이버가 트랙패드를 일반 휠 형식으로 보내면 구분할 수 없습니다. 실제 마우스·트랙패드 동작은 이 Mac에서 별도로 확인해야 합니다.",
+                     "Reverses vertical and horizontal line-based wheel events without gesture or momentum phases. Physical devices are not identified. Continuous, gesture and momentum events stay unchanged to protect trackpad scrolling, so smooth-scroll mice may also remain unchanged. A driver that reports trackpad input as a line wheel cannot be distinguished. Verify your mouse and trackpad on this Mac separately.")
                  : t("사용하는 동안 화면이 자동으로 꺼지지 않습니다. 플러그인을 끄거나 앱을 종료하면 원래대로 돌아갑니다. 덮개 닫기·직접 잠자기·잠금은 그대로 동작하며 배터리를 더 사용할 수 있습니다.",
                      "Prevents the display from sleeping automatically while enabled. Turning off the plugin or quitting the app restores normal behavior. Closing the lid, manual sleep and locking still work. Battery use may increase."))
                 .font(.system(size: 11)).foregroundStyle(.secondary)
