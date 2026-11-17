@@ -187,12 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         displayedMenuTitle = model.menuTitle
         displayedPluginItems = items
         updateMenuBarTitle()
-        let pluginPanelHeight = plugins.registrations.reduce(CGFloat.zero) { height, entry in
-            guard plugins.allowsExecution(entry.id), plugins.isEnabled(entry.id), entry.controller.enabled,
-                  let provider = entry.controller as? any PluginPanelProviding else { return height }
-            return height + provider.panelHeight
-        }
-        let panelSize = NSSize(width: 364, height: CGFloat(350 + 40 * items.count) + pluginPanelHeight)
+        let panelSize = model.panelContentSize(menuBarItemCount: items.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
         popover.contentSize = panelSize
         menuPanel?.updateContentSize(panelSize)
         menuPanel?.reposition()

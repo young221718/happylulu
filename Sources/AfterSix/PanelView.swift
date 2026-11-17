@@ -25,6 +25,10 @@ struct PanelView: View {
     let onOpenCalendar: () -> Void
     let onOpenPlugin: (String) -> Void
     private var accent: Color { appearance.accent }
+    private var panelSize: NSSize {
+        model.panelContentSize(menuBarItemCount: plugins.menuBarItems.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
+    }
 
     init(model: AppModel, calendarSync: CalendarSyncModel, plugins: PluginManagerModel,
          onOpenHistory: @escaping () -> Void, onOpenSettings: @escaping () -> Void,
@@ -96,7 +100,7 @@ struct PanelView: View {
             .background(appearance.surface.opacity(glass.isEnabled && !appearance.usesNativeAppearance ? 0.42 : 1),
                         in: RoundedRectangle(cornerRadius: glass.isEnabled ? 18 : 12))
             Divider()
-            if model.daouLeaveProposal != nil || model.daouArrivalProposal != nil {
+            if model.hasDaouProposal {
                 Button { onOpenPlugin("daouoffice") } label: {
                     Label(L("다우 휴가·출근 변경 확인", "Review Daou leave/arrival change"), systemImage: "exclamationmark.bubble")
                         .font(.caption).frame(maxWidth: .infinity, alignment: .leading)
@@ -123,8 +127,7 @@ struct PanelView: View {
             TodayAgendaView(model: agenda, plugins: plugins, sync: calendarSync,
                             now: model.now, onOpenCalendar: onOpenCalendar)
         }
-        .padding(16).frame(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count + (model.daouLeaveProposal == nil && model.daouArrivalProposal == nil ? 0 : 32))
-            + plugins.panelProviders.reduce(0) { $0 + $1.panelHeight }, alignment: .topLeading)
+        .padding(16).frame(width: panelSize.width, height: panelSize.height, alignment: .topLeading)
         .tint(accent)
         .foregroundStyle(appearance.text)
         .luluGlassSurface(tint: appearance.background, fallback: appearance.background,

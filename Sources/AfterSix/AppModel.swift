@@ -59,6 +59,10 @@ final class AppModel: ObservableObject {
     var autoApplyDaouLeave: Bool { daouLeaveReview.automaticallyApply }
     var autoApplyDaouArrival: Bool { daouLeaveReview.automaticallyApplyArrival == true }
     var canChangeDaouLeaveReview: Bool { writable && daouLeaveReviewWritable }
+    var hasDaouProposal: Bool { daouLeaveProposal != nil || daouArrivalProposal != nil }
+    func panelContentSize(menuBarItemCount: Int, pluginPanelHeight: CGFloat) -> NSSize {
+        NSSize(width: 364, height: CGFloat(350 + 40 * menuBarItemCount + (hasDaouProposal ? 32 : 0)) + pluginPanelHeight)
+    }
 
     var daouLeaveProposal: DaouLeaveProposal? {
         let checkedAt = nowProvider()

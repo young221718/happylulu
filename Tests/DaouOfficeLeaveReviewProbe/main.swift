@@ -1,4 +1,6 @@
 import Foundation
+import AppKit
+import Combine
 import AppPluginCore
 import AfterSixCore
 
@@ -16,7 +18,7 @@ final class DaouLeaveFixture: FeatureAdapter {
 @main
 struct DaouLeaveReviewProbe {
     @MainActor
-    static func main() throws {
+    static func main() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("daou-leave-review-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -145,6 +147,32 @@ struct DaouLeaveReviewProbe {
             "Null source arrival must preserve manual record in memory and on disk")
         publishArrival(updatedArrival, fetchedAt: now.addingTimeInterval(-901))
         precondition(arrivalConflict.daouArrivalProposal == nil, "Stale attendance cannot propose")
+        try store.save(AttendanceState())
+        publishArrival(nil)
+        let panelModel = AppModel(store: StateStore(url: folder.appendingPathComponent("panel-attendance.json")),
+            featureRouter: router, allowsLoginItemChanges: false, nowProvider: { now }, calendarProvider: { fixedCalendar })
+        let popover = NSPopover()
+        func resizePanel() {
+            popover.contentSize = panelModel.panelContentSize(menuBarItemCount: 2, pluginPanelHeight: 14)
+        }
+        resizePanel()
+        precondition(popover.contentSize == NSSize(width: 364, height: 444), "No proposal must use the existing base and plugin heights")
+        let panelObservation = panelModel.objectWillChange.sink { _ in
+            Task { @MainActor in resizePanel() }
+        }
+        publishArrival(serverArrival); panelModel.refresh()
+        for _ in 0..<30 { await Task.yield() }
+        precondition(popover.contentSize.height == 476, "A new proposal must resize the actual popover by its visible row height")
+        precondition(panelModel.applyDaouArrivalProposal(), "Displayed panel proposal must apply")
+        for _ in 0..<30 { await Task.yield() }
+        precondition(popover.contentSize.height == 444, "Accepting a proposal must restore the actual popover height")
+        publishArrival(updatedArrival); panelModel.refresh()
+        for _ in 0..<30 { await Task.yield() }
+        precondition(popover.contentSize.height == 476, "A changed source value must expand the popover again")
+        precondition(panelModel.dismissDaouArrivalProposal(), "Displayed panel proposal must decline")
+        for _ in 0..<30 { await Task.yield() }
+        precondition(popover.contentSize.height == 444, "Declining a proposal must restore the actual popover height")
+        withExtendedLifetime(panelObservation) {}
         print("PASS Daou leave review: proposals, acceptance, decline/restart deduplication, opt-in/off, manual preservation, cancellation, stale/missing data and day rollover")
     }
 }
