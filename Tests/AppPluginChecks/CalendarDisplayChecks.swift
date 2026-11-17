@@ -66,5 +66,24 @@ func checkCalendarDisplayCopies() {
     require(FeatureCalendarEvent.coalescedForDisplay([metadata("a", "a", identity: "mapping:1"),
         metadata("b", "b", identity: "mapping:1", signature: "changed notes")]).count == 2,
         "Mapping identity must not conceal a diverged peer")
+    let firstOccurrence = metadata("a1", "a", identity: "occurrence:series:1", fallback: false)
+    let firstCopy = metadata("b1", "b", identity: "occurrence:series:1", fallback: false)
+    let movedOccurrence = metadata("a2", "a", identity: "occurrence:series:2", fallback: false)
+    let movedCopy = metadata("b2", "b", identity: "occurrence:series:2", fallback: false)
+    let overlapping = FeatureCalendarEvent.coalescedForDisplay([firstOccurrence, movedOccurrence, firstCopy])
+    require(overlapping.count == 2 && overlapping.filter { $0.duplicateIdentity == "occurrence:series:1" }.count == 1,
+        "A verified pair must collapse even when another original occurrence moves to the same visible interval")
+    let copiedOccurrences = FeatureCalendarEvent.coalescedForDisplay([movedCopy, firstCopy, movedOccurrence, firstOccurrence])
+    require(copiedOccurrences.count == 2 && Set(copiedOccurrences.compactMap(\.duplicateIdentity)) == ["occurrence:series:1", "occurrence:series:2"] &&
+        copiedOccurrences.allSatisfy { $0.calendarIDs == ["a", "b"] },
+        "Two verified pairs at one displayed time must retain exactly two distinct original occurrences")
+    let ambiguousOccurrence = metadata("a1-other", "a", identity: "occurrence:series:1", fallback: false)
+    require(FeatureCalendarEvent.coalescedForDisplay([firstOccurrence, firstCopy, ambiguousOccurrence]).count == 3,
+        "Multiple candidates for the same identity in one calendar must remain ambiguous")
+    let verifiedPairAndOther = [metadata("v1", "a", identity: "verified-pair"),
+        metadata("v2", "b", identity: "verified-pair"), metadata("other", "c", identity: "other")]
+    let once = FeatureCalendarEvent.coalescedForDisplay(verifiedPairAndOther)
+    require(once.count == 2 && FeatureCalendarEvent.coalescedForDisplay(once).count == 2,
+        "Reusing the month projection in the daily agenda must not fallback-merge a verified group with an unrelated candidate")
     print("PASS calendar display copies: exact matching, ambiguity, source preservation, deterministic rows, removal, edits, time zones, DST and all-day bounds")
 }

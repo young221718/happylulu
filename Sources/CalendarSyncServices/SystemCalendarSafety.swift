@@ -324,13 +324,13 @@ enum SystemCalendarSafety {
         return formatter
     }
 
-    static func dates(for time: CalendarEventTime) throws -> (Date, Date) {
+    static func dates(for time: CalendarEventTime, timeZone: TimeZone = .current) throws -> (Date, Date) {
         switch time {
         case let .timed(start, end, _):
             guard start < end else { throw SystemCalendarError.invalidDate }
             return (start, end)
         case let .allDay(start, end):
-            let formatter = dayFormatter(timeZone: .current)
+            let formatter = dayFormatter(timeZone: timeZone)
             guard let startDate = formatter.date(from: start),
                   let endDate = formatter.date(from: end), startDate < endDate,
                   formatter.string(from: startDate) == start,

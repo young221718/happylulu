@@ -65,6 +65,7 @@ extension FeatureCalendarEvent {
         self.init(sourceID: sourceID, eventID: event.id, calendarID: event.calendarID,
             title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
             location: event.location, duplicateIdentity: sync.displayIdentity(for: event),
-            contentSignature: event.contentSignature, allowsContentMatching: event.allowsContentMatching)
+            contentSignature: event.contentSignature, allowsContentMatching: event.allowsContentMatching,
+            matchingInterval: event.matchingInterval)
     }
 }

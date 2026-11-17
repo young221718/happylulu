@@ -6,7 +6,8 @@ import AppPluginHost
 import CPURunnerIntegration
 import MacUtilitiesIntegration
 import AfterSixCore
-import CalendarSyncServices
+@testable import CalendarSyncServices
+import EventKit
 
 func fixtureDate(_ value: String) throws -> Date {
     guard let date = ISO8601DateFormatter().date(from: value) else { throw FeatureAdapterFailure.unsupported }
@@ -1114,10 +1115,50 @@ private func checkOvertimeTimer(root: URL) async throws {
     print("PASS live overtime timer: repeated millisecond updates within 450ms, unchanged attendance")
 }
 
+@MainActor
+private func checkAllDayDisplayCopies() throws {
+    let sync = CalendarSyncModel(calendarAccess: ProbeCalendarAccess(), runtimeAllowed: false)
+    let dates = ISO8601DateFormatter()
+    for (first, exclusive, inclusive, hours) in [
+        ("2026-03-08T00:00:00-05:00", "2026-03-09T00:00:00-04:00", "2026-03-08T23:59:59-04:00", 23),
+        ("2026-11-01T00:00:00-04:00", "2026-11-02T00:00:00-05:00", "2026-11-01T23:59:59-05:00", 25)
+    ] {
+        let start = dates.date(from: first)!, end = dates.date(from: exclusive)!, copyEnd = dates.date(from: inclusive)!
+        require(end.timeIntervalSince(start) == Double(hours * 3600), "Fixture must cross a real DST day")
+        let event = EKEvent(eventStore: EKEventStore())
+        event.title = "All-day fixture"; event.startDate = start; event.endDate = end; event.isAllDay = true
+        var original = try SystemCalendarEventSnapshot(event: event, localID: "original")
+        original.defaultTimeZone = TimeZone(identifier: "America/New_York")!
+        // EKEvent's all-day setter uses the host zone; model the provider's raw values explicitly.
+        original.startDate = start; original.endDate = end; original.isAllDay = true
+        original.externalID = "shared-fixture"; original.hasRecurrenceRules = false; original.isDetached = false
+        let originalDisplay = SystemCalendarDisplayEvent(snapshot: original, calendarID: "b")
+        var copied = original
+        copied.localID = "copy"; copied.endDate = copyEnd; copied.timeZoneID = "Asia/Seoul"
+        let copiedDisplay = SystemCalendarDisplayEvent(snapshot: copied, calendarID: "a")
+        let raw = [originalDisplay, copiedDisplay].map { FeatureCalendarEvent(systemEvent: $0, sync: sync, sourceID: "mac-calendar") }
+        let displayed = FeatureCalendarEvent.coalescedForDisplay(raw)
+        require(displayed.count == 1 && displayed[0].calendarIDs == ["a", "b"],
+            "All-day copies using last-second versus exclusive-midnight ends must display once across DST")
+        require(displayed[0].end == copyEnd && original.endDate == end && copied.endDate == copyEnd && raw.map(\.end) == [end, copyEnd],
+            "Canonical matching must preserve raw event values and the representative's display time")
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = original.defaultTimeZone
+        require(DailyAgenda(events: raw, on: start, calendar: calendar).items.count == 1 &&
+            DailyAgenda(events: raw, on: end, calendar: calendar).items.isEmpty,
+            "Daily agenda must share canonical all-day matching without extending into the next date")
+        copied.externalID = "independent-copy"
+        let unlinked = FeatureCalendarEvent(systemEvent: SystemCalendarDisplayEvent(snapshot: copied, calendarID: "a"), sync: sync, sourceID: "mac-calendar")
+        require(FeatureCalendarEvent.coalescedForDisplay([raw[0], unlinked]).count == 1,
+            "Exact-content matching must use the same canonical civil-day bounds as verified identities")
+    }
+    print("PASS all-day display copies: last-second/exclusive ends, 23/25-hour DST days, raw preservation and shared agenda matching")
+}
+
 @main
 struct PluginArchitectureChecks {
     @MainActor
     static func main() async throws {
+        try checkAllDayDisplayCopies()
         // Keep legacy menu assertions independent of a previous probe's saved toggle.
         let departureKey = "HappyLuluShowDepartureInMenuBar"
         let savedDepartureVisibility = UserDefaults.standard.object(forKey: departureKey)

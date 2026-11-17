@@ -57,6 +57,8 @@ public struct SystemCalendarDisplayEvent: Identifiable, Sendable {
     public let duplicateIdentity: String?
     public let contentSignature: Data?
     public let allowsContentMatching: Bool
+    /// Canonical civil-day bounds used only for duplicate matching.
+    public let matchingInterval: DateInterval?
 
     init(snapshot: SystemCalendarEventSnapshot, calendarID: String) {
         id = "\(calendarID)|\(snapshot.localID)|\(snapshot.startDate.timeIntervalSince1970)"
@@ -72,6 +74,10 @@ public struct SystemCalendarDisplayEvent: Identifiable, Sendable {
             decoded?.exclusion != .other("invalidDate")
         duplicateIdentity = !supported ? nil : (recurring ? (hasOccurrence ? decoded?.id : nil)
             : (snapshot.externalID?.isEmpty == false ? decoded?.id : nil))
+        if supported, snapshot.isAllDay, let time = decoded?.content.time,
+           let bounds = try? SystemCalendarSafety.dates(for: time, timeZone: snapshot.defaultTimeZone) {
+            matchingInterval = DateInterval(start: bounds.0, end: bounds.1)
+        } else { matchingInterval = nil }
         if supported, var content = decoded?.content {
             // Named zones may differ between copies of the same absolute timed interval.
             if case let .timed(start, end, _) = content.time {
