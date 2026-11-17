@@ -27,6 +27,75 @@ private func clockFields(in view: NSView) -> [NSTextField] {
 }
 
 @MainActor
+private func checkKeyboardEditing() {
+    let draft = Draft()
+    var submittedText: String?
+    let host = NSHostingView(rootView: HStack {
+        ForEach(0..<4) { index in
+            ArrivalClockDigitField(
+                text: Binding(get: { draft.edit.digits[index] }, set: { draft.edit.replaceDigit(at: index, with: $0) }),
+                focusedDigit: Binding(get: { draft.focus }, set: { draft.focus = $0 }),
+                index: index, color: .labelColor, label: "Digit \(index)",
+                onPaste: { draft.edit.replaceDigit(at: index, with: $0) },
+                onSubmit: { draft.submits += 1; submittedText = draft.edit.text },
+                onCancel: { draft.cancels += 1 })
+                .frame(width: 20, height: 34)
+        }
+    })
+    let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 200, height: 80),
+                          styleMask: [.titled], backing: .buffered, defer: false)
+    window.contentView = host
+    window.orderFront(nil)
+    defer { window.orderOut(nil) }
+    host.layoutSubtreeIfNeeded()
+    let fields = clockFields(in: host).sorted { $0.tag < $1.tag }
+    precondition(fields.count == 4 && window.makeFirstResponder(fields[0]))
+    func press(_ characters: String, keyCode: UInt16, modifiers: NSEvent.ModifierFlags = []) {
+        let editor = window.firstResponder as! NSTextView
+        editor.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+            characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)!)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.03))
+    }
+    let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
+    let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+    press(right, keyCode: 124)
+    precondition(draft.focus == 1, "Right arrow must move to the next clock digit")
+    press(right, keyCode: 124)
+    precondition(draft.focus == 2, "Right arrow must cross from hours to minutes")
+    press(left, keyCode: 123)
+    precondition(draft.focus == 1, "Left arrow must cross from minutes to hours")
+    press("\t", keyCode: 48)
+    precondition(draft.focus == 2, "Tab must select the minute section")
+    press("\u{19}", keyCode: 48, modifiers: .shift)
+    precondition(draft.focus == 0, "Shift-Tab must select the hour section")
+    press(left, keyCode: 123)
+    precondition(draft.focus == 0, "Left arrow at the first digit must keep the draft open")
+    for (index, digit) in "0942".enumerated() {
+        let editor = window.firstResponder as! NSTextView
+        editor.insertText(String(digit), replacementRange: NSRange(location: NSNotFound, length: 0))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.03))
+        precondition(draft.focus == min(index + 1, 3), "Typing must advance without losing the final digit's focus")
+    }
+    precondition(draft.edit.text == "09:42" && draft.submits == 0, "Continuous typing must replace HH:mm without submitting")
+    press(right, keyCode: 124)
+    precondition(draft.focus == 3, "Right arrow at the final digit must not submit")
+    press("\r", keyCode: 36)
+    precondition(draft.submits == 1 && submittedText == "09:42", "Return must submit the complete typed clock exactly once")
+    press("\u{3}", keyCode: 76, modifiers: .numericPad)
+    precondition(draft.submits == 2, "Numeric keypad Enter must submit")
+    precondition(window.makeFirstResponder(fields[0]))
+    press("\t", keyCode: 48)
+    precondition(draft.focus == 2, "Tab must skip the other hour digit")
+    press("\u{19}", keyCode: 48, modifiers: .shift)
+    precondition(draft.focus == 0)
+    let beforeInvalid = draft.edit.text
+    (window.firstResponder as! NSTextView).insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+    precondition(draft.focus == 0 && draft.edit.text == beforeInvalid, "Rejected typing must neither advance nor change the clock")
+    print("PASS keyboard clock: continuous HHmm, hour/minute Tab, Shift-Tab, left/right boundaries, Return and keypad Enter")
+}
+
+@MainActor
 private func checkNaturalFocusTransitions() {
     let draft = Draft()
     let host = NSHostingView(rootView: HStack {
@@ -51,7 +120,7 @@ private func checkNaturalFocusTransitions() {
     precondition(draft.focus == 0, "Initial responder focus was not recorded before typing")
     let firstEditor = fields[0].currentEditor() as! NSTextView
     firstEditor.insertText("2", replacementRange: NSRange(location: 0, length: 1))
-    precondition(draft.focus == 0 && draft.edit.digits[0] == "2", "Natural typing did not begin editing")
+    precondition(draft.focus == 1 && draft.edit.digits[0] == "2", "Natural typing did not advance after replacing a digit")
     precondition(window.makeFirstResponder(fields[1]))
     RunLoop.current.run(until: Date().addingTimeInterval(0.03))
     precondition(draft.focus == 1 && fields[1].currentEditor() != nil,
@@ -61,7 +130,7 @@ private func checkNaturalFocusTransitions() {
     precondition(draft.focus == 2 && fields[2].currentEditor() != nil, "Tab to an untyped digit lost editing focus")
     (fields[2].currentEditor() as! NSTextView).doCommand(by: #selector(NSResponder.insertBacktab(_:)))
     RunLoop.current.run(until: Date().addingTimeInterval(0.03))
-    precondition(draft.focus == 1 && fields[1].currentEditor() != nil, "Shift-Tab to an untyped digit lost editing focus")
+    precondition(draft.focus == 0 && fields[0].currentEditor() != nil, "Shift-Tab to the hour section lost editing focus")
     precondition(window.makeFirstResponder(nil))
     RunLoop.current.run(until: Date().addingTimeInterval(0.03))
     precondition(draft.focus == nil, "Leaving an untyped digit did not signal editor exit")
@@ -78,6 +147,7 @@ private func checkNaturalFocusTransitions() {
 struct ClockPasteProbe {
     @MainActor static func main() {
         _ = NSApplication.shared
+        checkKeyboardEditing()
         checkNaturalFocusTransitions()
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
                               styleMask: [.titled], backing: .buffered, defer: false)
