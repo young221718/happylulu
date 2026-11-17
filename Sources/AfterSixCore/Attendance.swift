@@ -75,9 +75,12 @@ public struct Arrival: Codable, Equatable, Sendable {
     public let mode: WorkdayMode
     public let modeSource: ModeSource
     public let earlyLeaveOverrideMinutes: Int?
+    /// An approved external import uses the existing manual source for older-reader compatibility.
+    public let externalSourceID: String?
 
     public init(day: String, time: Date, source: ArrivalSource, timeZoneID: String,
-                mode: WorkdayMode = .normal, modeSource: ModeSource = .legacy, earlyLeaveOverrideMinutes: Int? = nil) {
+                mode: WorkdayMode = .normal, modeSource: ModeSource = .legacy, earlyLeaveOverrideMinutes: Int? = nil,
+                externalSourceID: String? = nil) {
         self.day = day
         self.time = time
         self.source = source
@@ -85,9 +88,10 @@ public struct Arrival: Codable, Equatable, Sendable {
         self.mode = mode
         self.modeSource = modeSource
         self.earlyLeaveOverrideMinutes = earlyLeaveOverrideMinutes
+        self.externalSourceID = externalSourceID
     }
 
-    private enum CodingKeys: String, CodingKey { case day, time, source, timeZoneID, mode, modeSource, earlyLeaveOverrideMinutes }
+    private enum CodingKeys: String, CodingKey { case day, time, source, timeZoneID, mode, modeSource, earlyLeaveOverrideMinutes, externalSourceID }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -98,6 +102,7 @@ public struct Arrival: Codable, Equatable, Sendable {
         mode = try values.decodeIfPresent(WorkdayMode.self, forKey: .mode) ?? .normal
         modeSource = try values.decodeIfPresent(ModeSource.self, forKey: .modeSource) ?? .legacy
         earlyLeaveOverrideMinutes = try values.decodeIfPresent(Int.self, forKey: .earlyLeaveOverrideMinutes)
+        externalSourceID = try values.decodeIfPresent(String.self, forKey: .externalSourceID)
     }
 }
 
@@ -257,7 +262,8 @@ public enum Attendance {
               newMode != arrival.mode else { return false }
         state.arrivals[day] = Arrival(day: day, time: arrival.time, source: arrival.source,
                                       timeZoneID: arrival.timeZoneID, mode: newMode, modeSource: .automatic,
-                                      earlyLeaveOverrideMinutes: arrival.earlyLeaveOverrideMinutes)
+                                      earlyLeaveOverrideMinutes: arrival.earlyLeaveOverrideMinutes,
+                                      externalSourceID: arrival.externalSourceID)
         return true
     }
 
@@ -272,7 +278,8 @@ public enum Attendance {
             }
             state.arrivals[day] = Arrival(day: arrival.day, time: arrival.time, source: arrival.source,
                                           timeZoneID: arrival.timeZoneID, mode: mode, modeSource: .manual,
-                                          earlyLeaveOverrideMinutes: type.earlyLeaveOverrideMinutes)
+                                          earlyLeaveOverrideMinutes: type.earlyLeaveOverrideMinutes,
+                                          externalSourceID: arrival.externalSourceID)
         }
         state.manualDayTypes[day] = type
         if type == .annualLeave { state.suppressedDays.insert(day) }

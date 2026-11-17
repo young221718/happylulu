@@ -1,0 +1,150 @@
+import Foundation
+import AppPluginCore
+import AfterSixCore
+
+@MainActor
+final class DaouLeaveFixture: FeatureAdapter {
+    let descriptor = FeatureAdapterDescriptor(id: "daouoffice", name: "Synthetic", features: [.leave])
+    var calendarTimeZone: TimeZone? { TimeZone(identifier: "Asia/Seoul") }
+    var snapshot: PluginSnapshot?
+    func leaveSnapshot() -> PluginSnapshot? { snapshot }
+    func calendarEvents(in interval: DateInterval) async throws -> [FeatureCalendarEvent] { [] }
+    func requestHalfDayAccess() async throws {}
+    func halfDayTitles(on day: Date, timeZone: TimeZone) async throws -> [String] { [] }
+}
+
+@main
+struct DaouLeaveReviewProbe {
+    @MainActor
+    static func main() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("daou-leave-review-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+        let fixedCalendar = calendar
+        var now = ISO8601DateFormatter().date(from: "2026-11-17T10:00:00+09:00")!
+        let adapter = DaouLeaveFixture()
+        let router = FeatureAdapterRouter(defaultAdapter: adapter)
+        let store = StateStore(url: folder.appendingPathComponent("attendance.json"))
+        var initial = AttendanceState(); initial.didOfferLoginItem = true
+        try store.save(initial)
+        func model() -> AppModel {
+            AppModel(store: store, featureRouter: router, allowsLoginItemChanges: false,
+                nowProvider: { now }, calendarProvider: { fixedCalendar })
+        }
+        func publish(_ status: String = "APPROVAL", days: Double = 1, fetchedAt: Date? = nil) {
+            adapter.snapshot = PluginSnapshot(pluginID: "daouoffice", fetchedAt: fetchedAt ?? now, leave: nil,
+                vacations: [PluginVacation(id: "synthetic-" + status, kind: "연차", status: status, days: days,
+                    dates: ["2026-11-17"], periodLabel: "2026-11-17")], events: [], coverage: PluginCoverage())
+        }
+        publish()
+        let proposed = model()
+        precondition(proposed.daouLeaveProposal != nil, "Fresh approved leave must propose a change")
+        precondition(!proposed.autoApplyDaouLeave && proposed.state == initial, "Default must preserve attendance until confirmation")
+        precondition(proposed.dismissDaouLeaveProposal(), "Decline must persist")
+        publish(fetchedAt: now.addingTimeInterval(-1))
+        precondition(model().daouLeaveProposal == nil, "Repeated fetch and restart must not re-propose the declined change")
+
+        // A changed local value creates a distinct conflict and requires explicit acceptance.
+        initial.manualDayTypes["2026-11-17"] = .morningHalf
+        let arrivalTime = now.addingTimeInterval(-3600)
+        initial.arrivals["2026-11-17"] = Arrival(day: "2026-11-17", time: arrivalTime, source: .manual,
+            timeZoneID: "Asia/Seoul", mode: .morningHalf, modeSource: .manual)
+        try store.save(initial)
+        let conflict = model()
+        precondition(conflict.daouLeaveProposal != nil, "Manual conflict must remain reviewable")
+        precondition(conflict.setAutoApplyDaouLeave(true), "Explicit opt-in must persist")
+        conflict.refresh()
+        precondition(conflict.state == initial, "Auto apply must preserve manual arrival and day type")
+        precondition(conflict.applyDaouLeaveProposal(), "Explicit acceptance may change today's type")
+        precondition(conflict.state.manualDayTypes["2026-11-17"] == .annualLeave, "Acceptance must apply approved leave")
+        precondition(conflict.state.arrivals == initial.arrivals, "Acceptance must retain the original arrival")
+        precondition(conflict.daouLeaveProposal == nil, "Accepted matching values must not reappear")
+
+        var unlocked = AttendanceState()
+        unlocked.arrivals["2026-11-17"] = Arrival(day: "2026-11-17", time: arrivalTime, source: .unlock,
+            timeZoneID: "Asia/Seoul", modeSource: .automatic)
+        try store.save(unlocked)
+        let automatic = model()
+        automatic.refresh()
+        precondition(automatic.state.manualDayTypes["2026-11-17"] == .annualLeave, "Opt-in may apply to an untouched day")
+        precondition(automatic.state.arrivals == unlocked.arrivals, "Automatic application must retain observed arrival history")
+        publish("CANCEL"); automatic.refresh()
+        precondition(automatic.state.manualDayTypes["2026-11-17"] == .annualLeave, "Cancellation must never erase a saved local value")
+        precondition(automatic.setAutoApplyDaouLeave(false), "Turning automatic application off must persist")
+        try store.save(unlocked)
+        let disabled = model(); publish(); disabled.refresh()
+        precondition(disabled.state.manualDayTypes.isEmpty && disabled.daouLeaveProposal != nil, "Off must restore proposals")
+        for status in ["CANCEL", "RETURN", "PENDING"] {
+            publish(status); precondition(disabled.daouLeaveProposal == nil, "Only approved leave may propose")
+        }
+        publish(days: 0.5); precondition(disabled.daouLeaveProposal == nil, "Half-day duration cannot invent AM/PM")
+        publish(fetchedAt: now.addingTimeInterval(-901)); precondition(disabled.daouLeaveProposal == nil, "Stale snapshots cannot propose or apply")
+        adapter.snapshot = nil; precondition(disabled.daouLeaveProposal == nil, "Unavailable attendance/leave must not invent a value")
+        publish(); now = now.addingTimeInterval(86400); disabled.refresh()
+        precondition(disabled.daouLeaveProposal == nil, "Yesterday's leave must not apply today")
+        now = now.addingTimeInterval(-86400); publish()
+        var skipped = AttendanceState(); skipped.suppressedDays.insert("2026-11-17")
+        try store.save(skipped)
+        let skippedModel = model()
+        precondition(skippedModel.setAutoApplyDaouLeave(true), "Opt-in must be available on skipped days")
+        precondition(skippedModel.state == skipped && skippedModel.daouLeaveProposal?.isSkipped == true,
+            "Skipped days must remain unchanged and show their actual previous value")
+        var utc = Calendar(identifier: .gregorian); utc.timeZone = TimeZone(secondsFromGMT: 0)!
+        let utcCalendar = utc
+        now = ISO8601DateFormatter().date(from: "2026-11-17T01:00:00+09:00")!; publish()
+        let traveler = AppModel(store: store, featureRouter: router, allowsLoginItemChanges: false,
+            nowProvider: { now }, calendarProvider: { utcCalendar })
+        precondition(traveler.daouLeaveProposal == nil, "Different civil dates must not address yesterday's local record")
+        now = ISO8601DateFormatter().date(from: "2026-11-17T10:00:00+09:00")!; publish()
+        let preferences = store.url.appendingPathExtension("daou-review.json")
+        let corrupt = Data(#"{"version":99,"automaticallyApply":true}"#.utf8)
+        try corrupt.write(to: preferences)
+        let unreadable = model(); unreadable.refresh()
+        precondition(!unreadable.autoApplyDaouLeave && !unreadable.canChangeDaouLeaveReview && unreadable.state == skipped,
+            "Unreadable preferences must disable automatic application and preserve attendance")
+        precondition(!unreadable.setAutoApplyDaouLeave(false), "Corrupt preferences cannot be overwritten")
+        let preserved = try Data(contentsOf: preferences)
+        precondition(preserved == corrupt, "Corrupt preference bytes must be preserved")
+        try FileManager.default.removeItem(at: preferences)
+        try store.save(AttendanceState())
+        func publishArrival(_ at: Date? = nil, fetchedAt: Date? = nil) {
+            adapter.snapshot = PluginSnapshot(pluginID: "daouoffice", fetchedAt: now, leave: nil, vacations: [], events: [],
+                coverage: PluginCoverage(), todayAttendance: PluginTodayAttendance(day: "2026-11-17", arrival: at,
+                    timeZoneID: "Asia/Seoul", fetchedAt: fetchedAt ?? now))
+        }
+        let serverArrival = ISO8601DateFormatter().date(from: "2026-11-17T07:31:23+09:00")!
+        publishArrival(serverArrival)
+        let arrivalReview = model()
+        precondition(arrivalReview.daouArrivalProposal != nil && arrivalReview.state.arrivals.isEmpty,
+            "A valid source arrival must propose without inventing a local record")
+        precondition(arrivalReview.dismissDaouArrivalProposal(), "Arrival decline must persist")
+        precondition(model().daouArrivalProposal == nil, "Repeated attendance polling/restart must not re-propose")
+        try store.save(unlocked)
+        let arrivalConflict = model()
+        precondition(arrivalConflict.daouArrivalProposal != nil, "Changed local arrival must be compared")
+        precondition(!arrivalConflict.applyDaouArrivalProposal(expectedID: "previously-displayed-value"),
+            "A source change after displaying a proposal must require another review")
+        precondition(arrivalConflict.applyDaouArrivalProposal(), "Explicit confirmation may import exact source arrival")
+        let imported = try store.load().arrivals["2026-11-17"]!
+        precondition(imported.time == serverArrival && imported.externalSourceID == "daouoffice", "Import must preserve seconds, provenance and restart")
+        precondition(arrivalConflict.daouArrivalProposal == nil, "Matching source/current time must not re-propose")
+        precondition(arrivalConflict.setAutoApplyDaouArrival(true), "Arrival automation requires its own explicit opt-in")
+        let updatedArrival = serverArrival.addingTimeInterval(30)
+        publishArrival(updatedArrival); arrivalConflict.refresh()
+        precondition(arrivalConflict.state.arrivals["2026-11-17"]?.time == updatedArrival, "Opt-in may update a previous Daou import")
+        precondition(arrivalConflict.saveManualClockText("08:42", forDay: "2026-11-17"), "Fixture manual editing must succeed")
+        arrivalConflict.refresh()
+        precondition(arrivalConflict.state.arrivals["2026-11-17"]?.time != updatedArrival && arrivalConflict.daouArrivalProposal?.hasManualConflict == true,
+            "Manual editing must remove external ownership and prevent subsequent auto overwrite")
+        precondition(arrivalConflict.setAutoApplyDaouArrival(false), "Arrival automation off must persist")
+        let kept = arrivalConflict.state
+        publishArrival(nil); arrivalConflict.refresh()
+        let savedAfterNull = try store.load()
+        precondition(arrivalConflict.state == kept && savedAfterNull == kept && arrivalConflict.daouArrivalProposal == nil,
+            "Null source arrival must preserve manual record in memory and on disk")
+        publishArrival(updatedArrival, fetchedAt: now.addingTimeInterval(-901))
+        precondition(arrivalConflict.daouArrivalProposal == nil, "Stale attendance cannot propose")
+        print("PASS Daou leave review: proposals, acceptance, decline/restart deduplication, opt-in/off, manual preservation, cancellation, stale/missing data and day rollover")
+    }
+}

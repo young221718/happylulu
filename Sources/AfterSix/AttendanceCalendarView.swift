@@ -138,7 +138,7 @@ struct AttendanceCalendarView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Text(L("출근 \(clock(record)) · \(record.mode.displayLabel)", "Arrived \(clock(record)) · \(record.mode.displayLabel)"))
-                        Label(record.source == .manual ? L("직접 입력", "Manual entry") : (record.source == .login ? L("로그인 감지", "Login detected") : L("잠금 해제 감지", "Unlock detected")),
+                        Label(record.externalSourceID == "daouoffice" ? L("다우오피스에서 반영", "Applied from Daouoffice") : record.source == .manual ? L("직접 입력", "Manual entry") : (record.source == .login ? L("로그인 감지", "Login detected") : L("잠금 해제 감지", "Unlock detected")),
                               systemImage: record.source == .manual ? "pencil" : (record.source == .login ? "power" : "lock.open"))
                             .foregroundStyle(.secondary)
                         Text(L("기록 시간대: \(record.timeZoneID)", "Recorded time zone: \(record.timeZoneID)")).foregroundStyle(.secondary)

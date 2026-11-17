@@ -142,7 +142,7 @@ class RunnerTests(unittest.TestCase):
             'calendar-diagnostics', 'calendar-runtime', 'automatic-install', 'runtime-profile',
             'clock-paste', 'panel-focus', 'appearance-model', 'settings-navigation',
             'settings-navigation', 'material-policy', 'plugin-architecture', 'vacation-eve',
-            'vacation-appearance', 'plugin-isolation', 'daouoffice-model', 'edit-menu']
+            'vacation-appearance', 'plugin-isolation', 'daouoffice-model', 'edit-menu', 'daouoffice-leave-review']
         expected += [('bash', 'scripts/check-' + name + '.sh') for name in scripts]
         self.assertCountEqual(actual, expected)
         self.assertEqual([c.env for c in checks if c.id.startswith('render-')], [

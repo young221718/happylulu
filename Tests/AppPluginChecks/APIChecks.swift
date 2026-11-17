@@ -40,6 +40,10 @@ actor FixtureTransport: DaouOfficeTransport {
         self.holdPath = holdPath
     }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        if request.url?.path == "/api/attend/normal/gadget/today", steps.first?.path != request.url?.path {
+            return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 404,
+                httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!)
+        }
         guard !steps.isEmpty else { fatalError("Unexpected network request") }
         let step = steps.removeFirst()
         require(request.url?.path == step.path, "Wrong API route")

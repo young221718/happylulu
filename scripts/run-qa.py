@@ -80,7 +80,7 @@ def checks_for(profile, root):
     daou_present = (os.environ.get('HAPPY_LULU_DISABLE_DAOUOFFICE') != '1' and all((root / 'Sources' / name).is_dir() for name in ('DaouOfficePlugin', 'DaouOfficeIntegration')))
     daou_reason = None if daou_present else 'Daouoffice module excluded by source composition or HAPPY_LULU_DISABLE_DAOUOFFICE=1'
     checks.append(Check('app-plugin', swift + ['AppPluginChecks'], excluded=daou_reason))
-    for identifier, name in [('daou-model', 'daouoffice-model'), ('edit-menu', 'edit-menu')]:
+    for identifier, name in [('daou-model', 'daouoffice-model'), ('edit-menu', 'edit-menu'), ('daou-leave-review', 'daouoffice-leave-review')]:
         check = script(identifier, name)
         check.excluded = daou_reason
         checks.append(check)

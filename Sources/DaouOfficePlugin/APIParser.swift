@@ -5,6 +5,30 @@ import AppPluginCore
 /// The Daouoffice 4 frontend response contract, verified against its public service modules.
 /// A missing field fails the refresh; it never replaces a last good snapshot with empty data.
 public enum DaouOfficeAPIParser {
+    /// Personal-session gadget contract. Accept explicit-offset ISO instants only; never guess a wall clock.
+    public static func todayAttendance(_ data: Data, now: Date) throws -> PluginTodayAttendance {
+        guard now.timeIntervalSince1970.isFinite,
+              let value = try payload(data) as? [String: Any],
+              let zoneID = value["zoneId"] as? String, let zone = TimeZone(identifier: zoneID),
+              let raw = value["startWorkTime"] else { throw PluginFailure.unsupportedResponse }
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = zone
+        let local = DateFormatter(); local.calendar = calendar; local.timeZone = zone
+        local.locale = Locale(identifier: "en_US_POSIX"); local.dateFormat = "yyyy-MM-dd"
+        let day = local.string(from: now)
+        let arrival: Date?
+        if raw is NSNull { arrival = nil }
+        else {
+            guard let text = raw as? String,
+                  text.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"#, options: .regularExpression) != nil else {
+                throw PluginFailure.unsupportedResponse
+            }
+            let parsed = try date(text)
+            guard parsed <= now, local.string(from: parsed) == day else { throw PluginFailure.unsupportedResponse }
+            arrival = parsed
+        }
+        return PluginTodayAttendance(day: day, arrival: arrival, timeZoneID: zoneID, fetchedAt: now)
+    }
+
     public static func object(_ data: Data) throws -> [String: Any] {
         guard data.count <= 8 * 1_024 * 1_024,
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

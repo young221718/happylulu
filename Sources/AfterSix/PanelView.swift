@@ -96,6 +96,12 @@ struct PanelView: View {
             .background(appearance.surface.opacity(glass.isEnabled && !appearance.usesNativeAppearance ? 0.42 : 1),
                         in: RoundedRectangle(cornerRadius: glass.isEnabled ? 18 : 12))
             Divider()
+            if model.daouLeaveProposal != nil || model.daouArrivalProposal != nil {
+                Button { onOpenPlugin("daouoffice") } label: {
+                    Label(L("다우 휴가·출근 변경 확인", "Review Daou leave/arrival change"), systemImage: "exclamationmark.bubble")
+                        .font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                }.buttonStyle(.plain).frame(height: 20)
+            }
             ForEach(plugins.menuBarItems) { item in
                 Button { onOpenPlugin(item.id) } label: {
                     HStack {
@@ -117,7 +123,7 @@ struct PanelView: View {
             TodayAgendaView(model: agenda, plugins: plugins, sync: calendarSync,
                             now: model.now, onOpenCalendar: onOpenCalendar)
         }
-        .padding(16).frame(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count)
+        .padding(16).frame(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count + (model.daouLeaveProposal == nil && model.daouArrivalProposal == nil ? 0 : 32))
             + plugins.panelProviders.reduce(0) { $0 + $1.panelHeight }, alignment: .topLeading)
         .tint(accent)
         .foregroundStyle(appearance.text)

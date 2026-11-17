@@ -34,7 +34,7 @@ public final class DaouOfficeAPILog: @unchecked Sendable {
             if let code = rawCode, code.range(of: #"^[A-Z0-9_-]{1,40}$"#, options: .regularExpression) != nil { row["code"] = code }
             let path = request.url?.path ?? ""
             let auth = path == "/login" || path.hasPrefix("/api/portal/public/auth/")
-            if !auth {
+            if !auth && path != "/api/attend/normal/gadget/today" {
                 let failed = !(200...299).contains(response.statusCode) || (rawCode != nil && rawCode != "200")
                 if failed, data.count <= Self.errorBodyLimit, let json, let original = String(data: data, encoding: .utf8) {
                     let (masked, changed) = Self.redact(json)
