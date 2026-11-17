@@ -66,12 +66,14 @@ class ExporterTests(unittest.TestCase):
     def test_invalid_input_keeps_previous_file_and_logs_no_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "usage.json"
-            for payload in [{"rate_limits": {"seven_day": {"used_percentage": True}}},
-                            {"rate_limits": {"seven_day": {"used_percentage": 101, "resets_at": 2000000000}}},
-                            {"rate_limits": []},
-                            {"product": "wrong", "quota": {"gemini-weekly": {}}}]:
+            for provider, payload in [
+                ("claude", {"rate_limits": {"seven_day": {"used_percentage": True}}}),
+                ("claude", {"rate_limits": {"seven_day": {"used_percentage": 101, "resets_at": 2000000000}}}),
+                ("claude", {"rate_limits": []}),
+                ("antigravity", {"product": "wrong", "quota": {"gemini-weekly": {}}})
+            ]:
                 output.write_text("preserved")
-                result = self.run_exporter("claude", payload, output)
+                result = self.run_exporter(provider, payload, output)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(output.read_text(), "preserved")
                 self.assertNotIn("used_percentage", result.stderr)

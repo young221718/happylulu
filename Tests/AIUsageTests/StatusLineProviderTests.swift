@@ -1,9 +1,73 @@
 import XCTest
 @testable import AIUsagePlugin
+@testable import AIUsageIntegration
 
 final class StatusLineProviderTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_900_000_000)
     private let claude = #"{"schema":1,"provider":"claude","observedAt":1900000000,"rate_limits":{"five_hour":{"used_percentage":99,"resets_at":1900001000},"seven_day":{"used_percentage":41.2,"resets_at":1900600000}}}"#
+
+    private func runExporter(provider: String, input: String, output: URL) throws -> Int32 {
+        let helper = try XCTUnwrap(StatusLineUsageProvider.exporterURL)
+        let process = Process(), pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = [helper.path, "--provider", provider, "--output", output.path]
+        process.standardInput = pipe
+        process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
+        try process.run()
+        try pipe.fileHandleForWriting.write(contentsOf: Data(input.utf8))
+        try pipe.fileHandleForWriting.close(); process.waitUntilExit()
+        return process.terminationStatus
+    }
+
+    @MainActor
+    func testBundledHelperReplacesPreviousQuotaWhenOptionalUsageIsAbsent() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let reset = Date().addingTimeInterval(3600)
+        let validClaude = "{\"rate_limits\":{\"seven_day\":{\"used_percentage\":41.2,\"resets_at\":\(reset.timeIntervalSince1970)}}}"
+        let validAntigravity = "{\"product\":\"antigravity\",\"email\":\"first@example.invalid\",\"quota\":{\"gemini-weekly\":{\"remaining_fraction\":0.58,\"reset_time\":\"\(ISO8601DateFormatter().string(from: reset))\"}}}"
+        for (id, valid, absent, field) in [
+            ("claude", validClaude, #"{"session_id":"next-session","model":{"id":"fixture"},"version":"2.1.90"}"#, "rate_limits"),
+            ("antigravity", validAntigravity, #"{"product":"antigravity","email":"next@example.invalid","agent_state":"initializing"}"#, "quota")
+        ] {
+            let output = directory.appendingPathComponent(id + ".json")
+            let reader = StatusLineUsageProvider(providerID: id, name: id, reportPath: output.path)
+            XCTAssertEqual(try runExporter(provider: id, input: valid, output: output), 0)
+            let previous = try await reader.fetch()
+            XCTAssertEqual(previous.weekly.remainingPercent, 58)
+            let suite = "test.happylulu.absent-quota." + UUID().uuidString
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let model = AIUsageModel(defaults: defaults)
+            defer { model.stop(); defaults.removePersistentDomain(forName: suite) }
+            _ = try XCTUnwrap(model.addProfile(providerID: id))
+            model.updateSelectedProfile { $0.reportPath = output.path }
+            model.setEnabled(true); model.start()
+            var deadline = Date().addingTimeInterval(3)
+            while model.isRunning, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+            XCTAssertEqual(model.snapshot?.weekly.remainingPercent, 58)
+            let oldBytes = try Data(contentsOf: output)
+            XCTAssertEqual(try runExporter(provider: id, input: absent, output: output), 0)
+            let noQuotaBytes = try Data(contentsOf: output)
+            XCTAssertNotEqual(noQuotaBytes, oldBytes)
+            let marker = try XCTUnwrap(JSONSerialization.jsonObject(with: noQuotaBytes) as? [String: Any])
+            XCTAssertEqual((marker[field] as? [String: Any])?.count, 0)
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(marker["observedAt"] as? Double), previous.fetchedAt.timeIntervalSince1970)
+            do {
+                _ = try await reader.fetch()
+                XCTFail("A fresh session without quota must not inherit the previous session's usage")
+            } catch StatusLineUsageError.noWeeklyQuota {} catch { XCTFail("Unexpected reader error: \(error)") }
+            model.refreshData()
+            deadline = Date().addingTimeInterval(3)
+            while model.isRunning, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+            XCTAssertNil(model.snapshot)
+            XCTAssertEqual(model.menuBarItem?.title, (id == "claude" ? "Claude" : "Antigravity") + " —")
+            for malformed in ["{", "[]", "{\"product\":\"antigravity\",\"\(field)\":null}", "{\"product\":\"antigravity\",\"\(field)\":[]}"] {
+                XCTAssertNotEqual(try runExporter(provider: id, input: malformed, output: output), 0)
+                XCTAssertEqual(try Data(contentsOf: output), noQuotaBytes)
+            }
+        }
+    }
 
     func testBundledHelperProducesAnImportablePrivateReportWithoutRawSessionData() async throws {
         let helper = try XCTUnwrap(StatusLineUsageProvider.exporterURL)

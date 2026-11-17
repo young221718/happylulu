@@ -21,7 +21,8 @@ def number(value, minimum, maximum):
 def export(provider, payload):
     result = {"schema": 1, "provider": provider, "observedAt": time.time()}
     if provider == "claude":
-        limits = payload["rate_limits"]
+        # Optional fields disappear in new sessions; replace old readings with a fresh empty marker.
+        limits = payload.get("rate_limits", {})
         if not isinstance(limits, dict):
             raise ValueError("quota object required")
         cleaned = {}
@@ -34,11 +35,14 @@ def export(provider, payload):
     else:
         if payload["product"] != "antigravity":
             raise ValueError("wrong provider")
-        if not isinstance(payload["quota"], dict):
+        quota = payload.get("quota", {})
+        if not isinstance(quota, dict):
             raise ValueError("quota object required")
         cleaned = {}
-        if "gemini-weekly" in payload["quota"]:
-            bucket = payload["quota"]["gemini-weekly"]
+        if "gemini-weekly" in quota:
+            bucket = quota["gemini-weekly"]
+            if not isinstance(bucket, dict):
+                raise ValueError("quota bucket object required")
             if type(bucket.get("disabled", False)) is not bool or not isinstance(bucket["reset_time"], str):
                 raise ValueError("invalid quota")
             cleaned["gemini-weekly"] = {
