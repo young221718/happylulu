@@ -308,7 +308,7 @@ struct AIUsageUIProbe {
             } else {
                 base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve)
             }
-            return group.image(base: base)
+            return group.image(base: base, appearance: appearance, highlighted: highlighted)
         }
         button.image = renderImage(highlighted: false)
         precondition(button.image?.size == NSSize(width: orbit ? 26 : 58, height: 18))
@@ -624,7 +624,8 @@ private final class InteractiveUsageSession: NSObject {
         } else {
             base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve)
         }
-        button.image = images.image(base: base)
+        button.image = images.image(base: base, appearance: button.effectiveAppearance,
+            highlighted: button.cell?.isHighlighted == true)
         button.attributedTitle = PluginMenuBarTitle.attributed(base: "QA · " + model.menuTitle,
             items: plugins.menuBarItems, font: button.font!, appearance: button.effectiveAppearance)
         button.setAccessibilityLabel("HappyLulu synthetic QA, " + model.menuTitle)

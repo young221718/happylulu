@@ -236,7 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         } else {
             base = baseMenuBarImage
         }
-        button.image = menuBarImages.image(base: base)
+        button.image = menuBarImages.image(base: base, appearance: button.effectiveAppearance, highlighted: highlighted)
         let labels = menuBarImages.accessibilityLabels
         let suffix = labels.isEmpty ? "" : " · " + labels.joined(separator: " · ")
         let toolTip = baseToolTip + suffix

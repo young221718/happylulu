@@ -185,10 +185,13 @@ public final class PluginMenuBarImageGroup {
         }
     }
 
-    public func image(base: NSImage) -> NSImage {
+    public func image(base: NSImage, appearance: NSAppearance? = nil, highlighted: Bool = false) -> NSImage {
         let additions = providers.compactMap { $0.menuBarImage?.image }
         guard !additions.isEmpty else { return base }
         let images = [base] + additions
+        let isTemplate = images.allSatisfy(\.isTemplate)
+        let dark = (appearance ?? NSAppearance.currentDrawing()).bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let ink = highlighted || dark ? NSColor.white : NSColor.black
         let gap: CGFloat = 4
         let size = NSSize(width: images.reduce(0) { $0 + $1.size.width } + gap * CGFloat(additions.count),
                           height: images.map { $0.size.height }.max() ?? base.size.height)
@@ -205,15 +208,20 @@ public final class PluginMenuBarImageGroup {
             context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
             var x: CGFloat = 0
             for part in images {
-                part.draw(in: NSRect(x: x, y: (size.height - part.size.height) / 2,
-                                     width: part.size.width, height: part.size.height),
+                let rect = NSRect(x: x, y: (size.height - part.size.height) / 2,
+                                  width: part.size.width, height: part.size.height)
+                part.draw(in: rect,
                           from: .zero, operation: .sourceOver, fraction: 1)
+                if !isTemplate && part.isTemplate {
+                    // AppKit cannot tint template parts after they join a colored image.
+                    ink.setFill(); rect.fill(using: .sourceIn)
+                }
                 x += part.size.width + gap
             }
             NSGraphicsContext.restoreGraphicsState()
             image.addRepresentation(rep)
         }
-        image.isTemplate = images.allSatisfy(\.isTemplate)
+        image.isTemplate = isTemplate
         return image
     }
 }

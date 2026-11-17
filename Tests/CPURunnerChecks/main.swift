@@ -547,6 +547,45 @@ final class FixtureImageProvider: PluginMenuBarImageProviding {
 }
 
 @MainActor
+func checkMixedTemplateRendering() {
+    let base = NSImage(size: NSSize(width: 8, height: 18), flipped: false) { rect in
+        NSColor(srgbRed: 0.2, green: 0.7, blue: 0.4, alpha: 1).setFill(); rect.fill(); return true
+    }
+    base.isTemplate = false
+    let provider = FixtureImageProvider(), group = PluginMenuBarImageGroup()
+    group.setProviders([provider])
+    for animal in RunnerAnimal.allCases {
+        provider.menuBarImage = PluginMenuBarImage(image: RunnerArtwork.image(for: animal, frame: 0), accessibilityLabel: "Runner")
+        for (appearanceName, highlighted, white) in [
+            (NSAppearance.Name.aqua, false, false), (.darkAqua, false, true),
+            (.aqua, true, true), (.darkAqua, true, true)
+        ] {
+            let composite = group.image(base: base, appearance: NSAppearance(named: appearanceName), highlighted: highlighted)
+            require(!composite.isTemplate, "mixed output must retain the colored pressure base")
+            for scale in [1, 2] {
+                let rep = composite.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == Int(composite.size.width) * scale }!
+                let color = rep.colorAt(x: 4 * scale, y: 9 * scale)!.usingColorSpace(.sRGB)!
+                require(abs(color.redComponent - 0.2) < 0.03 && abs(color.greenComponent - 0.7) < 0.03
+                    && abs(color.blueComponent - 0.4) < 0.03, "template tint changed the colored pressure base")
+                require((rep.colorAt(x: 10 * scale, y: 9 * scale)?.alphaComponent ?? 1) < 0.05, "mixed composition filled the transparent gap")
+                var opaque = 0
+                for y in 0..<rep.pixelsHigh {
+                    for x in (12 * scale)..<rep.pixelsWide {
+                        guard let pixel = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), pixel.alphaComponent > 0.95 else { continue }
+                        opaque += 1
+                        let components = [pixel.redComponent, pixel.greenComponent, pixel.blueComponent]
+                        require(components.allSatisfy { white ? $0 > 0.95 : $0 < 0.05 },
+                                "mixed composite must tint template animals for the current appearance and highlight")
+                    }
+                }
+                require(opaque > 40 * scale * scale, "mixed composition lost the animal silhouette")
+            }
+        }
+    }
+    print("PASS mixed native render: all real animals with colored base, 1x/2x, light/dark/highlight ink, preserved pressure color and transparency")
+}
+
+@MainActor
 func checkGroupedRendering() {
     func rectangle(width: CGFloat) -> NSImage {
         let image = NSImage(size: NSSize(width: width, height: 18), flipped: false) { rect in
@@ -707,6 +746,7 @@ await MainActor.run {
     checkSettings()
     checkLifecycle()
     checkOwlOrbit()
+    checkMixedTemplateRendering()
     checkGroupedRendering()
     checkControllerMetricsLifecycle()
 }
