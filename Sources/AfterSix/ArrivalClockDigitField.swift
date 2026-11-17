@@ -100,25 +100,43 @@ struct ArrivalClockDigitField: NSViewRepresentable {
 
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
-            parent.text = field.stringValue
+            let input = field.stringValue
+            parent.text = input
             synchronize(field)
+            // Keep the final digit focused so typing HHmm never commits before Return.
+            if (1...2).contains(input.count), input.allSatisfy({ $0.isASCII && $0.isNumber }),
+               parent.text.count == 1 {
+                moveFocus(from: field, by: 1)
+            }
         }
         func control(_ control: NSControl, textView: NSTextView, doCommandBy command: Selector) -> Bool {
             if command == #selector(NSResponder.insertNewline(_:)) { parent.onSubmit(); return true }
             if command == #selector(NSResponder.cancelOperation(_:)) { parent.onCancel(); return true }
-            if command == #selector(NSResponder.insertTab(_:)) { moveFocus(from: control, by: 1); return true }
-            if command == #selector(NSResponder.insertBacktab(_:)) { moveFocus(from: control, by: -1); return true }
+            if command == #selector(NSResponder.insertTab(_:)) {
+                moveFocus(from: control, by: (parent.index < 2 ? 2 : 4) - parent.index, leaveAtBoundary: true)
+                return true
+            }
+            if command == #selector(NSResponder.insertBacktab(_:)) {
+                moveFocus(from: control, by: (parent.index >= 2 ? 0 : -1) - parent.index, leaveAtBoundary: true)
+                return true
+            }
+            if command == #selector(NSResponder.moveRight(_:)) || command == #selector(NSResponder.moveForward(_:)) {
+                moveFocus(from: control, by: 1); return true
+            }
+            if command == #selector(NSResponder.moveLeft(_:)) || command == #selector(NSResponder.moveBackward(_:)) {
+                moveFocus(from: control, by: -1); return true
+            }
             return false
         }
 
-        private func moveFocus(from control: NSControl, by delta: Int) {
+        private func moveFocus(from control: NSControl, by delta: Int, leaveAtBoundary: Bool = false) {
             func digit(in view: NSView, at index: Int) -> NSTextField? {
                 if let field = view as? NSTextField, field.cell is ArrivalClockDigitCell, field.tag == index { return field }
                 return view.subviews.lazy.compactMap { digit(in: $0, at: index) }.first
             }
             guard let window = control.window, let content = window.contentView else { return }
             if let next = digit(in: content, at: parent.index + delta) { window.makeFirstResponder(next) }
-            else { window.makeFirstResponder(nil) }
+            else if leaveAtBoundary { window.makeFirstResponder(nil) }
         }
     }
 }

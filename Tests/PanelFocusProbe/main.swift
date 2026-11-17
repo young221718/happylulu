@@ -167,22 +167,34 @@ struct PanelFocusProbe {
         precondition(fields[2].currentEditor() != nil && saves == 0, "Production Tab traversal did not retain the next untyped digit")
         (fields[2].currentEditor() as! NSTextView).doCommand(by: #selector(NSResponder.insertBacktab(_:)))
         pump(host)
-        precondition(fields[1].currentEditor() != nil && saves == 0, "Production Shift-Tab closed the editor")
+        precondition(fields[0].currentEditor() != nil && saves == 0, "Production Shift-Tab did not return to the hour section")
         let afterMoves = try Data(contentsOf: store.url)
         precondition(afterMoves == original, "Internal focus movement wrote attendance")
-        let pasteEditor = fields[1].currentEditor() as! ArrivalClockFieldEditor
-        pasteEditor.readPasteboard = { "08:12" }
-        pasteEditor.paste(nil)
+        if usesMenuBarPanel {
+            for (index, digit) in "0812".enumerated() {
+                let editor = window.firstResponder as! NSTextView
+                editor.insertText(String(digit), replacementRange: NSRange(location: NSNotFound, length: 0))
+                pump(host)
+                let duringTyping = try Data(contentsOf: store.url)
+                precondition(fields[min(index + 1, 3)].currentEditor() != nil && saves == 0 && duringTyping == original,
+                             "Continuous typing must keep the real panel open without intermediate writes")
+            }
+            (window.firstResponder as! NSTextView).doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        } else {
+            let pasteEditor = fields[0].currentEditor() as! ArrivalClockFieldEditor
+            pasteEditor.readPasteboard = { "08:12" }
+            pasteEditor.paste(nil)
+        }
         pump(host)
         let point = NSPoint(x: host.bounds.maxX - 4, y: host.bounds.maxY - 4)
         let event = NSEvent.mouseEvent(with: .leftMouseDown, location: host.convert(point, to: nil),
             modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
             context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
-        NSApplication.shared.sendEvent(event)
+        if !usesMenuBarPanel { NSApplication.shared.sendEvent(event) }
         pump(host)
         precondition(descendants(host).allSatisfy { !(($0 as? NSTextField)?.cell is ArrivalClockDigitCell) },
-                     "Outside click did not close the real editor")
-        precondition(saves == 1 && model.errorMessage == nil, "Outside click did not commit attendance exactly once")
+                     "Return or outside click did not close the real editor")
+        precondition(saves == 1 && model.errorMessage == nil, "Return or outside click did not commit attendance exactly once")
         let persisted = try store.load()
         let arrival = persisted.arrivals[model.dayKey(model.now)]!
         precondition(Attendance.clockLabel(arrival.time, timeZone: model.calendar.timeZone) == "08:12")
@@ -305,6 +317,12 @@ struct PanelFocusProbe {
         invalidEditor.readPasteboard = { "23:59" }; invalidEditor.paste(nil)
         pump(host)
         let beforeInvalidQuit = try Data(contentsOf: store.url)
+        invalidEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        pump(host)
+        let afterInvalidReturn = try Data(contentsOf: store.url)
+        precondition(model.errorMessage != nil && beforeInvalidQuit == afterInvalidReturn &&
+                     descendants(host).filter { ($0 as? NSTextField)?.cell is ArrivalClockDigitCell }.count == 4,
+                     "Return on an invalid time must preserve attendance and keep the draft editable")
         NSApplication.shared.delegate = editingTermination
         clickHeader(in: host, window: window, at: NSPoint(x: 334, y: 30))
         NSApplication.shared.delegate = nil
@@ -319,6 +337,6 @@ struct PanelFocusProbe {
                      && model.errorMessage == nil && afterInvalidCancel == beforeInvalidQuit,
                      "Escape must cancel the invalid draft and preserve the saved attendance")
         print("PASS invalid clock blocks direct Quit, preserves attendance and remains cancellable")
-        print("PASS real PanelView focus [host \(ProcessInfo.processInfo.environment["TZ"] ?? "default"), fixture \(timeZone.identifier)]: fixed Friday 16:00, 07:59/08:11 future guards, actual first-digit typing, internal move/pause, production Tab/pause, no intermediate writes, outside click closes and persists once")
+        print("PASS real PanelView focus [host \(ProcessInfo.processInfo.environment["TZ"] ?? "default"), fixture \(timeZone.identifier)]: fixed Friday 16:00, future guards, typing and Tab without intermediate writes, \(usesMenuBarPanel ? "continuous HHmm and Return" : "outside click") saves exactly once, invalid Return preserves draft and storage")
     }
 }
