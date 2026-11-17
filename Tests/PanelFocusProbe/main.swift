@@ -26,6 +26,26 @@ private final class TerminationProbe: NSObject, NSApplicationDelegate {
 }
 
 @MainActor
+private final class ViewportFixture: ObservableObject {
+    @Published var height: CGFloat = 698
+}
+
+private struct OverflowPanelFixture: View {
+    @ObservedObject var fixture: ViewportFixture
+    @State private var first = "first"
+    @State private var last = "last"
+    var body: some View {
+        PanelViewport(contentSize: NSSize(width: 364, height: fixture.height)) {
+            VStack {
+                TextField("First", text: $first).accessibilityLabel("viewport first")
+                Spacer()
+                TextField("Last", text: $last).accessibilityLabel("viewport last")
+            }.padding(12)
+        }
+    }
+}
+
+@MainActor
 private func clickHeader(in host: NSView, window: NSWindow, at point: NSPoint) {
     let location = host.convert(point, to: nil)
     for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
@@ -46,10 +66,50 @@ struct PanelFocusProbe {
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         let timeZone = TimeZone(identifier: CommandLine.arguments[2])!
         checkPlacement()
+        checkOverflowViewport()
         for usesMenuBarPanel in [false, true] {
             try checkFocus(root: root.appendingPathComponent(usesMenuBarPanel ? "arrowless" : "legacy"),
                            timeZone: timeZone, usesMenuBarPanel: usesMenuBarPanel)
         }
+    }
+
+    @MainActor private static func checkOverflowViewport() {
+        let fixture = ViewportFixture()
+        let controller = makePanelHostingController(rootView: OverflowPanelFixture(fixture: fixture), size: NSSize(width: 364, height: 636))
+        let host = controller.view
+        let window = MenuBarPanel(content: controller, size: NSSize(width: 364, height: 636))
+        window.isReleasedWhenClosed = false; window.contentViewController = controller
+        window.setContentSize(NSSize(width: 364, height: 636)); window.setFrameOrigin(NSPoint(x: -10000, y: -10000))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil); window.contentViewController = nil; window.close() }
+        pump(host)
+        let scroll = descendants(host).compactMap { $0 as? NSScrollView }.first!
+        let document = scroll.documentView!
+        precondition(host.bounds.height == 636 && document.bounds.height >= 698 && scroll.hasVerticalScroller,
+            "A 636pt viewport must retain the full 698pt natural panel content")
+        window.setContentSize(NSSize(width: 364, height: 600)); pump(host)
+        precondition(host.bounds.height == 600 && document.bounds.height >= 698, "The host must resize while retaining natural document height")
+        window.setContentSize(NSSize(width: 364, height: 636)); pump(host)
+        let fields = descendants(host).compactMap { $0 as? NSTextField }.filter(\.isEditable)
+        precondition(fields.count == 2, "Viewport fixture must expose both actual editable fields")
+        let first = fields.first { $0.stringValue == "first" }!
+        let last = fields.first { $0.stringValue == "last" }!
+        precondition(window.makeFirstResponder(first) && window.makeFirstResponder(last)); pump(host)
+        precondition(last.currentEditor() != nil, "The lower field must remain focusable through the scrolling viewport")
+        let bottom = last.convert(last.bounds, to: document)
+        _ = document.scrollToVisible(bottom); pump(host)
+        precondition(scroll.documentVisibleRect.contains(bottom), "The entire lower editable control must be reachable inside the viewport")
+        let responder = window.firstResponder
+        fixture.height = 666; pump(host)
+        precondition(document.bounds.height >= 666 && window.firstResponder === responder,
+            "Removing a 32pt proposal must preserve focused field identity and update natural content height")
+        fixture.height = 500; window.setContentSize(NSSize(width: 364, height: 500)); pump(host)
+        precondition(host.bounds.height == 500 && document.bounds.height <= 500 && !scroll.hasVerticalScroller && window.firstResponder === responder,
+            "Normal-height content must fit without overflow and preserve keyboard focus")
+        fixture.height = 698; window.setContentSize(NSSize(width: 364, height: 636)); pump(host)
+        precondition(host.bounds.height == 636 && document.bounds.height >= 698 && scroll.hasVerticalScroller && window.firstResponder === responder,
+            "New proposals/plugins must re-expand the scrollable document without replacing the focused field")
+        print("PASS panel viewport: 698pt content in 636pt host, lower field fully visible after scroll, 32pt proposal removal and normal-height focus preservation")
     }
 
     @MainActor private static func checkPlacement() {
@@ -107,7 +167,7 @@ struct PanelFocusProbe {
         var settingsOpens = 0
         let panel = PanelView(model: model, calendarSync: sync, plugins: manager,
                               onOpenHistory: {}, onOpenSettings: { settingsOpens += 1 })
-        let controller = NSHostingController(rootView: panel)
+        let controller = makePanelHostingController(rootView: panel)
         let host = controller.view
         let popup = usesMenuBarPanel ? MenuBarPanel(content: controller) : nil
         let window: NSWindow = popup ?? NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 364, height: 350),
@@ -129,7 +189,8 @@ struct PanelFocusProbe {
             let top = popup.frame.maxY
             for height in [CGFloat(390), 430, 350] {
                 popup.updateContentSize(NSSize(width: 364, height: height))
-                precondition(popup.frame.height == height && abs(popup.frame.maxY - top) < 0.5,
+                pump(host)
+                precondition(popup.frame.height == height && host.bounds.height == height && abs(popup.frame.maxY - top) < 0.5,
                              "Usage rows must resize the popup while keeping its menu-bar anchor")
             }
             print("PASS arrowless size: usage off/on/two rows keeps the top anchor")
@@ -274,7 +335,8 @@ struct PanelFocusProbe {
             for point in [NSPoint(x: 289, y: 17), NSPoint(x: 315, y: 43)] {
                 let before = settingsOpens
                 clickHeader(in: host, window: window, at: point)
-                precondition(settingsOpens == before + 1, "Settings button must preserve its 28pt target and direct callback")
+                precondition(settingsOpens == before + 1,
+                    "Settings button must preserve its 28pt target and direct callback: arrowless=\(usesMenuBarPanel), point=\(point), key=\(window.isKeyWindow), host=\(host.bounds), hit=\(String(describing: host.hitTest(point))), scroll=\(descendants(host).compactMap { ($0 as? NSScrollView)?.documentVisibleRect })")
             }
             let termination = TerminationProbe()
             NSApplication.shared.delegate = termination

@@ -106,7 +106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentSize = NSSize(width: 364, height: 350)
+        let initialPanelSize = model.panelContentSize(menuBarItemCount: plugins.menuBarItems.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
+        popover.contentSize = initialPanelSize
         let panelContent = PanelView(model: model, calendarSync: calendarSync, plugins: plugins, onOpenHistory: { [weak self] in
             self?.openSettings(section: .history)
         }, onOpenSettings: { [weak self] in
@@ -118,8 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             self?.openSettings(section: .plugin)
         })
         if LuluGlass.isSupported {
-            menuPanel = MenuBarPanel(content: NSHostingController(rootView:
-                panelContent.clipShape(RoundedRectangle(cornerRadius: 24))))
+            menuPanel = MenuBarPanel(content: makePanelHostingController(rootView:
+                panelContent.clipShape(RoundedRectangle(cornerRadius: 24)), size: initialPanelSize), size: initialPanelSize)
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
                 menuPanelObservations.append(NotificationCenter.default.addObserver(forName: name, object: menuPanel, queue: .main) { [weak self] _ in
                     Task { @MainActor [weak self] in
@@ -130,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 })
             }
         } else {
-            popover.contentViewController = NSHostingController(rootView: panelContent)
+            popover.contentViewController = makePanelHostingController(rootView: panelContent, size: initialPanelSize)
         }
         observation = model.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateTitle() }

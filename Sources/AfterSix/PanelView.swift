@@ -4,6 +4,32 @@ import AfterSixCore
 // Explicit type alias retains the macOS 13 property wrapper with SDK 27.
 private typealias PanelState<Value> = SwiftUI.State<Value>
 
+@MainActor
+func makePanelHostingController<Content: View>(rootView: Content, size: NSSize = NSSize(width: 364, height: 350)) -> NSHostingController<Content> {
+    let controller = NSHostingController(rootView: rootView)
+    // The popover/panel owns its explicit viewport; flexible content must not resize it to zero.
+    controller.sizingOptions = []
+    controller.view.frame = NSRect(origin: .zero, size: size)
+    controller.view.autoresizingMask = [.width, .height]
+    return controller
+}
+
+struct PanelViewport<Content: View>: View {
+    let contentSize: NSSize
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GeometryReader { viewport in
+            ScrollView(.vertical, showsIndicators: contentSize.height > viewport.size.height) {
+                content().frame(width: contentSize.width, height: contentSize.height, alignment: .topLeading)
+            }
+            .scrollDisabled(contentSize.height <= viewport.size.height)
+        }
+        .frame(width: contentSize.width)
+        .frame(minHeight: 0, idealHeight: contentSize.height, maxHeight: contentSize.height)
+    }
+}
+
 struct PanelView: View {
     var glass = LuluGlass()
     @ObservedObject private var appearance = AppearanceModel.shared
@@ -41,6 +67,7 @@ struct PanelView: View {
     }
 
     var body: some View {
+        PanelViewport(contentSize: panelSize) {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 9) {
                 Image(nsImage: LuluBrand.headerIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve))
@@ -127,7 +154,8 @@ struct PanelView: View {
             TodayAgendaView(model: agenda, plugins: plugins, sync: calendarSync,
                             now: model.now, onOpenCalendar: onOpenCalendar)
         }
-        .padding(16).frame(width: panelSize.width, height: panelSize.height, alignment: .topLeading)
+        .padding(16)
+        }
         .tint(accent)
         .foregroundStyle(appearance.text)
         .luluGlassSurface(tint: appearance.background, fallback: appearance.background,

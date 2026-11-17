@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-swift build --build-system native --product HappyLulu >/dev/null
+swift build --build-system native --jobs 2 --product HappyLulu >/dev/null
 build_dir="$(swift build --build-system native --show-bin-path)"
 probe_dir="$(mktemp -d "${TMPDIR:-/tmp/}HappyLulu-panel-focus.XXXXXX")"
 trap 'rm -rf "$probe_dir"' EXIT
