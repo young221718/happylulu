@@ -24,6 +24,7 @@ public struct FeatureCalendarEvent: Equatable, Sendable, Identifiable {
     public let isAllDay: Bool
     public let location: String?
     public private(set) var calendarIDs: [String]
+    public private(set) var calendarTitles: [String: String]
     /// Opaque, provider-verified event/occurrence or local sync-mapping identity.
     public let duplicateIdentity: String?
     /// Provider-normalized meaningful content not otherwise visible in this value.
@@ -34,12 +35,13 @@ public struct FeatureCalendarEvent: Equatable, Sendable, Identifiable {
     public init(sourceID: String, eventID: String, calendarID: String, title: String,
                 start: Date, end: Date, isAllDay: Bool, location: String? = nil,
                 duplicateIdentity: String? = nil, contentSignature: Data? = nil,
-                allowsContentMatching: Bool = true, matchingInterval: DateInterval? = nil) {
+                allowsContentMatching: Bool = true, matchingInterval: DateInterval? = nil, calendarTitle: String? = nil) {
         // JSON avoids collisions when an external ID itself contains a separator.
         id = String(decoding: try! JSONEncoder().encode([sourceID, calendarID, eventID]), as: UTF8.self)
         self.sourceID = sourceID; self.calendarID = calendarID; self.title = title
         self.start = start; self.end = end; self.isAllDay = isAllDay; self.location = location
         calendarIDs = [calendarID]
+        calendarTitles = calendarTitle.map { [calendarID: $0] } ?? [:]
         self.duplicateIdentity = duplicateIdentity
         self.contentSignature = contentSignature
         self.allowsContentMatching = allowsContentMatching
@@ -65,6 +67,9 @@ extension FeatureCalendarEvent {
         func representative(_ group: [Self]) -> Self {
             var value = group.min { $0.id < $1.id }!
             value.calendarIDs = Set(group.flatMap(\.calendarIDs)).sorted()
+            for event in group {
+                for (id, title) in event.calendarTitles { value.calendarTitles[id] = title }
+            }
             return value
         }
         return groups.flatMap { group -> [Self] in

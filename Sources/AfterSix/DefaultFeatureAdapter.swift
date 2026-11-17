@@ -66,6 +66,7 @@ extension FeatureCalendarEvent {
             title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
             location: event.location, duplicateIdentity: sync.displayIdentity(for: event),
             contentSignature: event.contentSignature, allowsContentMatching: event.allowsContentMatching,
-            matchingInterval: event.matchingInterval)
+            matchingInterval: event.matchingInterval,
+            calendarTitle: sync.calendars.first(where: { $0.id == event.calendarID })?.title)
     }
 }

@@ -66,8 +66,7 @@ struct FeatureCalendarView: View {
                         Text(event.isAllDay ? L("종일", "All day")
                              : timeLabel(event))
                             .font(.caption).foregroundStyle(.secondary)
-                        if source == plugins.router.defaultID,
-                           let title = sync.calendars.first(where: { $0.id == event.calendarID })?.title {
+                        if let title = model.sourceLabel(for: event, fallback: plugins.adapterName(source)) {
                             Text(title).font(.caption).foregroundStyle(.secondary)
                         }
                         if let location = event.location, !location.isEmpty {

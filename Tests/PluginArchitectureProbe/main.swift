@@ -446,10 +446,12 @@ private func checkHalfDaySessionInvalidation(root: URL) async throws {
 }
 
 actor ProbeCalendarAccess: CalendarSyncAccess {
+    private let calendars: [SystemCalendarSummary]
+    init(calendars: [SystemCalendarSummary] = []) { self.calendars = calendars }
     private(set) var requests = 0
     private(set) var reads = 0
     func requestAccess() { requests += 1 }
-    func writableCalendars() -> [SystemCalendarSummary] { reads += 1; return [] }
+    func writableCalendars() -> [SystemCalendarSummary] { reads += 1; return calendars }
     func counts() -> (Int, Int) { (requests, reads) }
 }
 
@@ -1154,11 +1156,59 @@ private func checkAllDayDisplayCopies() throws {
     print("PASS all-day display copies: last-second/exclusive ends, 23/25-hour DST days, raw preservation and shared agenda matching")
 }
 
+@MainActor
+private func checkCalendarSourceLabels() async throws {
+    let calendars = [
+        SystemCalendarSummary(id: "a", title: "다우 업무", accountName: "Daou", accountID: "daou", colorHex: "#000000"),
+        SystemCalendarSummary(id: "b", title: "Google 개인", accountName: "Google", accountID: "google", colorHex: "#000000"),
+        SystemCalendarSummary(id: "blank", title: "   ", accountName: "Other", accountID: "other", colorHex: "#000000")
+    ]
+    let access = ProbeCalendarAccess(calendars: calendars)
+    let sync = CalendarSyncModel(calendarAccess: access)
+    await sync.requestCalendarAccess(requestPermission: false)
+    let mac = MacCalendarFeatureAdapter(sync: sync)
+    let router = FeatureAdapterRouter(defaultAdapter: ProbeAdapter("builtin"))
+    try router.register(mac, enabled: true); try router.select(mac.descriptor.id, for: .calendar)
+    let model = FeatureCalendarModel(router: router)
+    let event = EKEvent(eventStore: EKEventStore())
+    event.title = "Label fixture"; event.startDate = Date(timeIntervalSince1970: 1_800_000_000)
+    event.endDate = event.startDate.addingTimeInterval(3600)
+    var snapshot = try SystemCalendarEventSnapshot(event: event, localID: "label-fixture")
+    snapshot.externalID = "label-shared-uid"; snapshot.hasRecurrenceRules = false; snapshot.isDetached = false
+    func value(_ calendarID: String) -> FeatureCalendarEvent {
+        FeatureCalendarEvent(systemEvent: SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: calendarID),
+            sync: sync, sourceID: mac.descriptor.id)
+    }
+    let raw = [value("b"), value("a")]
+    let grouped = FeatureCalendarEvent.coalescedForDisplay(raw)
+    require(grouped.count == 1 && model.sourceLabel(for: grouped[0], fallback: "Mac Calendar") == "다우 업무 · Google 개인",
+        "The active Mac calendar source must label every available source of a coalesced event, independently of the default adapter")
+    require(raw.map(\.calendarIDs) == [["b"], ["a"]] && raw[0].calendarTitles == ["b": "Google 개인"] && sync.calendars == calendars,
+        "Source labeling must preserve raw event provenance and calendar summaries")
+    let partial = FeatureCalendarEvent.coalescedForDisplay([value("a"), value("missing")])
+    require(model.sourceLabel(for: partial[0], fallback: "Mac Calendar") == "다우 업무",
+        "An unavailable calendar name must not hide another known source name")
+    require(model.sourceLabel(for: value("missing"), fallback: "Mac Calendar") == "Mac Calendar" &&
+        model.sourceLabel(for: value("blank"), fallback: "Mac Calendar") == "Mac Calendar",
+        "Missing or blank names must use the active adapter label without inventing a calendar name")
+    let daou = ProbeAdapter("daouoffice")
+    try router.register(daou, enabled: true); try router.select(daou.descriptor.id, for: .calendar)
+    let company = FeatureCalendarEvent(sourceID: "daouoffice", eventID: "company", calendarID: "a", title: "Company",
+        start: event.startDate, end: event.endDate, isAllDay: false)
+    require(model.sourceLabel(for: company, fallback: "다우오피스") == "다우오피스" &&
+        model.sourceLabel(for: grouped[0], fallback: "다우오피스") == nil,
+        "Switching to Daou must not reuse Mac calendar names or label stale events as the new source")
+    let counts = await access.counts()
+    require(counts == (0, 1), "Label lookup must not request calendar permission or refetch data")
+    print("PASS calendar source labels: actual Mac adapter, all merged calendars, missing/blank names, Daou selection and raw preservation")
+}
+
 @main
 struct PluginArchitectureChecks {
     @MainActor
     static func main() async throws {
         try checkAllDayDisplayCopies()
+        try await checkCalendarSourceLabels()
         // Keep legacy menu assertions independent of a previous probe's saved toggle.
         let departureKey = "HappyLuluShowDepartureInMenuBar"
         let savedDepartureVisibility = UserDefaults.standard.object(forKey: departureKey)
