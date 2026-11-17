@@ -1,6 +1,7 @@
 import SwiftUI
 import AfterSixCore
 import CalendarSyncServices
+import AppPluginCore
 
 private typealias WorkspaceState<Value> = SwiftUI.State<Value>
 
@@ -54,7 +55,7 @@ struct SyncedEventsCalendarView: View {
                     Button(L("동기화 설정", "Sync settings"), action: onOpenSettings)
                 }
                 .font(.caption)
-                Text(L("선택한 Mac 캘린더의 현재 일정입니다. 양쪽의 복사본은 계정별로 표시하며, 반복·초대 일정도 조회할 수 있습니다.", "Current events from the selected Mac calendars. Copies appear per account, including recurring and invited events."))
+                Text(L("선택한 Mac 캘린더의 현재 일정입니다. 확인된 복사본은 한 번 표시하며, 반복·초대 일정도 조회할 수 있습니다.", "Current events from the selected Mac calendars. Matching copies appear once, including recurring and invited events."))
                     .font(.caption).foregroundStyle(.secondary)
                 if model.selectedDaouCalendar.isEmpty && model.selectedGoogleCalendar.isEmpty {
                     Text(L("동기화 설정에서 표시할 캘린더를 선택해 주세요.", "Select calendars in Sync settings.")).foregroundStyle(.secondary)
@@ -102,8 +103,9 @@ struct SyncedEventsCalendarView: View {
         .task(id: readID) { await model.loadDisplayedEvents(start: grid.start, end: grid.end) }
     }
 
-    private func events(on day: Date) -> [SystemCalendarDisplayEvent] {
-        model.displayedEvents.filter { grid.overlaps(day: day, start: $0.start, end: $0.end) }
+    private func events(on day: Date) -> [FeatureCalendarEvent] {
+        let events = model.displayedEvents.map { FeatureCalendarEvent(systemEvent: $0, sync: model, sourceID: "mac-calendar") }
+        return FeatureCalendarEvent.coalescedForDisplay(events).filter { grid.overlaps(day: day, start: $0.start, end: $0.end) }
     }
 
     private func calendarLabel(_ id: String, side: String, color: Color) -> some View {
@@ -111,15 +113,15 @@ struct SyncedEventsCalendarView: View {
         return Label("\(side) · \(title)", systemImage: "circle.fill").foregroundStyle(color)
     }
 
-    private func side(_ event: SystemCalendarDisplayEvent) -> String {
-        event.calendarID == model.selectedDaouCalendar ? L("다우오피스", "Daou Office") : "Google"
+    private func side(_ event: FeatureCalendarEvent) -> String {
+        event.calendarIDs.map { $0 == model.selectedDaouCalendar ? L("다우오피스", "Daou Office") : "Google" }.joined(separator: " · ")
     }
 
-    private func color(_ event: SystemCalendarDisplayEvent) -> Color {
+    private func color(_ event: FeatureCalendarEvent) -> Color {
         event.calendarID == model.selectedDaouCalendar ? .blue : .green
     }
 
-    private func timeLabel(_ event: SystemCalendarDisplayEvent) -> String {
+    private func timeLabel(_ event: FeatureCalendarEvent) -> String {
         if event.isAllDay { return L("종일", "All day") }
         let format = Date.FormatStyle(date: .abbreviated, time: .shortened, locale: displayLocale)
         return "\(event.start.formatted(format)) ~ \(event.end.formatted(format))"

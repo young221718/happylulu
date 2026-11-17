@@ -28,6 +28,10 @@ func checkAPILogging() throws {
     rows = try readLogFixture(file)
     require(rows[2]["responseBody"] == nil && rows[2]["code"] as? String == "PORTAL-0012" && rows[3]["responseBody"] == nil, "Authentication or bootstrap body was logged")
     require(rows[4]["responseBody"] == nil && rows[4]["responseShape"] != nil, "Success logged personal response values")
+    let attendance = URLRequest(url: URL(string: "https://fixture.invalid/api/attend/normal/gadget/today")!)
+    logger.record(request: attendance, data: Data(#"{"data":{"startWorkTime":"fixture-private-arrival"},"message":"fixture-private-error"}"#.utf8), response: response, duration: 0)
+    rows = try readLogFixture(file)
+    require(rows[5]["responseBody"] == nil, "Attendance error responses must not log personal attendance values")
     let text = try String(contentsOf: file, encoding: .utf8)
     for secret in ["fixture-private", "fixture-request", "fixture-response-cookie", "fixture-auth", "fixture-bootstrap", "fixture-query-token", "fixture-success-personal-value", "eyJmaXh0dXJl"] {
         require(!text.contains(secret), "API logger retained a fixture secret")

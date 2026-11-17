@@ -7,6 +7,7 @@ import ServiceManagement
 import AfterSixCore
 import MacLaunchSupport
 import AppPluginCore
+import UserNotifications
 // The previous development-only token bridge is not part of the released Codex plugin.
 if CommandLine.arguments.contains("--token-speed-bridge") { exit(64) }
 
@@ -14,7 +15,7 @@ let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdent
     applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var menuPanel: MenuBarPanel?
@@ -33,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         return manager
     }()
     private lazy var model = AppModel(store: StateStore(url: runtimeProfile.stateURL), featureRouter: plugins.router,
-        allowsLoginItemChanges: runtimeProfile.allowsLoginItemChanges)
+        allowsLoginItemChanges: runtimeProfile.allowsLoginItemChanges,
+        allowsDaouNotifications: runtimeProfile.allowsExternalIntegrations && runtimeProfile.allowsAutomaticActivity)
     private lazy var featureCalendar = FeatureCalendarModel(router: plugins.router)
     private let updater = AppUpdater()
     private let settingsNavigation = SettingsNavigation()
@@ -73,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         observeLoginLaunch()
+        if runtimeProfile.allowsExternalIntegrations && runtimeProfile.allowsAutomaticActivity {
+            UNUserNotificationCenter.current().delegate = self
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = LuluBrand.menuBarIcon()
@@ -101,7 +106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         }
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentSize = NSSize(width: 364, height: 350)
+        let initialPanelSize = model.panelContentSize(menuBarItemCount: plugins.menuBarItems.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
+        popover.contentSize = initialPanelSize
         let panelContent = PanelView(model: model, calendarSync: calendarSync, plugins: plugins, onOpenHistory: { [weak self] in
             self?.openSettings(section: .history)
         }, onOpenSettings: { [weak self] in
@@ -113,8 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             self?.openSettings(section: .plugin)
         })
         if LuluGlass.isSupported {
-            menuPanel = MenuBarPanel(content: NSHostingController(rootView:
-                panelContent.clipShape(RoundedRectangle(cornerRadius: 24))))
+            menuPanel = MenuBarPanel(content: makePanelHostingController(rootView:
+                panelContent.clipShape(RoundedRectangle(cornerRadius: 24)), size: initialPanelSize), size: initialPanelSize)
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
                 menuPanelObservations.append(NotificationCenter.default.addObserver(forName: name, object: menuPanel, queue: .main) { [weak self] _ in
                     Task { @MainActor [weak self] in
@@ -125,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
                 })
             }
         } else {
-            popover.contentViewController = NSHostingController(rootView: panelContent)
+            popover.contentViewController = makePanelHostingController(rootView: panelContent, size: initialPanelSize)
         }
         observation = model.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateTitle() }
@@ -187,12 +194,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         displayedMenuTitle = model.menuTitle
         displayedPluginItems = items
         updateMenuBarTitle()
-        let pluginPanelHeight = plugins.registrations.reduce(CGFloat.zero) { height, entry in
-            guard plugins.allowsExecution(entry.id), plugins.isEnabled(entry.id), entry.controller.enabled,
-                  let provider = entry.controller as? any PluginPanelProviding else { return height }
-            return height + provider.panelHeight
-        }
-        let panelSize = NSSize(width: 364, height: CGFloat(350 + 40 * items.count) + pluginPanelHeight)
+        let panelSize = model.panelContentSize(menuBarItemCount: items.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
         popover.contentSize = panelSize
         menuPanel?.updateContentSize(panelSize)
         menuPanel?.reposition()
@@ -236,7 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         } else {
             base = baseMenuBarImage
         }
-        button.image = menuBarImages.image(base: base)
+        button.image = menuBarImages.image(base: base, appearance: button.effectiveAppearance, highlighted: highlighted)
         let labels = menuBarImages.accessibilityLabels
         let suffix = labels.isEmpty ? "" : " · " + labels.joined(separator: " · ")
         let toolTip = baseToolTip + suffix
@@ -311,9 +314,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        model.setDaouNotificationRuntimeActive(false)
         if let statusInteractionMonitor { NSEvent.removeMonitor(statusInteractionMonitor) }
         menuPanelObservations.forEach(NotificationCenter.default.removeObserver)
         plugins.stop(); calendarSync.setRuntimeAllowed(false)
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse) async {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let pluginID = AppModel.pluginForReviewNotification(response.notification.request.identifier) else { return }
+        await MainActor.run {
+            self.settingsNavigation.pluginID = pluginID
+            self.openSettings(section: .plugin)
+        }
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        // Other plugins retain their previous foreground behavior and request identifiers.
+        AppModel.pluginForReviewNotification(notification.request.identifier) == nil ? [] : [.banner]
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

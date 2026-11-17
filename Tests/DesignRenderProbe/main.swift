@@ -43,9 +43,10 @@ private final class RenderWindow: NSWindow {
 
 @MainActor
 private func capture<V: View>(_ view: V, size: NSSize, to url: URL) throws {
-    let controller = NSHostingController(rootView: view.environment(\.luluMaterialMode, RenderConfiguration.materialMode))
-    let host = controller.view
     let isSettingsWindow = url.lastPathComponent.hasPrefix("settings-")
+    let content = view.environment(\.luluMaterialMode, RenderConfiguration.materialMode)
+    let controller = isSettingsWindow ? NSHostingController(rootView: content) : makePanelHostingController(rootView: content, size: size)
+    let host = controller.view
     let window = RenderWindow(contentRect: NSRect(origin: NSPoint(x: -10000, y: -10000), size: size),
                           styleMask: isSettingsWindow ? [.titled, .closable, .miniaturizable, .resizable] : [.titled],
                           backing: .buffered, defer: false)
@@ -135,9 +136,9 @@ private func capture<V: View>(_ view: V, size: NSSize, to url: URL) throws {
         window.constrainsToScreen = true
         var captureWindow: NSWindow = window
         if !isSettingsWindow, LuluGlass.isSupported, RenderConfiguration.materialMode == .automatic {
-            let content = NSHostingController(rootView: view
+            let content = makePanelHostingController(rootView: view
                 .environment(\.luluMaterialMode, RenderConfiguration.materialMode)
-                .clipShape(RoundedRectangle(cornerRadius: 24)))
+                .clipShape(RoundedRectangle(cornerRadius: 24)), size: size)
             let panel = MenuBarPanel(content: content, size: size)
             panel.contentViewController = content
             captureWindow = panel

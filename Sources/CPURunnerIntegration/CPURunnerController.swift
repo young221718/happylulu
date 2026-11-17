@@ -30,6 +30,17 @@ public enum RunnerOrbitAnimationPolicy {
     }
 }
 
+public enum RunnerMemoryPressureStyle {
+    public static func palette(_ pressure: MemoryPressure?) -> PluginOrbitPalette {
+        switch pressure {
+        case .normal: return PluginOrbitPalette(startRGB: 0x218649, endRGB: 0x64C987)
+        case .warning: return PluginOrbitPalette(startRGB: 0xD68100, endRGB: 0xFFBF3F)
+        case .critical: return PluginOrbitPalette(startRGB: 0xD63C3C, endRGB: 0xFF7971)
+        case nil: return PluginOrbitPalette(startRGB: 0x7D8590, endRGB: 0xA6ACB5)
+        }
+    }
+}
+
 @MainActor
 private final class RunnerTimer: RunnerScheduledTask {
     private let timer: Timer
@@ -142,7 +153,6 @@ public final class CPURunnerController: ObservableObject, PluginMenuBarImageProv
     public func setOrbitPalette(_ value: PluginOrbitPalette) {
         guard palette != value else { return }
         settings.palette = value; palette = value
-        if presentation == .owlOrbit { render() }
     }
 
     public func start() {
@@ -239,20 +249,25 @@ public final class CPURunnerController: ObservableObject, PluginMenuBarImageProv
     private func render() {
         guard enabled, isActive else { return }
         guard !asleep else { clearPresentation(); return }
+        let pressurePalette = RunnerMemoryPressureStyle.palette(metrics.memory?.pressure)
+        let pressureText = localize("메모리 압력: ", "Memory pressure: ")
+            + RunnerMetricsFormatter.pressure(metrics.memory?.pressure, localize: localize)
         if presentation == .owlOrbit {
             // A completed cycle stays at phase zero despite floating-point rounding.
             let phase = Double(Int((orbitProgress * Double(RunnerOrbitAnimationPolicy.frameCount) + 1e-9).rounded(.down))
                 % RunnerOrbitAnimationPolicy.frameCount) / Double(RunnerOrbitAnimationPolicy.frameCount)
             menuBarImage = nil
-            baseIconEffect = .orbit(phase: phase, palette: palette)
-            baseIconAccessibilityLabel = localize("happylulu 부엉이 눈빛, \(usageText)", "happylulu owl orbit, \(usageText)")
+            baseIconEffect = .orbit(phase: phase, palette: pressurePalette)
+            baseIconAccessibilityLabel = localize("happylulu 부엉이 눈빛, \(usageText), \(pressureText)", "happylulu owl orbit, \(usageText), \(pressureText)")
             imageUpdates.send()
             return
         }
-        baseIconEffect = nil; baseIconAccessibilityLabel = nil
+        // Keep the animal template intact; the stationary owl outline carries memory pressure.
+        baseIconEffect = .orbit(phase: 0, palette: pressurePalette)
+        baseIconAccessibilityLabel = nil
         if display == nil { display = displayFactory? { [weak self] in self?.selectAnimal($0) } }
         let name = localize(animal.koreanName, animal.englishName)
-        let label = localize("happylulu 러너, \(name), \(usageText)", "happylulu runner, \(name), \(usageText)")
+        let label = localize("happylulu 러너, \(name), \(usageText), \(pressureText)", "happylulu runner, \(name), \(usageText), \(pressureText)")
         menuBarImage = PluginMenuBarImage(image: RunnerArtwork.image(for: animal, frame: frame), accessibilityLabel: label)
         imageUpdates.send()
         display?.render(animal: animal, frame: frame, usageText: usageText, accessibilityLabel: label)

@@ -115,6 +115,10 @@ actor CaptchaModelTransport: DaouOfficeTransport {
     }
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let step: ModelAPIStep
+        if request.url?.path == "/api/attend/normal/gadget/today", steps.first?.path != request.url?.path {
+            return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 404,
+                httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!)
+        }
         if !steps.isEmpty { step = steps.removeFirst() }
         else if let previewCaptcha {
             // UI previews remain fixtures even if someone uses the visible controls.

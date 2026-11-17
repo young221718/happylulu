@@ -6,7 +6,8 @@ import AppPluginHost
 import CPURunnerIntegration
 import MacUtilitiesIntegration
 import AfterSixCore
-import CalendarSyncServices
+@testable import CalendarSyncServices
+import EventKit
 
 func fixtureDate(_ value: String) throws -> Date {
     guard let date = ISO8601DateFormatter().date(from: value) else { throw FeatureAdapterFailure.unsupported }
@@ -445,10 +446,12 @@ private func checkHalfDaySessionInvalidation(root: URL) async throws {
 }
 
 actor ProbeCalendarAccess: CalendarSyncAccess {
+    private let calendars: [SystemCalendarSummary]
+    init(calendars: [SystemCalendarSummary] = []) { self.calendars = calendars }
     private(set) var requests = 0
     private(set) var reads = 0
     func requestAccess() { requests += 1 }
-    func writableCalendars() -> [SystemCalendarSummary] { reads += 1; return [] }
+    func writableCalendars() -> [SystemCalendarSummary] { reads += 1; return calendars }
     func counts() -> (Int, Int) { (requests, reads) }
 }
 
@@ -1114,10 +1117,98 @@ private func checkOvertimeTimer(root: URL) async throws {
     print("PASS live overtime timer: repeated millisecond updates within 450ms, unchanged attendance")
 }
 
+@MainActor
+private func checkAllDayDisplayCopies() throws {
+    let sync = CalendarSyncModel(calendarAccess: ProbeCalendarAccess(), runtimeAllowed: false)
+    let dates = ISO8601DateFormatter()
+    for (first, exclusive, inclusive, hours) in [
+        ("2026-03-08T00:00:00-05:00", "2026-03-09T00:00:00-04:00", "2026-03-08T23:59:59-04:00", 23),
+        ("2026-11-01T00:00:00-04:00", "2026-11-02T00:00:00-05:00", "2026-11-01T23:59:59-05:00", 25)
+    ] {
+        let start = dates.date(from: first)!, end = dates.date(from: exclusive)!, copyEnd = dates.date(from: inclusive)!
+        require(end.timeIntervalSince(start) == Double(hours * 3600), "Fixture must cross a real DST day")
+        let event = EKEvent(eventStore: EKEventStore())
+        event.title = "All-day fixture"; event.startDate = start; event.endDate = end; event.isAllDay = true
+        var original = try SystemCalendarEventSnapshot(event: event, localID: "original")
+        original.defaultTimeZone = TimeZone(identifier: "America/New_York")!
+        // EKEvent's all-day setter uses the host zone; model the provider's raw values explicitly.
+        original.startDate = start; original.endDate = end; original.isAllDay = true
+        original.externalID = "shared-fixture"; original.hasRecurrenceRules = false; original.isDetached = false
+        let originalDisplay = SystemCalendarDisplayEvent(snapshot: original, calendarID: "b")
+        var copied = original
+        copied.localID = "copy"; copied.endDate = copyEnd; copied.timeZoneID = "Asia/Seoul"
+        let copiedDisplay = SystemCalendarDisplayEvent(snapshot: copied, calendarID: "a")
+        let raw = [originalDisplay, copiedDisplay].map { FeatureCalendarEvent(systemEvent: $0, sync: sync, sourceID: "mac-calendar") }
+        let displayed = FeatureCalendarEvent.coalescedForDisplay(raw)
+        require(displayed.count == 1 && displayed[0].calendarIDs == ["a", "b"],
+            "All-day copies using last-second versus exclusive-midnight ends must display once across DST")
+        require(displayed[0].end == copyEnd && original.endDate == end && copied.endDate == copyEnd && raw.map(\.end) == [end, copyEnd],
+            "Canonical matching must preserve raw event values and the representative's display time")
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = original.defaultTimeZone
+        require(DailyAgenda(events: raw, on: start, calendar: calendar).items.count == 1 &&
+            DailyAgenda(events: raw, on: end, calendar: calendar).items.isEmpty,
+            "Daily agenda must share canonical all-day matching without extending into the next date")
+        copied.externalID = "independent-copy"
+        let unlinked = FeatureCalendarEvent(systemEvent: SystemCalendarDisplayEvent(snapshot: copied, calendarID: "a"), sync: sync, sourceID: "mac-calendar")
+        require(FeatureCalendarEvent.coalescedForDisplay([raw[0], unlinked]).count == 1,
+            "Exact-content matching must use the same canonical civil-day bounds as verified identities")
+    }
+    print("PASS all-day display copies: last-second/exclusive ends, 23/25-hour DST days, raw preservation and shared agenda matching")
+}
+
+@MainActor
+private func checkCalendarSourceLabels() async throws {
+    let calendars = [
+        SystemCalendarSummary(id: "a", title: "다우 업무", accountName: "Daou", accountID: "daou", colorHex: "#000000"),
+        SystemCalendarSummary(id: "b", title: "Google 개인", accountName: "Google", accountID: "google", colorHex: "#000000"),
+        SystemCalendarSummary(id: "blank", title: "   ", accountName: "Other", accountID: "other", colorHex: "#000000")
+    ]
+    let access = ProbeCalendarAccess(calendars: calendars)
+    let sync = CalendarSyncModel(calendarAccess: access)
+    await sync.requestCalendarAccess(requestPermission: false)
+    let mac = MacCalendarFeatureAdapter(sync: sync)
+    let router = FeatureAdapterRouter(defaultAdapter: ProbeAdapter("builtin"))
+    try router.register(mac, enabled: true); try router.select(mac.descriptor.id, for: .calendar)
+    let model = FeatureCalendarModel(router: router)
+    let event = EKEvent(eventStore: EKEventStore())
+    event.title = "Label fixture"; event.startDate = Date(timeIntervalSince1970: 1_800_000_000)
+    event.endDate = event.startDate.addingTimeInterval(3600)
+    var snapshot = try SystemCalendarEventSnapshot(event: event, localID: "label-fixture")
+    snapshot.externalID = "label-shared-uid"; snapshot.hasRecurrenceRules = false; snapshot.isDetached = false
+    func value(_ calendarID: String) -> FeatureCalendarEvent {
+        FeatureCalendarEvent(systemEvent: SystemCalendarDisplayEvent(snapshot: snapshot, calendarID: calendarID),
+            sync: sync, sourceID: mac.descriptor.id)
+    }
+    let raw = [value("b"), value("a")]
+    let grouped = FeatureCalendarEvent.coalescedForDisplay(raw)
+    require(grouped.count == 1 && model.sourceLabel(for: grouped[0], fallback: "Mac Calendar") == "다우 업무 · Google 개인",
+        "The active Mac calendar source must label every available source of a coalesced event, independently of the default adapter")
+    require(raw.map(\.calendarIDs) == [["b"], ["a"]] && raw[0].calendarTitles == ["b": "Google 개인"] && sync.calendars == calendars,
+        "Source labeling must preserve raw event provenance and calendar summaries")
+    let partial = FeatureCalendarEvent.coalescedForDisplay([value("a"), value("missing")])
+    require(model.sourceLabel(for: partial[0], fallback: "Mac Calendar") == "다우 업무",
+        "An unavailable calendar name must not hide another known source name")
+    require(model.sourceLabel(for: value("missing"), fallback: "Mac Calendar") == "Mac Calendar" &&
+        model.sourceLabel(for: value("blank"), fallback: "Mac Calendar") == "Mac Calendar",
+        "Missing or blank names must use the active adapter label without inventing a calendar name")
+    let daou = ProbeAdapter("daouoffice")
+    try router.register(daou, enabled: true); try router.select(daou.descriptor.id, for: .calendar)
+    let company = FeatureCalendarEvent(sourceID: "daouoffice", eventID: "company", calendarID: "a", title: "Company",
+        start: event.startDate, end: event.endDate, isAllDay: false)
+    require(model.sourceLabel(for: company, fallback: "다우오피스") == "다우오피스" &&
+        model.sourceLabel(for: grouped[0], fallback: "다우오피스") == nil,
+        "Switching to Daou must not reuse Mac calendar names or label stale events as the new source")
+    let counts = await access.counts()
+    require(counts == (0, 1), "Label lookup must not request calendar permission or refetch data")
+    print("PASS calendar source labels: actual Mac adapter, all merged calendars, missing/blank names, Daou selection and raw preservation")
+}
+
 @main
 struct PluginArchitectureChecks {
     @MainActor
     static func main() async throws {
+        try checkAllDayDisplayCopies()
+        try await checkCalendarSourceLabels()
         // Keep legacy menu assertions independent of a previous probe's saved toggle.
         let departureKey = "HappyLuluShowDepartureInMenuBar"
         let savedDepartureVisibility = UserDefaults.standard.object(forKey: departureKey)
@@ -1351,6 +1442,13 @@ struct PluginArchitectureChecks {
         builtin.events = [FeatureCalendarEvent(sourceID: "builtin", eventID: "one", calendarID: "one", title: "Fixture", start: start, end: interval.end, isAllDay: true)]
         await model.load(in: interval)
         require(model.events.count == 1 && !model.isLoading && model.errorMessage == nil, "Calendar view model did not consume the selected default adapter")
+        let duplicate = FeatureCalendarEvent(sourceID: "builtin", eventID: "two", calendarID: "two", title: "Fixture",
+            start: start, end: interval.end, isAllDay: true)
+        builtin.events.append(duplicate)
+        await model.load(in: interval)
+        require(model.events.count == 1 && model.events(on: start, calendar: model.calendar).count == 1,
+            "Month and selected-day projections must display one cross-calendar copy")
+        require(builtin.events.count == 2, "Display coalescing must preserve the adapter's raw events")
         builtin.pauses = true
         let pending = Task { await model.load(in: interval) }
         while builtin.held == nil { await Task.yield() }

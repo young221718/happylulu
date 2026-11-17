@@ -26,5 +26,10 @@ func checkDailyAgenda() {
     require(DailyAgenda(events: [], on: day, calendar: calendar).items.isEmpty, "Empty agenda must remain empty")
     let exact = DailyAgenda(events: [c,b,a], on: day, calendar: calendar)
     require(exact.items.map(\.title) == ["a","b","c"] && exact.remainingCount == 0, "Three events must fit exactly")
+    let copy = FeatureCalendarEvent(sourceID: "fixture", eventID: "copied-a", calendarID: "other",
+        title: "a", start: a.start, end: a.end, isAllDay: false)
+    let copiedAgenda = DailyAgenda(events: [a, copy, b, c], on: day, calendar: calendar)
+    require(copiedAgenda.items.map(\.title) == ["a", "b", "c"] && copiedAgenda.remainingCount == 0,
+        "A copied cross-calendar event must consume one agenda row and no extra count")
     print("PASS compact daily agenda: three-row limit, remaining count, empty, order, all-day, spanning, exact midnight and DST")
 }

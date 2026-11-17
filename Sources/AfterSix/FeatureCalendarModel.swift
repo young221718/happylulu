@@ -26,7 +26,7 @@ final class FeatureCalendarModel: ObservableObject {
         do {
             let values = try await router.calendarEvents(in: interval)
             guard generation == current, !Task.isCancelled else { return }
-            events = values.sorted { $0.start < $1.start }
+            events = FeatureCalendarEvent.coalescedForDisplay(values)
             loadedSource = router.selectedID(for: .calendar)
         } catch is CancellationError {
         } catch {
@@ -41,6 +41,15 @@ final class FeatureCalendarModel: ObservableObject {
                 }
             } else { errorMessage = error.localizedDescription }
         }
+    }
+    func sourceLabel(for event: FeatureCalendarEvent, fallback: String) -> String? {
+        guard event.sourceID == router.selectedID(for: .calendar) else { return nil }
+        let titles = event.calendarIDs.compactMap { id -> String? in
+            guard let title = event.calendarTitles[id], !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return title
+        }
+        if !titles.isEmpty { return titles.joined(separator: " · ") }
+        return fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : fallback
     }
     func events(on day: Date, calendar: Calendar) -> [FeatureCalendarEvent] {
         guard loadedSource == router.selectedID(for: .calendar) else { return [] }

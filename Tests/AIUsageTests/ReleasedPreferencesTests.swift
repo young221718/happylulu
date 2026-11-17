@@ -162,4 +162,21 @@ final class ReleasedPreferencesTests: XCTestCase {
             XCTAssertEqual(defaults.data(forKey: oldKey), data)
         }
     }
+
+    func testCorruptProviderSettingsCannotFallBackToReleasedAccount() async throws {
+        for raw in ["{corrupt", #"{"schema":99,"profiles":[],"selectedID":null}"#] {
+            try await fixture { defaults in
+                let data = Data(raw.utf8)
+                defaults.set(data, forKey: "HappyLuluAIUsage.providers.v2")
+                let counter = ReleaseFetchCounter()
+                let model = AIUsageModel(defaults: defaults, providerFactory: { _ in ReleaseProvider(counter: counter) })
+                model.setEnabled(true); model.start(); model.login(); model.refreshData()
+                try await Task.sleep(for: .milliseconds(30)); model.stop()
+                let count = await counter.count
+                XCTAssertEqual(count, 0)
+                XCTAssertTrue(model.settingsReadOnly)
+                XCTAssertEqual(defaults.data(forKey: "HappyLuluAIUsage.providers.v2"), data)
+            }
+        }
+    }
 }

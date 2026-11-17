@@ -23,12 +23,76 @@ public struct FeatureCalendarEvent: Equatable, Sendable, Identifiable {
     public let end: Date
     public let isAllDay: Bool
     public let location: String?
+    public private(set) var calendarIDs: [String]
+    public private(set) var calendarTitles: [String: String]
+    /// Opaque, provider-verified event/occurrence or local sync-mapping identity.
+    public let duplicateIdentity: String?
+    /// Provider-normalized meaningful content not otherwise visible in this value.
+    public let contentSignature: Data?
+    public let allowsContentMatching: Bool
+    /// Canonical all-day comparison bounds; start/end retain the source representation.
+    public let matchingInterval: DateInterval?
     public init(sourceID: String, eventID: String, calendarID: String, title: String,
-                start: Date, end: Date, isAllDay: Bool, location: String? = nil) {
+                start: Date, end: Date, isAllDay: Bool, location: String? = nil,
+                duplicateIdentity: String? = nil, contentSignature: Data? = nil,
+                allowsContentMatching: Bool = true, matchingInterval: DateInterval? = nil, calendarTitle: String? = nil) {
         // JSON avoids collisions when an external ID itself contains a separator.
         id = String(decoding: try! JSONEncoder().encode([sourceID, calendarID, eventID]), as: UTF8.self)
         self.sourceID = sourceID; self.calendarID = calendarID; self.title = title
         self.start = start; self.end = end; self.isAllDay = isAllDay; self.location = location
+        calendarIDs = [calendarID]
+        calendarTitles = calendarTitle.map { [calendarID: $0] } ?? [:]
+        self.duplicateIdentity = duplicateIdentity
+        self.contentSignature = contentSignature
+        self.allowsContentMatching = allowsContentMatching
+        self.matchingInterval = matchingInterval
+    }
+}
+
+extension FeatureCalendarEvent {
+    /// A display projection only; raw adapter values and source calendars remain intact.
+    public static func coalescedForDisplay(_ events: [Self]) -> [Self] {
+        var groups: [[Self]] = []
+        for event in events {
+            if let index = groups.firstIndex(where: { group in
+                let other = group[0]
+                return event.sourceID == other.sourceID && event.title == other.title &&
+                    (event.matchingInterval?.start ?? event.start) == (other.matchingInterval?.start ?? other.start) &&
+                    (event.matchingInterval?.end ?? event.end) == (other.matchingInterval?.end ?? other.end) &&
+                    event.isAllDay == other.isAllDay && event.location == other.location &&
+                    event.contentSignature == other.contentSignature
+            }) { groups[index].append(event) }
+            else { groups.append([event]) }
+        }
+        func representative(_ group: [Self]) -> Self {
+            var value = group.min { $0.id < $1.id }!
+            value.calendarIDs = Set(group.flatMap(\.calendarIDs)).sorted()
+            for event in group {
+                for (id, title) in event.calendarTitles { value.calendarTitles[id] = title }
+            }
+            return value
+        }
+        return groups.flatMap { group -> [Self] in
+            guard !group[0].title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  group.allSatisfy({ $0.end > $0.start }) else { return group }
+            var unmatched = group
+            var displayed: [Self] = []
+            let identified = Dictionary(grouping: group.filter { $0.duplicateIdentity?.isEmpty == false },
+                by: { $0.duplicateIdentity! })
+            for (identity, candidates) in identified {
+                guard candidates.count > 1,
+                      Set(candidates.map(\.calendarID)).count == candidates.count else { continue }
+                displayed.append(representative(candidates))
+                unmatched.removeAll { $0.duplicateIdentity == identity }
+            }
+            // shortcut: exact unlinked clones are indistinguishable, prefer provider identity when available.
+            if unmatched.count == 2,
+               unmatched.allSatisfy({ $0.allowsContentMatching && $0.calendarIDs.count == 1 }),
+               Set(unmatched.map(\.calendarID)).count == unmatched.count {
+                displayed.append(representative(unmatched))
+            } else { displayed.append(contentsOf: unmatched) }
+            return displayed
+        }.sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
     }
 }
 

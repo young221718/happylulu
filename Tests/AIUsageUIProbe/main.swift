@@ -308,7 +308,7 @@ struct AIUsageUIProbe {
             } else {
                 base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve)
             }
-            return group.image(base: base)
+            return group.image(base: base, appearance: appearance, highlighted: highlighted)
         }
         button.image = renderImage(highlighted: false)
         precondition(button.image?.size == NSSize(width: orbit ? 26 : 58, height: 18))
@@ -362,8 +362,9 @@ struct AIUsageUIProbe {
         reportUsageProbe("BEGIN usage render: \(name)")
         let materialMode: LuluMaterialMode =
             ProcessInfo.processInfo.environment["HAPPY_LULU_MATERIAL_MODE"] == "legacy" ? .legacy : .automatic
-        let controller = NSHostingController(rootView: view.environment(\.luluMaterialMode, materialMode))
         let isPanel = name.hasPrefix("panel-") || name.hasPrefix("overtime-")
+        let content = view.environment(\.luluMaterialMode, materialMode)
+        let controller = isPanel ? makePanelHostingController(rootView: content, size: size) : NSHostingController(rootView: content)
         let window: NSWindow = isPanel && LuluGlass.isSupported
             ? MenuBarPanel(content: controller, size: size)
             : NSWindow(contentRect: NSRect(origin: NSPoint(x: -10000, y: -10000), size: size),
@@ -540,8 +541,10 @@ private final class InteractiveUsageSession: NSObject {
 
     private static let bannerHeight: CGFloat = 30
     private var panelSize: NSSize {
-        NSSize(width: 364, height: CGFloat(350 + 40 * plugins.menuBarItems.count)
-            + plugins.panelProviders.reduce(0) { $0 + $1.panelHeight } + Self.bannerHeight)
+        var size = model.panelContentSize(menuBarItemCount: plugins.menuBarItems.count,
+            pluginPanelHeight: plugins.panelProviders.reduce(0) { $0 + $1.panelHeight })
+        size.height += Self.bannerHeight
+        return size
     }
 
     private var banner: some View {
@@ -588,14 +591,14 @@ private final class InteractiveUsageSession: NSObject {
     @objc private func openPanel() {
         guard let button = statusItem?.button else { return }
         if panel == nil {
-            let controller = NSHostingController(rootView: VStack(spacing: 0) {
+            let controller = makePanelHostingController(rootView: VStack(spacing: 0) {
                 banner
                 PanelView(model: model, calendarSync: sync, plugins: plugins,
                     onOpenHistory: { [weak self] in self?.navigateToSettings(section: .history) },
                     onOpenSettings: { [weak self] in self?.openSettings() },
                     onOpenCalendar: { [weak self] in self?.navigateToSettings(section: .plugins) },
                     onOpenPlugin: { [weak self] id in self?.navigateToSettings(section: .plugin, plugin: id) })
-            }.environment(\.luluMaterialMode, materialMode))
+            }.environment(\.luluMaterialMode, materialMode), size: panelSize)
             panel = MenuBarPanel(content: controller, size: panelSize)
             panel?.title = "happylulu-dev — Synthetic Attendance"
         }
@@ -624,7 +627,8 @@ private final class InteractiveUsageSession: NSObject {
         } else {
             base = LuluBrand.menuBarIcon(for: model.luluDisplayState, vacationEve: model.isVacationEve)
         }
-        button.image = images.image(base: base)
+        button.image = images.image(base: base, appearance: button.effectiveAppearance,
+            highlighted: button.cell?.isHighlighted == true)
         button.attributedTitle = PluginMenuBarTitle.attributed(base: "QA · " + model.menuTitle,
             items: plugins.menuBarItems, font: button.font!, appearance: button.effectiveAppearance)
         button.setAccessibilityLabel("HappyLulu synthetic QA, " + model.menuTitle)

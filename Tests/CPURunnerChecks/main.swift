@@ -132,6 +132,7 @@ final class FixtureSystemMetrics {
     var sent: UInt64 = 2_000
     var memoryUsed: UInt64 = 12 * 1_024 * 1_024 * 1_024
     var unavailable = false
+    var pressure: MemoryPressure? = .normal
     var memoryReads = 0, storageReads = 0, networkReads = 0, batteryReads = 0
     var readCounts: [Int] { [memoryReads, storageReads, networkReads, batteryReads] }
 
@@ -139,7 +140,7 @@ final class FixtureSystemMetrics {
         SystemMetricsSampler(readers: SystemMetricsReaders(memory: {
             self.memoryReads += 1
             return self.unavailable ? nil : MemoryMetrics(totalBytes: 32 * 1_024 * 1_024 * 1_024,
-                usedBytes: self.memoryUsed, pressure: .normal)
+                usedBytes: self.memoryUsed, pressure: self.pressure)
         }, storage: {
             self.storageReads += 1
             return self.unavailable ? nil : StorageMetrics(totalBytes: 1_000_000_000_000, availableBytes: 640_000_000_000)
@@ -308,12 +309,13 @@ func checkOwlOrbit() {
     controller.setOrbitPalette(selectedPalette)
     require(controller.palette == selectedPalette && RunnerSettings(defaults: defaults).palette == selectedPalette,
             "live palette selection was not persisted")
-    require(controller.baseIconEffect == .orbit(phase: unchangedPhase, palette: selectedPalette)
-            && paletteUpdates == 1, "palette did not update the active output immediately")
+    require(controller.baseIconEffect == .orbit(phase: unchangedPhase,
+            palette: PluginOrbitPalette(startRGB: 0x218649, endRGB: 0x64C987))
+            && paletteUpdates == 0, "legacy palette edits must not override the pressure signal")
     require(timers.count == timerCount && !busyAnimation.cancelled && phase() == unchangedPhase,
             "palette change altered animation timers or phase")
     controller.setOrbitPalette(selectedPalette)
-    require(paletteUpdates == 1, "same palette selection republished output")
+    require(paletteUpdates == 0, "legacy palette selection republished pressure output")
     var hostChanges = 0
     let subscription = controller.changes.sink { hostChanges += 1 }
     for _ in 0..<24 { fire(busyAnimation) }
@@ -336,9 +338,10 @@ func checkOwlOrbit() {
     require(phase() == 0, "cancelled owl callback escaped Reduce Motion")
     let reducedTimerCount = timers.count
     controller.setOrbitPalette(.standard)
-    require(controller.baseIconEffect == .orbit(phase: 0, palette: .standard)
+    require(controller.baseIconEffect == .orbit(phase: 0,
+            palette: PluginOrbitPalette(startRGB: 0x218649, endRGB: 0x64C987))
             && controller.palette == .standard && timers.count == reducedTimerCount,
-            "Reduce Motion blocked a static palette update or restarted animation")
+            "legacy palette edit changed reduced-motion pressure output or restarted animation")
     motion.reduceMotion = false; motion.lowPower = true; controller.refreshDisplayPreferences()
     let lowPowerAnimation = timers.last!
     require(lowPowerAnimation.interval >= 1.0 / 12, "low power orbit exceeded 12 fps")
@@ -353,7 +356,7 @@ func checkOwlOrbit() {
     fails = true; controller.refreshData()
     require(phase() == 0 && controller.usage == nil, "failed CPU must use a static phase")
     controller.selectAnimal(.rabbit); controller.selectPresentation(.animal)
-    require(controller.menuBarImage != nil && controller.baseIconEffect == nil, "animal mode retained owl overlay")
+    require(controller.menuBarImage != nil && phase() == 0, "animal mode lost the static pressure outline")
     controller.selectPresentation(.owlOrbit)
     require(controller.menuBarImage == nil && phase() == 0 && controller.animal == .rabbit,
             "switching to owl lost saved animal or retained duplicate image")
@@ -367,6 +370,77 @@ func checkOwlOrbit() {
             "changing a stopped palette restored menu bar output")
     withExtendedLifetime((subscription, paletteSubscription)) {}
     print("PASS owl orbit: default/persisted mode, 48 phases, 4.8–0.9s periods, 24/12 fps caps, CPU AX, motion/sleep/stop reset and animal compatibility")
+}
+
+@MainActor
+func checkPressurePresentation() {
+    let name = "happylulu-runner-pressure-" + UUID().uuidString
+    let defaults = UserDefaults(suiteName: name)!
+    defer { defaults.removePersistentDomain(forName: name) }
+    let settings = RunnerSettings(defaults: defaults)
+    let savedPalette = PluginOrbitPalette(startRGB: 0x112233, endRGB: 0x445566)
+    settings.palette = savedPalette
+    let metrics = FixtureSystemMetrics(), motion = FixtureMotionPreferences()
+    var ticks: UInt64 = 0
+    var timers: [FixtureTimer] = []
+    let controller = CPURunnerController(settings: settings,
+        sampler: CPUUsageSampler(readTicks: {
+            ticks += 100
+            return CPUUsageTicks(user: ticks, system: 0, nice: 0, idle: ticks)
+        }), metricsSampler: metrics.sampler(), schedule: { interval, action in
+            let timer = FixtureTimer(interval: interval, action: action); timers.append(timer); return timer
+        }, reduceMotion: { motion.reduceMotion }, lowPower: { motion.lowPower },
+        observeSystemChanges: false, now: { metrics.time }, localize: { _, english in english })
+    func palette() -> PluginOrbitPalette? {
+        guard case let .orbit(_, palette)? = controller.baseIconEffect else { return nil }
+        return palette
+    }
+    controller.setModuleEnabled(true); controller.start(); controller.refreshData()
+    let sample = timers[0], animation = timers.last!, timerCount = timers.count
+    metrics.time = 0.4; animation.fireEvenIfCancelled()
+    let phaseBeforePressureChange = controller.baseIconEffect
+    require(palette() == PluginOrbitPalette(startRGB: 0x218649, endRGB: 0x64C987),
+            "normal OS pressure must use a distinct green menu-bar signal, independent of custom colors")
+    var hostChanges = 0
+    let observation = controller.changes.sink { hostChanges += 1 }
+    for (pressure, used, expected, label) in [
+        (MemoryPressure.warning, UInt64(1), PluginOrbitPalette(startRGB: 0xD68100, endRGB: 0xFFBF3F), "Warning"),
+        (.critical, UInt64(1), PluginOrbitPalette(startRGB: 0xD63C3C, endRGB: 0xFF7971), "Critical"),
+        (.normal, UInt64(32 * 1_024 * 1_024 * 1_024), PluginOrbitPalette(startRGB: 0x218649, endRGB: 0x64C987), "Normal")
+    ] {
+        metrics.pressure = pressure; metrics.memoryUsed = used; sample.fireEvenIfCancelled()
+        require(palette() == expected, "menu-bar color must follow OS pressure rather than memory percentage")
+        require(controller.baseIconAccessibilityLabel?.contains("Memory pressure: " + label) == true,
+                "menu-bar accessibility lost the textual pressure state")
+        require(controller.usage == 0.5 && timers.count == timerCount && !animation.cancelled,
+                "pressure change altered CPU animation speed or timers")
+        if case let .orbit(phase, _)? = phaseBeforePressureChange {
+            require(controller.baseIconEffect == .orbit(phase: phase, palette: expected),
+                    "pressure color change jumped the visible orbit phase")
+        } else { require(false, "pressure fixture did not establish an animated orbit") }
+    }
+    metrics.pressure = nil; sample.fireEvenIfCancelled()
+    require(palette() == PluginOrbitPalette(startRGB: 0x7D8590, endRGB: 0xA6ACB5)
+        && controller.baseIconAccessibilityLabel?.contains("Memory pressure: Unavailable") == true,
+            "unknown pressure must remain neutral and explicit even when memory capacity is available")
+    require(hostChanges == 0, "pressure samples invalidated calendar/feature data")
+    controller.selectPresentation(.animal)
+    require(controller.menuBarImage?.image.isTemplate == true && controller.baseIconEffect != nil,
+            "animal mode must retain its template artwork and show pressure on the owl outline")
+    require(controller.menuBarImage?.accessibilityLabel.contains("Memory pressure: Unavailable") == true,
+            "animal accessibility lost pressure text")
+    metrics.pressure = .critical; motion.reduceMotion = true; sample.fireEvenIfCancelled()
+    require(controller.baseIconEffect == .orbit(phase: 0, palette: PluginOrbitPalette(startRGB: 0xD63C3C, endRGB: 0xFF7971))
+        && timers.last!.cancelled, "Reduce Motion must stop movement while preserving the pressure signal")
+    controller.selectPresentation(.owlOrbit)
+    require(controller.baseIconEffect == .orbit(phase: 0, palette: PluginOrbitPalette(startRGB: 0xD63C3C, endRGB: 0xFF7971)),
+            "reduced-motion owl mode lost the static critical pressure signal")
+    require(settings.palette == savedPalette, "pressure presentation overwrote saved custom colors")
+    controller.suspendForSleep()
+    require(controller.baseIconEffect == nil && controller.menuBarImage == nil, "sleep retained pressure output")
+    controller.stop()
+    withExtendedLifetime(observation) {}
+    print("PASS pressure: OS state independent of capacity, neutral unknown, both menu-bar modes, AX text, CPU timer isolation, motion/sleep and saved-color preservation")
 }
 
 @MainActor
@@ -473,6 +547,45 @@ final class FixtureImageProvider: PluginMenuBarImageProviding {
 }
 
 @MainActor
+func checkMixedTemplateRendering() {
+    let base = NSImage(size: NSSize(width: 8, height: 18), flipped: false) { rect in
+        NSColor(srgbRed: 0.2, green: 0.7, blue: 0.4, alpha: 1).setFill(); rect.fill(); return true
+    }
+    base.isTemplate = false
+    let provider = FixtureImageProvider(), group = PluginMenuBarImageGroup()
+    group.setProviders([provider])
+    for animal in RunnerAnimal.allCases {
+        provider.menuBarImage = PluginMenuBarImage(image: RunnerArtwork.image(for: animal, frame: 0), accessibilityLabel: "Runner")
+        for (appearanceName, highlighted, white) in [
+            (NSAppearance.Name.aqua, false, false), (.darkAqua, false, true),
+            (.aqua, true, true), (.darkAqua, true, true)
+        ] {
+            let composite = group.image(base: base, appearance: NSAppearance(named: appearanceName), highlighted: highlighted)
+            require(!composite.isTemplate, "mixed output must retain the colored pressure base")
+            for scale in [1, 2] {
+                let rep = composite.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == Int(composite.size.width) * scale }!
+                let color = rep.colorAt(x: 4 * scale, y: 9 * scale)!.usingColorSpace(.sRGB)!
+                require(abs(color.redComponent - 0.2) < 0.03 && abs(color.greenComponent - 0.7) < 0.03
+                    && abs(color.blueComponent - 0.4) < 0.03, "template tint changed the colored pressure base")
+                require((rep.colorAt(x: 10 * scale, y: 9 * scale)?.alphaComponent ?? 1) < 0.05, "mixed composition filled the transparent gap")
+                var opaque = 0
+                for y in 0..<rep.pixelsHigh {
+                    for x in (12 * scale)..<rep.pixelsWide {
+                        guard let pixel = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), pixel.alphaComponent > 0.95 else { continue }
+                        opaque += 1
+                        let components = [pixel.redComponent, pixel.greenComponent, pixel.blueComponent]
+                        require(components.allSatisfy { white ? $0 > 0.95 : $0 < 0.05 },
+                                "mixed composite must tint template animals for the current appearance and highlight")
+                    }
+                }
+                require(opaque > 40 * scale * scale, "mixed composition lost the animal silhouette")
+            }
+        }
+    }
+    print("PASS mixed native render: all real animals with colored base, 1x/2x, light/dark/highlight ink, preserved pressure color and transparency")
+}
+
+@MainActor
 func checkGroupedRendering() {
     func rectangle(width: CGFloat) -> NSImage {
         let image = NSImage(size: NSSize(width: width, height: 18), flipped: false) { rect in
@@ -568,15 +681,16 @@ func renderSettings(to folder: URL) throws {
         let localize: PluginLocalizer = { korean, english in language == "ko" ? korean : english }
         let controller = CPURunnerController(settings: RunnerSettings(defaults: defaults),
             sampler: CPUUsageSampler(readTicks: {
+                guard !metrics.unavailable else { return nil }
                 reads += 1
-                return reads == 1 ? .init(user: 0, system: 0, nice: 0, idle: 0)
-                    : .init(user: 35, system: 0, nice: 0, idle: 65)
+                return .init(user: UInt64(reads) * 35, system: 0, nice: 0, idle: UInt64(reads) * 65)
             }), metricsSampler: metrics.sampler(), displayFactory: { _ in FixtureDisplay() },
             schedule: { FixtureTimer(interval: $0, action: $1) }, reduceMotion: { false }, lowPower: { false },
             observeSystemChanges: false, localize: localize)
         for dark in [false, true] {
             controller.stop(); reads = 0
-            metrics.unavailable = false; metrics.time = 0; metrics.received = 1_000; metrics.sent = 2_000
+            metrics.unavailable = false; metrics.pressure = .normal
+            metrics.time = 0; metrics.received = 1_000; metrics.sent = 2_000
             controller.setModuleEnabled(true); controller.start()
             metrics.time = 1; metrics.received = 8_501_000; metrics.sent = 1_202_000
             controller.refreshData()
@@ -600,17 +714,22 @@ func renderSettings(to folder: URL) throws {
                 try renderView(view, size: NSSize(width: 500, height: 580), dark: dark,
                     to: folder.appendingPathComponent(filename))
             }
-            for unavailable in [false, true] {
+            for (state, pressure, unavailable) in [
+                ("normal", MemoryPressure?.some(.normal), false), ("warning", .some(.warning), false),
+                ("critical", .some(.critical), false), ("unknown-pressure", nil, false), ("unavailable", nil, true)
+            ] {
+                metrics.unavailable = unavailable; metrics.pressure = pressure
+                if unavailable { controller.stop(); controller.start() }
+                metrics.time += 1; metrics.received += 8_500_000; metrics.sent += 1_200_000
+                controller.refreshData()
                 if unavailable {
-                    controller.stop(); metrics.unavailable = true; controller.start()
-                    require(controller.usage == nil && controller.metrics == .empty,
-                            "unavailable summary render retained measured values")
+                    require(controller.metrics == .empty, "unavailable summary render retained measured metrics")
                 }
                 let summary = RunnerMetricsSummaryView(model: controller, localize: localize)
                     .frame(width: 332, height: 172)
                     .background(dark ? Color(NSColor.windowBackgroundColor) : Color.white)
                     .environment(\.colorScheme, dark ? .dark : .light)
-                let filename = "runner-summary-\(language)-\(dark ? "dark" : "light")-\(unavailable ? "unavailable" : "measured").png"
+                let filename = "runner-summary-\(language)-\(dark ? "dark" : "light")-\(state).png"
                 try renderView(summary, size: NSSize(width: 332, height: 172), dark: dark,
                     to: folder.appendingPathComponent(filename))
             }
@@ -618,14 +737,16 @@ func renderSettings(to folder: URL) throws {
         controller.stop()
     }
     print("PASS settings render: 16 files at 500x580pt, owl orbit/all animals, Korean/English, light/dark, injected CPU/memory/storage/network/battery")
-    print("PASS summary render: 8 files at 332x172pt, Korean/English, light/dark, measured and unavailable metrics")
+    print("PASS summary render: 20 files at 332x172pt, Korean/English, light/dark, normal/warning/critical/unknown pressure and unavailable metrics")
 }
 
 await MainActor.run {
+    checkPressurePresentation()
     checkCPUUsage()
     checkSettings()
     checkLifecycle()
     checkOwlOrbit()
+    checkMixedTemplateRendering()
     checkGroupedRendering()
     checkControllerMetricsLifecycle()
 }

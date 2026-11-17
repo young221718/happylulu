@@ -659,6 +659,7 @@ let checks: [(String, () async throws -> Void)] = [
     ("coordinator persists protected origin", testCoordinatorPersistsInvitationProtection),
     ("conflict protects invitation origin", testConflictCannotWriteProtectedInvitation),
     ("recovery protects invitation origin", testPendingRecoveryCannotWriteProtectedInvitation),
+    ("system display identity", { try testSystemDisplayIdentity() }),
     ("expanded system alarms", { try testSystemExpandedAlarmSupport() }),
     ("expanded invitation protection", testSystemExpandedInvitationProtection),
     ("expanded recurrence occurrences", { try testSystemExpandedRecurrenceSupport() }),

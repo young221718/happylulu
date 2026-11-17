@@ -55,6 +55,7 @@ def checks_for(profile, root):
     ai_reason = None if ai_present else 'AI usage module excluded by source composition or HAPPY_LULU_DISABLE_AI_USAGE=1'
     if profile == 'full':
         checks.append(Check('ai-tests', ['swift', 'test', '--build-system', 'native', '--filter', 'AIUsageTests'], excluded=ai_reason))
+        checks.append(Check('ai-exporter-tests', ['python3', '-B', '-m', 'unittest', 'discover', '-s', 'Tests/AIUsageExporterTests', '-v'], excluded=ai_reason))
         checks.append(Check('mac-utilities-tests', ['swift', 'test', '--build-system', 'native', '--filter', 'MacUtilitiesTests']))
     for identifier, name in [('codex-symbol', 'codex-symbol'), ('ai-ui', 'ai-usage-ui')]:
         check = script(identifier, name, {'HAPPY_LULU_SKIP_BUILD': '1'})
@@ -80,7 +81,7 @@ def checks_for(profile, root):
     daou_present = (os.environ.get('HAPPY_LULU_DISABLE_DAOUOFFICE') != '1' and all((root / 'Sources' / name).is_dir() for name in ('DaouOfficePlugin', 'DaouOfficeIntegration')))
     daou_reason = None if daou_present else 'Daouoffice module excluded by source composition or HAPPY_LULU_DISABLE_DAOUOFFICE=1'
     checks.append(Check('app-plugin', swift + ['AppPluginChecks'], excluded=daou_reason))
-    for identifier, name in [('daou-model', 'daouoffice-model'), ('edit-menu', 'edit-menu')]:
+    for identifier, name in [('daou-model', 'daouoffice-model'), ('edit-menu', 'edit-menu'), ('daou-leave-review', 'daouoffice-leave-review')]:
         check = script(identifier, name)
         check.excluded = daou_reason
         checks.append(check)

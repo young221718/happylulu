@@ -75,6 +75,16 @@ public struct PluginCoverage: Codable, Sendable, Equatable {
     }
 }
 
+public struct PluginTodayAttendance: Codable, Sendable, Equatable {
+    public let day: String
+    public let arrival: Date?
+    public let timeZoneID: String
+    public let fetchedAt: Date
+    public init(day: String, arrival: Date?, timeZoneID: String, fetchedAt: Date) {
+        self.day = day; self.arrival = arrival; self.timeZoneID = timeZoneID; self.fetchedAt = fetchedAt
+    }
+}
+
 public struct PluginSnapshot: Codable, Sendable, Equatable {
     public let pluginID: String
     public let fetchedAt: Date
@@ -82,10 +92,13 @@ public struct PluginSnapshot: Codable, Sendable, Equatable {
     public let vacations: [PluginVacation]
     public let events: [PluginCalendarEvent]
     public let coverage: PluginCoverage
+    /// nil means unavailable; a present value with nil arrival means a confirmed empty read.
+    public let todayAttendance: PluginTodayAttendance?
     public init(pluginID: String, fetchedAt: Date, leave: PluginLeaveBalance?, vacations: [PluginVacation],
-                events: [PluginCalendarEvent], coverage: PluginCoverage) {
+                events: [PluginCalendarEvent], coverage: PluginCoverage, todayAttendance: PluginTodayAttendance? = nil) {
         self.pluginID = pluginID; self.fetchedAt = fetchedAt; self.leave = leave
         self.vacations = vacations; self.events = events; self.coverage = coverage
+        self.todayAttendance = todayAttendance
     }
 }
 

@@ -20,8 +20,8 @@
 
 | UI/자산 ID | 현재 규칙 | 확인할 상태·범위 |
 | --- | --- | --- |
-| HL-UI-001 | 부엉이·선택 동물·시간·Codex 표시를 **같은 메뉴바 항목**에 묶는다. 시스템 러너 기본은 부엉이 눈빛. 눈 모양은 고정하고 테두리를 따라 색 띠만 회전, 시작/끝 색을 선택 | 메뉴바 기본 26×18 pt 눈·부리 상태 유지, 색/동물은 시간 계산이나 상태 우선순위와 독립. CPU만 애니메이션 속도 제어. 동작 줄이기에서는 정지. template 기본과 컬러 눈빛을 구분. [main.swift](../Sources/AfterSix/main.swift), [LuluBrand.swift](../Sources/AfterSix/LuluBrand.swift) |
-| HL-UI-002/003/005 | 패널 폭364 pt, 기본 높이350 pt에 활성 사용량행당40 pt·시스템 러너184 pt 추가. 28 pt 상태별 헤더 얼굴·5유형·출근/퇴근·오늘 일정 유지. 퇴근30분후 상태 설명은 선택 단위의 `추가 … 중` | 기존 일정/출근 영역을 러너로 대체하지 않는다. 사용량행은 해당 상세로 이동. 야근 갱신이 멈추지 않고 빈 기록/휴무 상태에는 나타나지 않아야 함. [PanelView.swift](../Sources/AfterSix/PanelView.swift) |
+| HL-UI-001 | 부엉이·선택 동물·시간·사용량 표시를 **같은 메뉴바 항목**에 묶는다. 시스템 러너 기본은 부엉이 눈빛. 눈 모양은 고정하고 CPU 사용률에 따라 테두리를 회전하며 메모리 압력을 색으로 표시 | 메뉴바 기본 26×18 pt 눈·부리 상태 유지, 색/동물은 시간 계산이나 상태 우선순위와 독립. CPU만 애니메이션 속도 제어. 동작 줄이기에서는 정지. template 기본과 컬러 눈빛을 구분. [main.swift](../Sources/AfterSix/main.swift), [LuluBrand.swift](../Sources/AfterSix/LuluBrand.swift) |
+| HL-UI-002/003/005 | 패널 폭364 pt·기본 높이350 pt에 플러그인 항목과 패널 내용, 다우 제안 행 높이를 더한다. 콘텐츠가 화면의 가용 높이를 넘으면 세로 스크롤한다. 28 pt 상태별 헤더 얼굴·5유형·출근/퇴근·오늘 일정 유지. 퇴근30분후 상태 설명은 선택 단위의 `추가 … 중` | 기존 일정/출근 영역을 러너로 대체하지 않는다. 사용량행은 해당 상세로 이동. 스크롤과 크기 변경 시 키보드 포커스를 유지한다. 야근 갱신이 멈추지 않고 빈 기록/휴무 상태에는 나타나지 않아야 함. [PanelView.swift](../Sources/AfterSix/PanelView.swift) |
 | HL-UI-006 | 패널 우상단은 `…` → 설정/종료. 설정 사이드바 하단은 사용 안내 링크. 표시 브랜드는 `happylulu` 소문자 | 기존 테마의 메뉴 버튼은 투명 배경·포커스 표시 사용. 종료·설정 경로와 창닫기 상주 동작 보존. 저장 경로/bundle ID/기술 심볼의 대소문자를 브랜드 변경으로 바꾸지 않음 |
 | HL-UI-007 | **기본 설정 행은 왼쪽 항목명·가운데 변화 예시/도움말·오른쪽 조작** 3열. 언어 Picker도 오른쪽. 일반 설정의 이름열140 pt·선택열190 pt, 사이 간격16 pt | 한영 긴 문구에서 겹침/잘림 없는지 확인. 토글·Picker 라벨을 숨겨도 접근성 이름 유지. 실제 사용자 조작값과 가운데 예시를 혼동하지 않게 설명. [SettingsView.swift](../Sources/AfterSix/SettingsView.swift) |
 | HL-UI-010 | 기본을 맨 앞에 두고 색상 테마와 커스텀을 모두 2열로 배치. 카드 왼쪽 위에 이름과 넓은 색상 미리보기를 둔다. 테마와 부엉이 아이콘 선택은 고정 크기 테두리와 우상단 체크로 표시한다. 제목은 13pt semibold, 제목과 카드는 8pt, 설정 구역 사이는 20pt 간격을 사용한다. 색상 편집은 별도 창으로 열어 테마 전환 시 본문 구성을 유지한다 | 저장된 테마와 이전 색상 아이콘 선택은 보존. 기본 테마는 지원 빌드의 시스템 동적 색/밝기·세부색 편집 숨김. 투명도 줄이기/대비 증가는 재질 fallback. [LuluMaterials.swift](../Sources/AfterSix/LuluMaterials.swift), [AppearanceSettingsView.swift](../Sources/AfterSix/AppearanceSettingsView.swift) |
@@ -33,7 +33,7 @@
 
 ### 새 상세 UI와 플랫폼 규격
 
-- **HL-UI-016 시스템 러너 / HL-RUNNER-001~003:** 표시 방식·동물·시작색·끝색·기본색 복원과 CPU/메모리/디스크/네트워크/배터리. 좌측112 pt·가운데 유동·우측132 pt 패턴. 색 미리보기는 시작→끝 그라데이션이며 눈 모양을 흔들거나 깜빡임으로 바꾸지 않는다. 기본색은 `#14C9FF`/`#AD58FF`, 동물값 기본은 햄스터지만 표시 방식 기본은 눈빛이다. [CPURunnerSettingsView.swift](../Sources/CPURunnerIntegration/CPURunnerSettingsView.swift)
+- **HL-UI-016 시스템 러너 / HL-RUNNER-001~003:** 표시 방식·동물·메모리 압력 색 범례와 CPU/메모리/디스크/네트워크/배터리. 정상 녹색·주의 황색·위험 적색·미측정 회색을 텍스트와 함께 표시하며 눈 모양을 흔들거나 깜빡이지 않는다. 이전 사용자 색상 저장값은 보존한다. 동물값 기본은 햄스터지만 표시 방식 기본은 눈빛이다. [CPURunnerSettingsView.swift](../Sources/CPURunnerIntegration/CPURunnerSettingsView.swift)
 - **HL-UI-017 AI 사용량 / HL-AI-001/002:** 주간 잔여·초기화·소모율·마지막조회, 표시/갱신·알림, CLI 연결/로그인으로 구분한다. 이름·중간 미리보기·우측선택160 pt. 기본 Codex 글자+%·5분·알림끔. 저잔여·로딩·이전값·실패는 0%와 다른 상태다. [AIUsageSettingsView.swift](../Sources/AIUsageIntegration/AIUsageSettingsView.swift)
 - **macOS26+ 패널:** 지원은 OS와 Swift6.2+ compiler 조건. 사용자 승인으로 모든 테마에 화살표 없는 `MenuBarPanel`·통합 제목줄 적용. 기본 패널 R24, 카드의 유리 스타일 R18(기존 불투명 R12), 사이드바 R20. 투명도 줄이기/대비 증가는 재질을 불투명하게 되돌리지만 패널/제목줄 선택과는 별도다. macOS13~25 또는 미지원 compiler는 기존 팝오버/재질 경로다. [MenuBarPanel.swift](../Sources/AfterSix/MenuBarPanel.swift), [SettingsWindowChrome.swift](../Sources/AfterSix/SettingsWindowChrome.swift)
 - **브랜드/이스터에그:** 일반/룰루/반차/대기/연차/휴무/퇴근가능8상태 우선순위 유지. 내일 승인된 연차/공가 예고는 퇴근10분전부터 신선한 휴가조회 조건에서만 표현하며 문자/접근성 이름에 내일휴가 설명을 함께 둔다. CPU 눈빛과 회사 휴가 확정 여부를 같은 의미로 표현하지 않는다.

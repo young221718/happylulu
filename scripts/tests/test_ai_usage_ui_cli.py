@@ -196,18 +196,68 @@ sys.exit(93)
 
     def test_interactive_panel_size_tracks_production_geometry_and_updates(self):
         repository = SCRIPT.parent.parent
-        production = (repository / "Sources/AfterSix/PanelView.swift").read_text()
+        production = (repository / "Sources/AfterSix/AppModel.swift").read_text()
         probe = (repository / "Tests/AIUsageUIProbe/main.swift").read_text()
-        shape = r"width: (\d+), height: CGFloat\((\d+) \+ (\d+) \* plugins\.menuBarItems\.count\)"
-        production_geometry = re.search(shape, production)
-        self.assertIsNotNone(production_geometry)
+        production_geometry = re.search(r"    func panelContentSize\(.*?\n    \}", production, re.S)
+        self.assertIsNotNone(production_geometry, "The app must expose its shared panel sizing policy")
         sizing = re.search(r"private var panelSize: NSSize \{(.*?)\n    \}", probe, re.S)
         self.assertIsNotNone(sizing, "The held panel must compute its size from enabled providers")
-        fixture_geometry = re.search(shape, sizing.group(1))
-        self.assertIsNotNone(fixture_geometry)
-        self.assertEqual(fixture_geometry.groups(), production_geometry.groups())
-        self.assertIn("plugins.panelProviders.reduce(0) { $0 + $1.panelHeight }", sizing.group(1))
-        self.assertIn("+ Self.bannerHeight", sizing.group(1))
+        banner = re.search(r"private static let bannerHeight: CGFloat = [^\n]+", probe)
+        self.assertIsNotNone(banner)
+        # Execute the actual sizing members without creating the UI or loading preferences.
+        # An arbitrary model result proves that the fixture delegates instead of copying numbers.
+        swift = '''import Foundation
+struct ProductionModel {
+    var hasDaouProposal: Bool
+''' + production_geometry.group(0) + '''
+}
+struct Provider { let panelHeight: CGFloat }
+struct Plugins { let menuBarItems: [Int]; let panelProviders: [Provider] }
+struct SentinelModel {
+    let size: NSSize
+    let itemCount: Int
+    let providerHeight: CGFloat
+    func panelContentSize(menuBarItemCount: Int, pluginPanelHeight: CGFloat) -> NSSize {
+        precondition(menuBarItemCount == itemCount && pluginPanelHeight == providerHeight,
+                     "Fixture must forward current enabled item/provider inputs")
+        return size
+    }
+}
+struct InteractiveFixture {
+    let model: SentinelModel
+    let plugins: Plugins
+    ''' + banner.group(0) + '''
+    ''' + sizing.group(0) + '''
+    var measuredSize: NSSize { panelSize }
+    static var measuredBannerHeight: CGFloat { bannerHeight }
+}
+for (items, provider, proposal, expected) in [
+    (0, CGFloat(0), false, CGFloat(350)),
+    (2, CGFloat(14), false, CGFloat(444)),
+    (2, CGFloat(14), true, CGFloat(476)),
+    (2, CGFloat(236), true, CGFloat(698))
+] {
+    let productionSize = ProductionModel(hasDaouProposal: proposal).panelContentSize(
+        menuBarItemCount: items, pluginPanelHeight: provider)
+    precondition(productionSize.width == 364 && productionSize.height == expected,
+        "Production sizing must include enabled items/providers and proposal visibility")
+    let sentinel = NSSize(width: 411 + CGFloat(items), height: expected + 17)
+    let fixture = InteractiveFixture(model: SentinelModel(size: sentinel, itemCount: items, providerHeight: provider),
+        plugins: Plugins(menuBarItems: Array(0..<items), panelProviders: [Provider(panelHeight: provider)]))
+    let fixtureSize = fixture.measuredSize
+    precondition(fixtureSize.width == sentinel.width && fixtureSize.height == sentinel.height + InteractiveFixture.measuredBannerHeight,
+        "Fixture must preserve the production result and add only its banner")
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "main.swift"
+            source.write_text(swift)
+            compiled = subprocess.run(['swiftc', '-module-cache-path', str(root / 'modules'), str(source),
+                                       '-o', str(root / 'geometry')], capture_output=True, text=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            result = subprocess.run([str(root / 'geometry')], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(".frame(height: Self.bannerHeight)", probe)
         self.assertIn("panel?.updateContentSize(panelSize)", probe)
         self.assertIn("MenuBarPanel(content: controller, size: panelSize)", probe)

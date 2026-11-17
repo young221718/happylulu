@@ -104,6 +104,7 @@ func checkConfigurationStore() throws {
 }
 
 checkDailyAgenda()
+checkCalendarDisplayCopies()
 checkVacationPreview()
 try checkAddress()
 try checkParser()
@@ -112,4 +113,6 @@ try checkConfigurationStore()
 try await checkRegistry()
 try await checkFeatureAdapters()
 try await checkAPIClient()
+try await checkDaouAttendance()
+try checkAPILogging()
 try await checkCurlTransport()

@@ -27,6 +27,14 @@ private final class FakeScrollTap: ScrollTap {
 
 @Suite("MacUtilitiesTests")
 struct MacUtilitiesTests {
+    @Test @MainActor func inactiveNewTapIsReleasedWithoutReportingActive() {
+        weak var released: FakeScrollTap?
+        let driver = ScrollReverseDriver(isTrusted: { true }, makeTap: {
+            let tap = FakeScrollTap(); tap.isActive = false; released = tap; return tap
+        })
+        #expect(driver.start() == .failed(-2) && released == nil)
+        driver.stop()
+    }
     @Test @MainActor func scrollDriverHandlesPermissionCreationFailureInterruptionAndRelease() {
         var trusted = false
         var creates = 0
@@ -188,10 +196,23 @@ struct MacUtilitiesTests {
     }
 
     @Test func continuousPhaseAndMomentumEventsRemainByteIdentical() {
-        for event in [wheel(continuous: 1), wheel(phase: 1), wheel(momentum: 1), CGEvent(source: nil)!] {
+        let events = [wheel(continuous: 1), wheel(continuous: 2), CGEvent(source: nil)!]
+            + [1, 2, 4, 8, 16, 128].map { wheel(phase: $0) }
+            + [1, 2, 3].map { wheel(momentum: $0) }
+        for event in events {
             let original = event.data as Data?
             ScrollWheelTransform.apply(to: event)
             #expect(event.data as Data? == original)
         }
+    }
+
+    @Test func continuousHighResolutionInputPreservesBothAxes() {
+        // Either a smooth mouse or trackpad may supply this same pixel-based format.
+        let event = wheel(continuous: 1)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0.125)
+        event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: -0.25)
+        let original = event.data as Data?
+        ScrollWheelTransform.apply(to: event)
+        #expect(event.data as Data? == original)
     }
 }

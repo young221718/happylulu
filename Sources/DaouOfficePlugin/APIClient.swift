@@ -278,10 +278,16 @@ public actor DaouOfficeAPIClient {
         let local = DateFormatter()
         local.calendar = calendar; local.timeZone = calendar.timeZone
         local.locale = Locale(identifier: "en_US_POSIX"); local.dateFormat = "yyyy-MM-dd"
+        let attendance: PluginTodayAttendance?
+        do {
+            attendance = try DaouOfficeAPIParser.todayAttendance(await get("/api/attend/normal/gadget/today", operation: operation), now: now)
+        } catch is CancellationError { throw CancellationError() }
+        catch { attendance = nil } // Optional personal attendance must not discard valid leave/calendar data.
         try checkOperation(operation)
         return PluginSnapshot(pluginID: "daouoffice", fetchedAt: Date(), leave: balance, vacations: vacations, events: events,
             coverage: PluginCoverage(calendarFrom: local.string(from: month.start),
-                calendarThrough: local.string(from: month.end.addingTimeInterval(-0.001)), leaveHistoryIsLimited: true, leaveYear: year))
+                calendarThrough: local.string(from: month.end.addingTimeInterval(-0.001)), leaveHistoryIsLimited: true, leaveYear: year),
+            todayAttendance: attendance)
     }
 }
 

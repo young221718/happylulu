@@ -338,6 +338,7 @@ struct SettingsView: View {
                     } else {
                         if let settings = pluginPresentations.view(for: id) { settings }
                         else { Text(L("이 플러그인은 별도 설정이 없습니다.", "This plugin has no additional settings.")) }
+                        if id == "daouoffice" { daouLeaveReviewSection }
                         let supported = plugins.registrations.first(where: { $0.id == id })?.adapter.descriptor.features ?? []
                         let routedFeatures = [AppFeature.calendar, .leave].filter { supported.contains($0) }
                         if !routedFeatures.isEmpty {
@@ -359,6 +360,91 @@ struct SettingsView: View {
             Text(L("플러그인 관리에서 기능을 추가해 주세요.", "Add a feature in plugin management."))
             Button(L("플러그인 관리", "Manage plugins")) { navigation.selection = .plugins }
         }
+    }
+
+    private var daouLeaveReviewSection: some View {
+        GroupBox(L("HappyLulu에 반영", "Apply to HappyLulu")) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(L("수정 제안을 macOS 알림으로 받기", "Receive macOS notifications for review proposals"), isOn: Binding(
+                    get: { model.daouNotificationsEnabled }, set: { model.setDaouNotifications($0) }))
+                    .disabled(!model.canChangeDaouNotifications)
+                Text(L("기본은 꺼짐이며 켤 때만 시스템 알림 권한을 요청합니다. 알림에는 개인 날짜·시각·연차 값을 표시하지 않습니다. 알림을 누르면 이 설정을 엽니다.",
+                    "Off by default; enabling requests system notification permission. Notifications contain no personal dates, arrival times or leave values. Clicking opens these settings."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let message = model.daouNotificationMessage {
+                    Label(message, systemImage: "bell.badge").font(.caption).foregroundStyle(.orange)
+                }
+                Divider()
+                Text(L("휴가 현황 출처를 다우오피스로 선택하면 오늘의 승인된 전일 연차·공가를 비교합니다. 기본은 수정 제안이며, 잔여 일수는 조회용입니다. 반차의 오전·오후는 추정하지 않습니다.",
+                    "Select Daouoffice as the leave source to compare today's approved full-day leave. Changes require review by default. Balances are informational; AM/PM half-days are never inferred."))
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle(L("수동 입력이 없는 날의 전일 휴가 자동 반영", "Automatically apply full-day leave on days without manual input"), isOn: Binding(
+                    get: { model.autoApplyDaouLeave }, set: { _ = model.setAutoApplyDaouLeave($0) }))
+                    .disabled(!model.canChangeDaouLeaveReview)
+                Text(L("수동 출근·근무 유형·기록 안 함은 항상 확인합니다. 반영 후 다우에서 취소·변경돼도 저장된 기록은 지우지 않으므로 직접 확인해 주세요.",
+                    "Manual arrivals, workday choices and skipped days always require review. Later source cancellation or changes do not erase saved records; review them manually."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let proposal = model.daouLeaveProposal {
+                    Text(L("\(proposal.day) · APPROVAL · 조회 \(proposal.fetchedAt.formatted(date: .omitted, time: .shortened))",
+                           "\(proposal.day) · APPROVAL · Fetched \(proposal.fetchedAt.formatted(date: .omitted, time: .shortened))"))
+                        .font(.caption)
+                    Text(L("\(proposal.isSkipped ? "기록 안 함" : proposal.currentType?.displayLabel ?? "근무 유형 미지정") → 연차/공가로 수정할까요?",
+                           "\(proposal.isSkipped ? "Skipped" : proposal.currentType?.displayLabel ?? "No workday choice") → Leave: apply this change?"))
+                    if proposal.hasManualConflict {
+                        Label(L("수동 입력과 충돌하므로 자동으로 바꾸지 않습니다.", "Manual input conflicts; automatic application is blocked."), systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    HStack {
+                        Button(L("수정", "Apply")) { _ = model.applyDaouLeaveProposal(expectedID: proposal.id) }
+                        Button(L("현재 값 유지", "Keep current value")) { _ = model.dismissDaouLeaveProposal(expectedID: proposal.id) }
+                            .disabled(!model.canChangeDaouLeaveReview)
+                    }
+                } else {
+                    Text(L("지금 반영할 전일 휴가 변경이 없습니다. 선택한 출처와 마지막 조회 시각을 확인해 주세요.",
+                        "No full-day leave change to apply. Check the selected source and last fetch time."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Divider()
+                Toggle(L("수동 입력이 없는 출근 시각 자동 반영", "Automatically apply arrivals without manual conflicts"), isOn: Binding(
+                    get: { model.autoApplyDaouArrival }, set: { _ = model.setAutoApplyDaouArrival($0) }))
+                    .disabled(!model.canChangeDaouLeaveReview)
+                Text(L("개인 로그인 세션에서 오늘의 출근 시각을 조회합니다. 반영은 출근 시각만 바꾸며 근무 유형·기록 안 함은 유지합니다.",
+                    "Reads today's arrival using your personal login session. Applying changes only the arrival time; workday choices and skipped status remain."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let record = model.daouTodayAttendance {
+                    Text("\(record.day) · \(record.timeZoneID) · " + L("조회 ", "Fetched ") + record.fetchedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption)
+                    if let proposal = model.daouArrivalProposal, let at = record.arrival {
+                        Text(L("\(proposal.currentArrival.map { daouClock($0, zone: model.calendar.timeZone) } ?? "기록 없음") → \(daouClock(at, zone: TimeZone(identifier: record.timeZoneID)!))로 수정할까요?",
+                               "\(proposal.currentArrival.map { daouClock($0, zone: model.calendar.timeZone) } ?? "No record") → \(daouClock(at, zone: TimeZone(identifier: record.timeZoneID)!)): apply this change?"))
+                        if proposal.hasManualConflict {
+                            Label(L("수동 입력을 유지합니다. 변경하려면 직접 확인해 주세요.", "Manual input is preserved. Confirm to change it."), systemImage: "exclamationmark.triangle")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
+                        HStack {
+                            Button(L("출근 시각 수정", "Apply arrival")) { _ = model.applyDaouArrivalProposal(expectedID: proposal.id) }
+                            Button(L("현재 값 유지", "Keep current value")) { _ = model.dismissDaouArrivalProposal(expectedID: proposal.id) }
+                                .disabled(!model.canChangeDaouLeaveReview)
+                        }
+                    } else {
+                        Text(record.arrival == nil
+                            ? L("조회 시점의 오늘 출근 기록이 없습니다. HappyLulu 기록은 유지합니다.", "No arrival was recorded at fetch time. HappyLulu records are preserved.")
+                            : L("반영할 출근 시각 변경이 없습니다. 마지막 조회 시각을 확인해 주세요.", "No arrival change to apply. Check the last fetch time."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(L("오늘 출근 시각을 확인하지 못했습니다. 휴가 출처·조회 상태·회사 근태 권한을 확인해 주세요. 휴가·일정과 저장된 출근 기록은 유지합니다.",
+                        "Today's arrival is unavailable. Check the leave source, refresh status and company attendance permissions. Leave/calendar data and saved arrivals are preserved."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+        }
+    }
+
+    private func daouClock(_ date: Date, zone: TimeZone) -> String {
+        let formatter = DateFormatter(); formatter.locale = displayLocale
+        formatter.timeZone = zone; formatter.dateFormat = "HH:mm:ss z"
+        return formatter.string(from: date)
     }
 
     private var generalSection: some View {

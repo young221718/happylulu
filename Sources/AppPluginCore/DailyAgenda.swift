@@ -8,7 +8,7 @@ public struct DailyAgenda: Sendable {
     public init(events: [FeatureCalendarEvent], on day: Date, calendar: Calendar) {
         let start = calendar.startOfDay(for: day)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
-        let today = events.filter {
+        let today = FeatureCalendarEvent.coalescedForDisplay(events).filter {
             $0.start < end && ($0.end > start || ($0.start == $0.end && $0.start >= start))
         }.sorted {
             if $0.isAllDay != $1.isAllDay { return $0.isAllDay }

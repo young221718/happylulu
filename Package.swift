@@ -17,7 +17,7 @@ let hasAIUsage = ProcessInfo.processInfo.environment["HAPPY_LULU_DISABLE_AI_USAG
     FileManager.default.fileExists(atPath: root.appendingPathComponent("Sources/AIUsagePlugin").path) &&
     FileManager.default.fileExists(atPath: root.appendingPathComponent("Sources/AIUsageIntegration").path)
 let usageTargets: [Target] = hasAIUsage ? [
-    .target(name: "AIUsagePlugin"),
+    .target(name: "AIUsagePlugin", resources: [.copy("Resources/export-ai-usage.py")]),
     .target(name: "AIUsageIntegration", dependencies: ["AIUsagePlugin", "AppPluginCore", "AppPluginHost"]),
     .testTarget(name: "AIUsageTests", dependencies: ["AIUsagePlugin", "AIUsageIntegration"])
 ] : []

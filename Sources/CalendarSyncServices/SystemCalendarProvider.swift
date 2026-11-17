@@ -53,6 +53,59 @@ public struct SystemCalendarDisplayEvent: Identifiable, Sendable {
     public let end: Date
     public let isAllDay: Bool
     public let location: String?
+    public let syncEventID: String?
+    public let duplicateIdentity: String?
+    public let contentSignature: Data?
+    public let allowsContentMatching: Bool
+    /// Canonical civil-day bounds used only for duplicate matching.
+    public let matchingInterval: DateInterval?
+
+    init(snapshot: SystemCalendarEventSnapshot, calendarID: String) {
+        id = "\(calendarID)|\(snapshot.localID)|\(snapshot.startDate.timeIntervalSince1970)"
+        self.calendarID = calendarID
+        title = snapshot.title.isEmpty ? "제목 없음" : snapshot.title
+        start = snapshot.startDate; end = snapshot.endDate
+        isAllDay = snapshot.isAllDay; location = snapshot.location
+        let decoded = try? SystemCalendarSafety.decodeSnapshot(snapshot)
+        let recurring = snapshot.hasRecurrenceRules || snapshot.isDetached
+        let hasOccurrence = decoded?.id.hasPrefix("occurrence:") == true
+        syncEventID = recurring && !hasOccurrence ? nil : decoded?.id
+        let supported = snapshot.alarmExclusion == nil && snapshot.startDate < snapshot.endDate &&
+            decoded?.exclusion != .other("invalidDate")
+        duplicateIdentity = !supported ? nil : (recurring ? (hasOccurrence ? decoded?.id : nil)
+            : (snapshot.externalID?.isEmpty == false ? decoded?.id : nil))
+        if supported, snapshot.isAllDay, let time = decoded?.content.time,
+           let bounds = try? SystemCalendarSafety.dates(for: time, timeZone: snapshot.defaultTimeZone) {
+            matchingInterval = DateInterval(start: bounds.0, end: bounds.1)
+        } else { matchingInterval = nil }
+        if supported, var content = decoded?.content {
+            // Named zones may differ between copies of the same absolute timed interval.
+            if case let .timed(start, end, _) = content.time {
+                content.time = .timed(start: start, end: end, timeZoneID: "")
+            }
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            contentSignature = try? encoder.encode(SystemCalendarDisplayContent(content: content,
+                url: SystemCalendarSafety.marker(from: snapshot.url) == nil ? snapshot.url?.absoluteString : nil))
+        } else { contentSignature = nil }
+        allowsContentMatching = supported && decoded != nil && !recurring && !snapshot.hasAttendees && !snapshot.isFloating && !snapshot.title.isEmpty
+    }
+
+    public func displayIdentity(mappings: [CalendarMapping], daouCalendarID: String, googleCalendarID: String) -> String? {
+        guard contentSignature != nil, let syncEventID else { return nil }
+        guard daouCalendarID != googleCalendarID else { return duplicateIdentity }
+        let side: CalendarSide
+        if calendarID == daouCalendarID { side = .daou }
+        else if calendarID == googleCalendarID { side = .google }
+        else { return duplicateIdentity }
+        let matches = mappings.filter { $0.eventID(on: side) == syncEventID && $0.baseline != .deleted }
+        guard matches.count <= 1 else { return nil }
+        return matches.first.map { "mapping:" + $0.id } ?? duplicateIdentity
+    }
+}
+
+private struct SystemCalendarDisplayContent: Encodable {
+    let content: CalendarEventContent
+    let url: String?
 }
 
 public actor SystemCalendarAccess {
@@ -109,11 +162,9 @@ public actor SystemCalendarAccess {
             return calendar
         }
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: selected)
-        return store.events(matching: predicate).map { event in
-            SystemCalendarDisplayEvent(
-                id: "\(event.calendar.calendarIdentifier)|\(event.eventIdentifier ?? event.calendarItemIdentifier)|\(event.startDate.timeIntervalSince1970)",
-                calendarID: event.calendar.calendarIdentifier, title: event.title ?? "제목 없음",
-                start: event.startDate, end: event.endDate, isAllDay: event.isAllDay, location: event.location)
+        return try store.events(matching: predicate).map { event in
+            SystemCalendarDisplayEvent(snapshot: try SystemCalendarEventSnapshot(event: event,
+                localID: event.eventIdentifier ?? event.calendarItemIdentifier), calendarID: event.calendar.calendarIdentifier)
         }.sorted { ($0.start, $0.title, $0.id) < ($1.start, $1.title, $1.id) }
     }
 

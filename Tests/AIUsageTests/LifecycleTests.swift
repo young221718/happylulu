@@ -348,4 +348,84 @@ final class LifecycleTests: XCTestCase {
         XCTAssertEqual(model.preferences.cliPath, "/fixture/new-codex")
         model.stop()
     }
+
+    func testCorruptHistoryAndNotificationStateRemainByteIdenticalAfterRefreshAndSignout() async throws {
+        let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
+        let corrupt = Data(#"{"schema":99,"private":"preserve"}"#.utf8)
+        let prefix = "HappyLuluAIUsage.codex-release"
+        defaults.set(corrupt, forKey: prefix + ".history.v1")
+        defaults.set(corrupt, forKey: prefix + ".notification.v1")
+        defaults.set(corrupt, forKey: prefix + ".notificationAccount.v1")
+        let provider = DeferredProvider()
+        let model = AIUsageModel(defaults: defaults, providerFactory: { _ in provider })
+        defer { model.stop() }
+        model.setEnabled(true); model.start()
+        try await eventually { await provider.count == 1 }; await provider.finish(1)
+        try await eventually { !model.isRunning }
+        model.refreshData()
+        try await eventually { await provider.count == 2 }; await provider.finish(2, error: .notLoggedIn)
+        try await eventually { !model.isRunning }
+        for suffix in [".history.v1", ".notification.v1", ".notificationAccount.v1"] {
+            XCTAssertEqual(defaults.data(forKey: prefix + suffix), corrupt)
+        }
+    }
+
+    func testProviderSwitchCancelsLateFetchAndLeavesReleasedStorageUntouched() async throws {
+        let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
+        let released = DeferredProvider(), other = DeferredProvider()
+        let registry = UsageProviderRegistry(providers: [UsageProviderDescriptor(id: "fixture", name: "Other", connection: .statusLine) { _ in other }])
+        let model = AIUsageModel(defaults: defaults, providerFactory: { _ in released }, providerRegistry: registry)
+        defer { model.stop() }
+        let releasedBytes = defaults.data(forKey: ReleasedUsagePreferences.key)
+        model.setEnabled(true); model.start()
+        try await eventually { await released.count == 1 }
+        let profileID = try XCTUnwrap(model.addProfile(providerID: "fixture"))
+        XCTAssertFalse(model.canRequestUsage)
+        model.updateSelectedProfile { $0.reportPath = "/fixture/usage.json" }
+        try await eventually { await other.count == 1 }
+        await released.finish(1, used: 99)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertNil(model.snapshot)
+        await other.finish(1, used: 20)
+        try await eventually { !model.isRunning }
+        XCTAssertEqual(model.snapshot?.weekly.remainingPercent, 80)
+        model.updatePreferences { $0.labelFormat = .percentage }
+        XCTAssertEqual(defaults.data(forKey: ReleasedUsagePreferences.key), releasedBytes)
+        XCTAssertNil(defaults.data(forKey: "HappyLuluAIUsage.codex-release.history.v1"))
+        XCTAssertNotNil(defaults.data(forKey: "HappyLuluAIUsage.providers.v2.\(profileID).history.v1"))
+        model.selectProfile(nil)
+        try await eventually { await released.count == 2 }
+        XCTAssertEqual(model.preferences.labelFormat, .named)
+        await released.finish(2)
+        try await eventually { !model.isRunning }
+        model.selectProfile(profileID)
+        try await eventually { await other.count == 2 }
+        XCTAssertEqual(model.preferences.labelFormat, .percentage)
+        await other.finish(2)
+        try await eventually { !model.isRunning }
+    }
+
+    func testSwitchDuringLoginRejectsLateSuccessAndDoesNotRefreshNewProvider() async throws {
+        let (id, defaults) = defaults(); defer { defaults.removePersistentDomain(forName: id) }
+        let login = DeferredLogin(), released = DeferredProvider(loginAttempt: login), other = DeferredProvider()
+        let registry = UsageProviderRegistry(providers: [UsageProviderDescriptor(id: "fixture", name: "Other", connection: .statusLine) { _ in other }])
+        let model = AIUsageModel(defaults: defaults, providerFactory: { _ in released }, providerRegistry: registry)
+        defer { model.stop() }
+        model.setEnabled(true); model.start()
+        try await eventually { await released.count == 1 }; await released.finish(1)
+        try await eventually { !model.isRunning }
+        model.login(); try await eventually { await login.count == 1 }
+        _ = model.addProfile(providerID: "fixture")
+        try await eventually { await login.cancellations == 1 }
+        model.updateSelectedProfile { $0.reportPath = "/fixture/usage.json" }
+        try await eventually { await other.count == 1 }
+        await other.finish(1, used: 10)
+        try await eventually { !model.isRunning }
+        await login.finish(1)
+        try await Task.sleep(for: .milliseconds(20))
+        let requests = await other.count
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(model.snapshot?.weekly.remainingPercent, 90)
+        XCTAssertFalse(model.isLoggingIn)
+    }
 }
