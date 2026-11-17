@@ -75,11 +75,12 @@ struct KeepAwakeSettingsView: View {
             }
             GroupBox(t("유지 옵션", "Keep-awake options")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker(t("유지 범위", "Prevent idle sleep for"), selection: Binding(get: { model.mode }, set: model.selectMode)) {
+                    // Explicit closures avoid Swift 6.3's actor-isolated method-reference IRGen crash.
+                    Picker(t("유지 범위", "Prevent idle sleep for"), selection: Binding(get: { model.mode }, set: { model.selectMode($0) })) {
                         Text(t("화면과 시스템", "Display and system")).tag(KeepAwakeMode.displayAndSystem)
                         Text(t("시스템만 · 화면 꺼짐 허용", "System only · allow display sleep")).tag(KeepAwakeMode.system)
                     }
-                    Picker(t("유지 시간", "Duration"), selection: Binding(get: { model.duration }, set: model.selectDuration)) {
+                    Picker(t("유지 시간", "Duration"), selection: Binding(get: { model.duration }, set: { model.selectDuration($0) })) {
                         Text(t("직접 끌 때까지", "Until stopped")).tag(KeepAwakeDuration.indefinite)
                         Text(t("15분", "15 minutes")).tag(KeepAwakeDuration.minutes15)
                         Text(t("30분", "30 minutes")).tag(KeepAwakeDuration.minutes30)
