@@ -122,6 +122,7 @@ class RunnerTests(unittest.TestCase):
         self.assertIn('daou-model', ids)
         self.assertIn('edit-menu', ids)
         self.assertIn('ai-tests', ids)
+        self.assertIn('ai-exporter-tests', ids)
         self.assertIn('mac-utilities-tests', ids)
         self.assertIn('ai-ui', ids)
 
@@ -136,6 +137,7 @@ class RunnerTests(unittest.TestCase):
             ('CPURunnerChecks', []), ('SystemMetricsChecks', []), ('AppPluginChecks', [])]]
         expected += [tuple(['swift', 'build', '--build-system', 'native', '--product', 'HappyLulu']),
                      tuple(['swift', 'test', '--build-system', 'native', '--filter', 'AIUsageTests']),
+                     tuple(['python3', '-B', '-m', 'unittest', 'discover', '-s', 'Tests/AIUsageExporterTests', '-v']),
                      tuple(['swift', 'test', '--build-system', 'native', '--filter', 'MacUtilitiesTests'])]
         scripts = ['codex-symbol', 'ai-usage-ui'] + ['design-render'] * 5 + [
             'daouoffice-write', 'runner-artwork', 'owl-orbit', 'calendar-model',

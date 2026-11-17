@@ -59,6 +59,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$probe_dir/data"
 cp Resources/HappyLuluBrand.png "$app/Contents/Resources/"
 cp -R Resources/OwlStates "$app/Contents/Resources/"
 ditto "$build_dir/HappyLulu_CPURunnerIntegration.bundle" "$app/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
+ditto "$build_dir/HappyLulu_AIUsagePlugin.bundle" "$app/Contents/Resources/HappyLulu_AIUsagePlugin.bundle"
 python3 - Sources/AfterSix/AppearanceModel.swift "$probe_dir/AppearanceModel.swift" "$app/Contents/Info.plist" <<'PY'
 import pathlib, plistlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()

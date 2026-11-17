@@ -30,6 +30,10 @@ cp Resources/HappyLuluBrand.png "$app_dir/Contents/Resources/"
 cp -R Resources/OwlStates "$app_dir/Contents/Resources/"
 cp -R Resources/OwlIcons "$app_dir/Contents/Resources/"
 ditto "$binary_dir/HappyLulu_CPURunnerIntegration.bundle" "$app_dir/Contents/Resources/HappyLulu_CPURunnerIntegration.bundle"
+if [[ "${HAPPY_LULU_DISABLE_AI_USAGE:-0}" != 1 && -d Sources/AIUsagePlugin && -d Sources/AIUsageIntegration ]]; then
+    ditto "$binary_dir/HappyLulu_AIUsagePlugin.bundle" "$app_dir/Contents/Resources/HappyLulu_AIUsagePlugin.bundle"
+    cmp Sources/AIUsagePlugin/Resources/export-ai-usage.py "$app_dir/Contents/Resources/HappyLulu_AIUsagePlugin.bundle/export-ai-usage.py"
+fi
 cp Resources/PrivacyInfo.xcprivacy "$app_dir/Contents/Resources/"
 cp LICENSE THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
 for language in ko en; do
