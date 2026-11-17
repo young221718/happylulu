@@ -82,7 +82,15 @@ final class AppModel: ObservableObject {
         NSSize(width: 364, height: CGFloat(350 + 40 * menuBarItemCount + (hasDaouProposal ? 32 : 0)) + pluginPanelHeight)
     }
     nonisolated static func pluginForReviewNotification(_ identifier: String) -> String? {
-        identifier.hasPrefix("daou-review-") ? "daouoffice" : nil
+        let prefix = "daou-review-"
+        guard identifier.hasPrefix(prefix) else { return nil }
+        let suffix = String(identifier.dropFirst(prefix.count))
+        let legacyHash = suffix.count == 64 && suffix.allSatisfy { "0123456789abcdef".contains($0) }
+        return UUID(uuidString: suffix) != nil || legacyHash ? "daouoffice" : nil
+    }
+    private func removeDaouNotification(_ identifier: String) {
+        guard Self.pluginForReviewNotification(identifier) != nil else { return }
+        notificationRemoval(identifier)
     }
 
     func setDaouNotificationRuntimeActive(_ active: Bool) {
@@ -124,8 +132,8 @@ final class AppModel: ObservableObject {
         daouNotificationGeneration += 1; daouNotificationTask?.cancel(); daouNotificationTask = nil
         daouNotificationAttempt = nil
         if allowsDaouNotifications {
-            if let id = sendingDaouNotificationID { notificationRemoval(id) }
-            if removeDelivered, let id = daouLeaveReview.lastNotificationID { notificationRemoval(id) }
+            if let id = sendingDaouNotificationID { removeDaouNotification(id) }
+            if removeDelivered, let id = daouLeaveReview.lastNotificationID { removeDaouNotification(id) }
         }
         sendingDaouNotificationID = nil
     }
@@ -151,21 +159,21 @@ final class AppModel: ObservableObject {
                 self.daouNotificationMessage = L("시스템 알림 권한을 확인해 주세요. 수정 제안은 앱에 유지합니다.",
                     "Check system notification permissions. The proposal remains available in the app.")
             } else {
-                let id = "daou-review-" + pending.key
+                let id = "daou-review-" + UUID().uuidString
                 self.sendingDaouNotificationID = id
                 do {
                     try await self.notificationDelivery(id, L("다우 정보 수정 제안", "Review a Daou change"),
                         L("HappyLulu 기록과 다른 정보가 있습니다. 수정할까요? 눌러서 다우오피스 설정에서 확인하세요.",
                           "Some information differs from HappyLulu. Apply the change? Open Daouoffice settings to review it."))
                     guard self.daouNotificationGeneration == generation, !Task.isCancelled,
-                          self.pendingDaouNotification?.key == pending.key else { self.notificationRemoval(id); return }
+                          self.pendingDaouNotification?.key == pending.key else { self.removeDaouNotification(id); return }
                     var updated = self.daouLeaveReview
                     if let leave = pending.leave { updated.notifiedLeave = leave }
                     if let arrival = pending.arrival { updated.notifiedArrival = arrival }
                     updated.lastNotificationID = id
                     if !self.saveDaouLeaveReview(updated) {
                         self.daouNotificationRuntimeActive = false
-                        self.notificationRemoval(id)
+                        self.removeDaouNotification(id)
                     } else { self.daouNotificationMessage = nil }
                 } catch {
                     guard self.daouNotificationGeneration == generation, !Task.isCancelled else { return }
@@ -475,7 +483,10 @@ final class AppModel: ObservableObject {
         if FileManager.default.fileExists(atPath: daouLeaveReviewURL.path) {
             do {
                 let value = try JSONDecoder().decode(DaouLeaveReview.self, from: Data(contentsOf: daouLeaveReviewURL))
-                guard value.version == 1 else { throw PluginFailure.configuration }
+                guard value.version == 1,
+                      value.lastNotificationID.map({ Self.pluginForReviewNotification($0) != nil }) ?? true else {
+                    throw PluginFailure.configuration
+                }
                 daouLeaveReview = value
             } catch {
                 daouLeaveReviewWritable = false

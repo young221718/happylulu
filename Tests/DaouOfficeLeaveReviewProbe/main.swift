@@ -23,6 +23,7 @@ final class DaouNotificationFixture {
     var permissionRequests = 0
     var delivered: [String: (String, String)] = [:]
     var deliveryCount = 0
+    var submittedIDs: [String] = []
     var holdDelivery = false
     var deliveryWaiter: CheckedContinuation<Void, Never>?
     func authorization() async -> Bool {
@@ -31,6 +32,7 @@ final class DaouNotificationFixture {
     }
     func requestPermission() async -> Bool { permissionRequests += 1; return allowed }
     func deliver(_ id: String, title: String, body: String) async {
+        submittedIDs.append(id)
         if holdDelivery { await withCheckedContinuation { deliveryWaiter = $0 } }
         deliveryCount += 1; delivered[id] = (title, body)
     }
@@ -275,9 +277,43 @@ struct DaouLeaveReviewProbe {
         reopened.refresh()
         for _ in 0..<40 { await Task.yield() }
         precondition(notifications.deliveryCount == 2, "An off setting must not retry a canceled request")
-        precondition(AppModel.pluginForReviewNotification("daou-review-synthetic") == "daouoffice"
+        precondition(AppModel.pluginForReviewNotification("daou-review-11111111-2222-3333-4444-555555555555") == "daouoffice"
             && AppModel.pluginForReviewNotification("ai-usage-synthetic") == nil,
             "Only Daou request identifiers may route clicks to Daou settings")
+        let racing = DaouNotificationFixture(); racing.holdDelivery = true
+        let racingModel = AppModel(store: StateStore(url: folder.appendingPathComponent("race-attendance.json")),
+            featureRouter: router, allowsLoginItemChanges: false, allowsDaouNotifications: true,
+            nowProvider: { now }, calendarProvider: { fixedCalendar },
+            notificationAuthorization: { await racing.authorization() },
+            notificationPermissionRequest: { await racing.requestPermission() },
+            notificationDelivery: { id, title, body in await racing.deliver(id, title: title, body: body) },
+            notificationRemoval: { racing.remove($0) })
+        racingModel.setDaouNotificationRuntimeActive(true); racingModel.setDaouNotifications(true)
+        for _ in 0..<60 { await Task.yield() }
+        let oldDelivery = racing.deliveryWaiter!
+        racingModel.setDaouNotifications(false); racingModel.setDaouNotifications(true)
+        for _ in 0..<60 { await Task.yield() }
+        precondition(racing.submittedIDs.count == 2, "Fixture must queue A and B for the same proposal")
+        let newDelivery = racing.deliveryWaiter!
+        newDelivery.resume()
+        for _ in 0..<60 { await Task.yield() }
+        let newID = racing.submittedIDs[1]
+        precondition(racing.delivered[newID] != nil, "The current B request must complete first")
+        oldDelivery.resume()
+        for _ in 0..<60 { await Task.yield() }
+        precondition(racing.delivered[newID] != nil && racing.delivered.count == 1,
+            "A late stale request must never remove the newer request for the same proposal")
+        let foreignStore = StateStore(url: folder.appendingPathComponent("foreign-attendance.json"))
+        let foreignSidecar = foreignStore.url.appendingPathExtension("daou-review.json")
+        let foreignBytes = Data(#"{"version":1,"automaticallyApply":false,"notificationsEnabled":false,"lastNotificationID":"ai-usage-existing"}"#.utf8)
+        try foreignBytes.write(to: foreignSidecar)
+        let foreign = DaouNotificationFixture(); foreign.delivered["ai-usage-existing"] = ("Other plugin", "Existing notice")
+        let foreignModel = AppModel(store: foreignStore, featureRouter: router, allowsLoginItemChanges: false,
+            allowsDaouNotifications: true, notificationRemoval: { foreign.remove($0) })
+        foreignModel.setDaouNotificationRuntimeActive(false); foreignModel.setDaouNotifications(false)
+        let preservedForeign = try Data(contentsOf: foreignSidecar)
+        precondition(foreign.delivered["ai-usage-existing"] != nil && preservedForeign == foreignBytes,
+            "A foreign notification ID in a corrupt sidecar must never be removed or overwritten")
         print("PASS Daou leave review: proposals, acceptance, decline/restart deduplication, opt-in/off, manual preservation, cancellation, stale/missing data and day rollover")
     }
 }
