@@ -4,6 +4,7 @@ import ServiceManagement
 import AfterSixCore
 import AppPluginCore
 import CryptoKit
+import UserNotifications
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -44,6 +45,10 @@ final class AppModel: ObservableObject {
         var dismissed: String?
         var automaticallyApplyArrival: Bool?
         var dismissedArrival: String?
+        var notificationsEnabled: Bool?
+        var notifiedLeave: String?
+        var notifiedArrival: String?
+        var lastNotificationID: String?
     }
     struct DaouLeaveProposal {
         let id: String
@@ -55,13 +60,122 @@ final class AppModel: ObservableObject {
     }
     @Published private var daouLeaveReview = DaouLeaveReview()
     private var daouLeaveReviewWritable = true
+    private let allowsDaouNotifications: Bool
+    private let notificationAuthorization: @MainActor @Sendable () async -> Bool
+    private let notificationPermissionRequest: @MainActor @Sendable () async -> Bool
+    private let notificationDelivery: @MainActor @Sendable (String, String, String) async throws -> Void
+    private let notificationRemoval: @MainActor @Sendable (String) -> Void
+    private var daouNotificationRuntimeActive = false
+    private var daouNotificationTask: Task<Void, Never>?
+    private var daouNotificationGeneration = 0
+    private var daouNotificationAttempt: String?
+    private var sendingDaouNotificationID: String?
+    @Published private(set) var daouNotificationMessage: String?
     private var daouLeaveReviewURL: URL { store.url.appendingPathExtension("daou-review.json") }
     var autoApplyDaouLeave: Bool { daouLeaveReview.automaticallyApply }
     var autoApplyDaouArrival: Bool { daouLeaveReview.automaticallyApplyArrival == true }
     var canChangeDaouLeaveReview: Bool { writable && daouLeaveReviewWritable }
+    var daouNotificationsEnabled: Bool { daouLeaveReview.notificationsEnabled == true }
+    var canChangeDaouNotifications: Bool { canChangeDaouLeaveReview && allowsDaouNotifications }
     var hasDaouProposal: Bool { daouLeaveProposal != nil || daouArrivalProposal != nil }
     func panelContentSize(menuBarItemCount: Int, pluginPanelHeight: CGFloat) -> NSSize {
         NSSize(width: 364, height: CGFloat(350 + 40 * menuBarItemCount + (hasDaouProposal ? 32 : 0)) + pluginPanelHeight)
+    }
+    nonisolated static func pluginForReviewNotification(_ identifier: String) -> String? {
+        identifier.hasPrefix("daou-review-") ? "daouoffice" : nil
+    }
+
+    func setDaouNotificationRuntimeActive(_ active: Bool) {
+        daouNotificationRuntimeActive = active && allowsDaouNotifications
+        synchronizeDaouNotifications()
+    }
+
+    func setDaouNotifications(_ enabled: Bool) {
+        guard canChangeDaouNotifications else { return }
+        cancelDaouNotificationAttempt()
+        var updated = daouLeaveReview; updated.notificationsEnabled = enabled
+        guard saveDaouLeaveReview(updated), enabled else { return }
+        let generation = daouNotificationGeneration
+        daouNotificationAttempt = "permission"
+        daouNotificationTask = Task { [weak self] in
+            guard let self else { return }
+            let granted = await self.notificationPermissionRequest()
+            guard self.daouNotificationGeneration == generation, self.daouNotificationsEnabled, !Task.isCancelled else { return }
+            self.daouNotificationTask = nil; self.daouNotificationAttempt = nil
+            if granted { self.daouNotificationMessage = nil; self.synchronizeDaouNotifications() }
+            else {
+                var updated = self.daouLeaveReview; updated.notificationsEnabled = false
+                _ = self.saveDaouLeaveReview(updated)
+                self.daouNotificationMessage = L("시스템 설정에서 HappyLulu 알림을 허용해 주세요. 수정 제안은 앱에 유지합니다.",
+                    "Allow HappyLulu notifications in System Settings. The proposal remains available in the app.")
+            }
+        }
+    }
+
+    private var pendingDaouNotification: (key: String, leave: String?, arrival: String?)? {
+        let leave = (daouLeaveProposal?.id).flatMap { $0 == daouLeaveReview.notifiedLeave ? nil : $0 }
+        let arrival = (daouArrivalProposal?.id).flatMap { $0 == daouLeaveReview.notifiedArrival ? nil : $0 }
+        guard leave != nil || arrival != nil else { return nil }
+        let key = SHA256.hash(data: try! JSONEncoder().encode([leave, arrival])).map { String(format: "%02x", $0) }.joined()
+        return (key, leave, arrival)
+    }
+
+    private func cancelDaouNotificationAttempt(removeDelivered: Bool = true) {
+        daouNotificationGeneration += 1; daouNotificationTask?.cancel(); daouNotificationTask = nil
+        daouNotificationAttempt = nil
+        if allowsDaouNotifications {
+            if let id = sendingDaouNotificationID { notificationRemoval(id) }
+            if removeDelivered, let id = daouLeaveReview.lastNotificationID { notificationRemoval(id) }
+        }
+        sendingDaouNotificationID = nil
+    }
+
+    private func synchronizeDaouNotifications() {
+        guard daouNotificationRuntimeActive, daouNotificationsEnabled, canChangeDaouNotifications else {
+            cancelDaouNotificationAttempt(); return
+        }
+        if daouNotificationAttempt == "permission" { return }
+        guard let pending = pendingDaouNotification else {
+            cancelDaouNotificationAttempt(removeDelivered: !hasDaouProposal); return
+        }
+        guard pending.key != daouNotificationAttempt else { return }
+        cancelDaouNotificationAttempt()
+        let generation = daouNotificationGeneration
+        daouNotificationAttempt = pending.key
+        daouNotificationTask = Task { [weak self] in
+            guard let self else { return }
+            let authorized = await self.notificationAuthorization()
+            guard self.daouNotificationGeneration == generation, !Task.isCancelled,
+                  self.pendingDaouNotification?.key == pending.key else { return }
+            if !authorized {
+                self.daouNotificationMessage = L("시스템 알림 권한을 확인해 주세요. 수정 제안은 앱에 유지합니다.",
+                    "Check system notification permissions. The proposal remains available in the app.")
+            } else {
+                let id = "daou-review-" + pending.key
+                self.sendingDaouNotificationID = id
+                do {
+                    try await self.notificationDelivery(id, L("다우 정보 수정 제안", "Review a Daou change"),
+                        L("HappyLulu 기록과 다른 정보가 있습니다. 수정할까요? 눌러서 다우오피스 설정에서 확인하세요.",
+                          "Some information differs from HappyLulu. Apply the change? Open Daouoffice settings to review it."))
+                    guard self.daouNotificationGeneration == generation, !Task.isCancelled,
+                          self.pendingDaouNotification?.key == pending.key else { self.notificationRemoval(id); return }
+                    var updated = self.daouLeaveReview
+                    if let leave = pending.leave { updated.notifiedLeave = leave }
+                    if let arrival = pending.arrival { updated.notifiedArrival = arrival }
+                    updated.lastNotificationID = id
+                    if !self.saveDaouLeaveReview(updated) {
+                        self.daouNotificationRuntimeActive = false
+                        self.notificationRemoval(id)
+                    } else { self.daouNotificationMessage = nil }
+                } catch {
+                    guard self.daouNotificationGeneration == generation, !Task.isCancelled else { return }
+                    self.daouNotificationMessage = L("수정 제안 알림을 보내지 못했습니다. 앱에서 확인해 주세요.",
+                        "Could not deliver the review notification. Check the proposal in the app.")
+                }
+            }
+            guard self.daouNotificationGeneration == generation else { return }
+            self.daouNotificationTask = nil; self.daouNotificationAttempt = nil; self.sendingDaouNotificationID = nil
+        }
     }
 
     var daouLeaveProposal: DaouLeaveProposal? {
@@ -101,7 +215,9 @@ final class AppModel: ObservableObject {
     func dismissDaouLeaveProposal(expectedID: String? = nil) -> Bool {
         guard let proposal = daouLeaveProposal, expectedID == nil || expectedID == proposal.id else { return false }
         var updated = daouLeaveReview; updated.dismissed = proposal.id
-        return saveDaouLeaveReview(updated)
+        let saved = saveDaouLeaveReview(updated)
+        if saved { synchronizeDaouNotifications() }
+        return saved
     }
 
     private func saveDaouLeaveReview(_ value: DaouLeaveReview) -> Bool {
@@ -174,7 +290,9 @@ final class AppModel: ObservableObject {
     func dismissDaouArrivalProposal(expectedID: String? = nil) -> Bool {
         guard let proposal = daouArrivalProposal, expectedID == nil || expectedID == proposal.id else { return false }
         var updated = daouLeaveReview; updated.dismissedArrival = proposal.id
-        return saveDaouLeaveReview(updated)
+        let saved = saveDaouLeaveReview(updated)
+        if saved { synchronizeDaouNotifications() }
+        return saved
     }
     @discardableResult
     func applyDaouArrivalProposal(expectedID: String? = nil) -> Bool {
@@ -323,9 +441,28 @@ final class AppModel: ObservableObject {
 
     init(store: StateStore = .standard, attendance: any AttendanceAdapter = DefaultAttendanceAdapter(),
          featureRouter: FeatureAdapterRouter, allowsLoginItemChanges: Bool = true,
-         nowProvider: @escaping () -> Date = Date.init, calendarProvider: @escaping () -> Calendar = { .current }) {
+         allowsDaouNotifications: Bool = false,
+         nowProvider: @escaping () -> Date = Date.init, calendarProvider: @escaping () -> Calendar = { .current },
+         notificationAuthorization: @escaping @MainActor @Sendable () async -> Bool = {
+             await withCheckedContinuation { continuation in
+                 UNUserNotificationCenter.current().getNotificationSettings { @Sendable settings in
+                     continuation.resume(returning: settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+                 }
+             }
+         }, notificationPermissionRequest: @escaping @MainActor @Sendable () async -> Bool = {
+             (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])) == true
+         }, notificationDelivery: @escaping @MainActor @Sendable (String, String, String) async throws -> Void = { id, title, body in
+             let content = UNMutableNotificationContent(); content.title = title; content.body = body
+             try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+         }, notificationRemoval: @escaping @MainActor @Sendable (String) -> Void = { id in
+             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
+             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [id])
+         }) {
         self.store = store; self.attendance = attendance; self.featureRouter = featureRouter
         self.allowsLoginItemChanges = allowsLoginItemChanges
+        self.allowsDaouNotifications = allowsDaouNotifications
+        self.notificationAuthorization = notificationAuthorization; self.notificationPermissionRequest = notificationPermissionRequest
+        self.notificationDelivery = notificationDelivery; self.notificationRemoval = notificationRemoval
         self.nowProvider = nowProvider; self.calendarProvider = calendarProvider
         now = nowProvider()
         observedHalfDaySource = featureRouter.selectedID(for: .halfDay)
@@ -356,6 +493,7 @@ final class AppModel: ObservableObject {
                 // A leave-only refresh or source change also updates the character immediately.
                 self.objectWillChange.send()
                 self.applyAutomaticDaouLeave()
+                self.synchronizeDaouNotifications()
                 let source = self.featureRouter.selectedID(for: .halfDay)
                 let fetchedAt = manager.registry.snapshot(for: source)?.fetchedAt
                 let detectionChanged = self.observedDetectionEnabled != self.detectionAllowed
@@ -427,6 +565,7 @@ final class AppModel: ObservableObject {
     }
 
     func start(loginObservedAt: Date? = nil) {
+        setDaouNotificationRuntimeActive(true)
         // This notification is used by macOS but is not a documented Apple API.
         // A wake/session-active notification must never be treated as an unlock.
         DistributedNotificationCenter.default().addObserver(
@@ -449,6 +588,7 @@ final class AppModel: ObservableObject {
     func refresh() {
         now = nowProvider()
         applyAutomaticDaouLeave()
+        synchronizeDaouNotifications()
         lastPeriodicRefreshAt = now
         loginStatus = SMAppService.mainApp.status
         if state.detectHalfDaysFromCalendar && detectionAllowed,
@@ -523,6 +663,7 @@ final class AppModel: ObservableObject {
             try store.save(updated)
             state = updated
             errorMessage = nil
+            synchronizeDaouNotifications()
             return true
         } catch {
             errorMessage = "저장하지 못했습니다: \(error.localizedDescription)"

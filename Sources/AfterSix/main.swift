@@ -7,6 +7,7 @@ import ServiceManagement
 import AfterSixCore
 import MacLaunchSupport
 import AppPluginCore
+import UserNotifications
 // The previous development-only token bridge is not part of the released Codex plugin.
 if CommandLine.arguments.contains("--token-speed-bridge") { exit(64) }
 
@@ -14,7 +15,7 @@ let runtimeProfile = AppRuntimeProfile(bundleIdentifier: Bundle.main.bundleIdent
     applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var menuPanel: MenuBarPanel?
@@ -33,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         return manager
     }()
     private lazy var model = AppModel(store: StateStore(url: runtimeProfile.stateURL), featureRouter: plugins.router,
-        allowsLoginItemChanges: runtimeProfile.allowsLoginItemChanges)
+        allowsLoginItemChanges: runtimeProfile.allowsLoginItemChanges,
+        allowsDaouNotifications: runtimeProfile.allowsExternalIntegrations && runtimeProfile.allowsAutomaticActivity)
     private lazy var featureCalendar = FeatureCalendarModel(router: plugins.router)
     private let updater = AppUpdater()
     private let settingsNavigation = SettingsNavigation()
@@ -73,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         observeLoginLaunch()
+        if runtimeProfile.allowsExternalIntegrations && runtimeProfile.allowsAutomaticActivity {
+            UNUserNotificationCenter.current().delegate = self
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = LuluBrand.menuBarIcon()
@@ -307,9 +312,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        model.setDaouNotificationRuntimeActive(false)
         if let statusInteractionMonitor { NSEvent.removeMonitor(statusInteractionMonitor) }
         menuPanelObservations.forEach(NotificationCenter.default.removeObserver)
         plugins.stop(); calendarSync.setRuntimeAllowed(false)
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse) async {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let pluginID = AppModel.pluginForReviewNotification(response.notification.request.identifier) else { return }
+        await MainActor.run {
+            self.settingsNavigation.pluginID = pluginID
+            self.openSettings(section: .plugin)
+        }
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        // Other plugins retain their previous foreground behavior and request identifiers.
+        AppModel.pluginForReviewNotification(notification.request.identifier) == nil ? [] : [.banner]
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

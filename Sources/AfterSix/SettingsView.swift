@@ -365,6 +365,16 @@ struct SettingsView: View {
     private var daouLeaveReviewSection: some View {
         GroupBox(L("HappyLulu에 반영", "Apply to HappyLulu")) {
             VStack(alignment: .leading, spacing: 12) {
+                Toggle(L("수정 제안을 macOS 알림으로 받기", "Receive macOS notifications for review proposals"), isOn: Binding(
+                    get: { model.daouNotificationsEnabled }, set: { model.setDaouNotifications($0) }))
+                    .disabled(!model.canChangeDaouNotifications)
+                Text(L("기본은 꺼짐이며 켤 때만 시스템 알림 권한을 요청합니다. 알림에는 개인 날짜·시각·연차 값을 표시하지 않습니다. 알림을 누르면 이 설정을 엽니다.",
+                    "Off by default; enabling requests system notification permission. Notifications contain no personal dates, arrival times or leave values. Clicking opens these settings."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if let message = model.daouNotificationMessage {
+                    Label(message, systemImage: "bell.badge").font(.caption).foregroundStyle(.orange)
+                }
+                Divider()
                 Text(L("휴가 현황 출처를 다우오피스로 선택하면 오늘의 승인된 전일 연차·공가를 비교합니다. 기본은 수정 제안이며, 잔여 일수는 조회용입니다. 반차의 오전·오후는 추정하지 않습니다.",
                     "Select Daouoffice as the leave source to compare today's approved full-day leave. Changes require review by default. Balances are informational; AM/PM half-days are never inferred."))
                     .font(.caption).foregroundStyle(.secondary)
